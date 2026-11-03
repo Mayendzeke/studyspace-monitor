@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
-  SlidersHorizontal, Users, X, KeyRound, Sparkles,
+  SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
 } from 'lucide-react'
 
 type Page = 'Overview' | 'Learners' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Theme = 'light' | 'dark'
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
@@ -19,6 +20,22 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
 function App() {
   const [page, setPage] = useState<Page>('Overview')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      return localStorage.getItem('studyspace-monitor-theme') === 'dark' ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('studyspace-monitor-theme', theme)
+    } catch {
+      // Theme still works for this session if browser storage is unavailable.
+    }
+  }, [theme])
 
   const navigate = (next: Page) => {
     setPage(next)
@@ -26,7 +43,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       {mobileOpen && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMobileOpen(false)} />}
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
@@ -75,6 +92,9 @@ function App() {
           </div>
           <div className="topbar-actions">
             <div className="system-status"><span className="status-dot" /> Setup mode</div>
+            <button className="icon-button theme-toggle" aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} title={theme === 'light' ? 'Dark theme' : 'Light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
             <div className="top-avatar">A</div>
           </div>
@@ -82,7 +102,7 @@ function App() {
 
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} />}
-          {page === 'Learners' && <EmptyPage icon={<Users size={25} />} title="Learner accounts" description="Learners who register through your enrolment PINs will appear here. You will be able to view account status and manage access." action="Create an enrolment PIN" onAction={() => navigate('Enrolment PINs')} />}
+          {page === 'Learners' && <EmptyPage icon={<Users size={25} />} title="Learner accounts" description="When learner accounts are connected, select a learner's preferred name to open their individual workspace. From there, you will be able to review their subjects and progress, assign resources, and create learning activities for them." action="Create an enrolment PIN" onAction={() => navigate('Enrolment PINs')} />}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <EmptyPage icon={<Activity size={25} />} title="Academic progress" description="Once learners are connected, this area will summarise study activity, subject progress and planner engagement." />}
           {page === 'Settings' && <SettingsPage />}
@@ -158,7 +178,7 @@ function Overview({ navigate }: { navigate: (page: Page) => void }) {
         </section>
       </div>
 
-      <footer className="page-footer"><span>STUDYSPACE MONITOR <b>·</b> FOUNDATION 0.1</span><span>Built for focused learning.</span></footer>
+      <footer className="page-footer"><span>STUDYSPACE MONITOR <b>·</b> FOUNDATION 0.2</span><span>Built for focused learning.</span></footer>
     </>
   )
 }

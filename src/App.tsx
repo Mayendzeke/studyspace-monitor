@@ -19,7 +19,6 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
 function App() {
   const [page, setPage] = useState<Page>('Overview')
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [search, setSearch] = useState('')
 
   const navigate = (next: Page) => {
     setPage(next)

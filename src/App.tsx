@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bell, BookOpen, CalendarDays,
-  CheckCircle2, ChevronDown, CircleHelp, Command, GraduationCap, LayoutDashboard,
-  LockKeyhole, LogOut, Menu, MoreHorizontal, Plus, Search, Settings, ShieldCheck,
+  Activity, ArrowUpRight, Bell, BookOpen,
+  CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
+  LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles,
 } from 'lucide-react'
 

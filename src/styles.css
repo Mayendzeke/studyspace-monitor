@@ -235,3 +235,38 @@ h1 span { color: #8278d9; }
   .stat-icon { width: 28px; height: 28px; }.stat-value { font-size: 23px; }
   .content-wrap { padding-inline: 14px; }
 }
+
+
+/* Explicit theme control and Content Studio */
+.theme-switch{display:inline-flex;align-items:center;gap:7px;height:35px;padding:0 10px;border:1px solid rgba(126,135,155,.2);border-radius:11px;color:var(--purple);background:var(--surface);box-shadow:var(--raised-small);font-size:10px;font-weight:700}
+.theme-switch .switch-knob{width:25px;height:14px;position:relative;margin-left:2px;border-radius:20px;background:#c8cedb;transition:background .2s}
+.theme-switch .switch-knob:after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #778}
+.theme-switch .switch-knob.is-dark{background:#7164d8}
+.theme-switch .switch-knob.is-dark:after{left:13px}
+.studio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:20px 0}
+.studio-panel{padding:21px}
+.studio-resource-types,.activity-type-list{display:grid;gap:4px;margin:16px 0}
+.studio-resource-row,.activity-type-row{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid rgba(135,145,165,.17)}
+.studio-resource-row:last-child,.activity-type-row:last-child{border-bottom:0}
+.studio-file-icon{width:34px;height:34px;display:grid;place-items:center;flex:0 0 auto;border-radius:10px;color:#7164d8;background:rgba(113,100,216,.1)}
+.studio-resource-row strong,.activity-type-row strong{font-size:10px;color:var(--ink)}
+.activity-type-row>span:nth-child(2){display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.activity-type-row small{font-size:9px;color:var(--muted)}
+.studio-coming{margin-left:auto;padding:4px 6px;border-radius:6px;background:rgba(135,145,165,.12);color:var(--muted);font-size:7px;font-weight:700;letter-spacing:.7px;white-space:nowrap}
+.studio-footnote{font-size:9px;line-height:1.6;color:var(--muted);margin:13px 0 0}
+.assignment-panel{margin-top:18px}
+.assignment-preview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:17px 0}
+.assignment-preview-grid>div{display:flex;flex-direction:column;gap:8px;padding:13px;border-radius:11px;background:rgba(135,145,165,.08);box-shadow:var(--inset)}
+.assignment-preview-grid span{font-size:8px;color:var(--muted);font-weight:700;letter-spacing:.8px}
+.assignment-preview-grid strong{font-size:10px;color:var(--ink);line-height:1.45}
+.primary-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+:root[data-theme="dark"]{--surface:#252a38;--ink:#edf0fa;--muted:#a9b1c3;--raised:7px 7px 16px #191d28,-7px -7px 16px #303748;--raised-small:4px 4px 9px #191d28,-4px -4px 9px #303748;--inset:inset 4px 4px 8px #191d28,inset -4px -4px 8px #303748}
+:root[data-theme="dark"] body,:root[data-theme="dark"] .sidebar,:root[data-theme="dark"] .icon-button,:root[data-theme="dark"] .stat-card,:root[data-theme="dark"] .panel{background-color:var(--surface);color:var(--ink)}
+:root[data-theme="dark"] .brand-copy strong,:root[data-theme="dark"] h1,:root[data-theme="dark"] .stat-value,:root[data-theme="dark"] .panel-heading h2,:root[data-theme="dark"] .setup-banner-copy strong,:root[data-theme="dark"] .studio-resource-row strong,:root[data-theme="dark"] .activity-type-row strong,:root[data-theme="dark"] .assignment-preview-grid strong{color:var(--ink)}
+:root[data-theme="dark"] .workspace-copy strong,:root[data-theme="dark"] .profile-copy strong,:root[data-theme="dark"] .breadcrumb strong{color:#dce2f2}
+:root[data-theme="dark"] .topbar,:root[data-theme="dark"] .sidebar-profile{border-color:rgba(220,225,245,.1)}
+:root[data-theme="dark"] .setup-banner,:root[data-theme="dark"] .help-card{background:linear-gradient(110deg,#302e49,#252a38 75%)}
+:root[data-theme="dark"] .subtle-button,:root[data-theme="dark"] .nav-count{background:#38364f;color:#c3bbff}
+:root[data-theme="dark"] .assignment-preview-grid>div{background:#202532}
+@media(max-width:900px){.studio-grid{grid-template-columns:1fr}.assignment-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.theme-switch{gap:5px;padding:0 8px}.assignment-preview-grid{grid-template-columns:1fr 1fr}.studio-panel{padding:16px}}

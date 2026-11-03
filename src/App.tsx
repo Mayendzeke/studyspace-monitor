@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import {
-  Activity, ArrowUpRight, Bell, BookOpen,
+  Activity, ArrowUpRight, Bell, BookOpen, FileText, PenTool, ClipboardCheck,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Content Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Learners', icon: Users },
+  { label: 'Content Studio', icon: PenTool },
   { label: 'Enrolment PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
   { label: 'Settings', icon: Settings },
@@ -92,8 +93,8 @@ function App() {
           </div>
           <div className="topbar-actions">
             <div className="system-status"><span className="status-dot" /> Setup mode</div>
-            <button className="icon-button theme-toggle" aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} title={theme === 'light' ? 'Dark theme' : 'Light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
+              {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
             <div className="top-avatar">A</div>
@@ -103,6 +104,7 @@ function App() {
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} />}
           {page === 'Learners' && <EmptyPage icon={<Users size={25} />} title="Learner accounts" description="When learner accounts are connected, select a learner's preferred name to open their individual workspace. From there, you will be able to review their subjects and progress, assign resources, and create learning activities for them." action="Create an enrolment PIN" onAction={() => navigate('Enrolment PINs')} />}
+          {page === 'Content Studio' && <ContentStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <EmptyPage icon={<Activity size={25} />} title="Academic progress" description="Once learners are connected, this area will summarise study activity, subject progress and planner engagement." />}
           {page === 'Settings' && <SettingsPage />}
@@ -191,6 +193,40 @@ function EmptyPage({ icon, title, description, action, onAction }: { icon: React
   return <div className="subpage">
     <div className="eyebrow">STUDYSPACE WORKSPACE</div><h1>{title}</h1><p className="page-subtitle">{description}</p>
     <div className="panel large-empty"><div className="large-empty-icon">{icon}</div><h2>Nothing here just yet</h2><p>This section will populate when the secure backend is connected and learner data is available.</p>{action && onAction && <button className="primary-button" onClick={onAction}><Plus size={17} /> {action}</button>}</div>
+  </div>
+}
+
+function ContentStudio() {
+  const activityTypes = [
+    { title: 'Multiple choice', detail: 'Single or multiple correct answers', icon: <ClipboardCheck size={19} /> },
+    { title: 'Fill in the blank', detail: 'Type the missing word or phrase', icon: <PenTool size={19} /> },
+    { title: 'Matching pairs', detail: 'Connect terms, definitions or images', icon: <Activity size={19} /> },
+    { title: 'True or false', detail: 'Quick knowledge checks', icon: <CheckCircle2 size={19} /> },
+  ]
+  return <div className="subpage">
+    <div className="eyebrow">LEARNING MATERIALS</div><h1>Content Studio</h1>
+    <p className="page-subtitle">Prepare resources and interactive exercises, then assign them to individual learners or groups.</p>
+    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><LockKeyhole size={21} /></div><div className="setup-banner-copy"><strong>Publishing is waiting for secure storage and learner accounts</strong><p>This workspace is a design preview. Uploads, assignments and student delivery will activate after the backend and access policies are connected.</p></div></div>
+    <div className="studio-grid">
+      <section className="panel studio-panel">
+        <div className="panel-heading"><div><h2>Resource library</h2><p>Materials you can prepare for learners</p></div><FileText size={19} className="muted-icon" /></div>
+        <div className="studio-resource-types">
+          {['PDF books and worksheets','Word documents and notes','Study guides and revision sheets','Teacher-created interactive PDFs'].map(item => <div className="studio-resource-row" key={item}><span className="studio-file-icon"><FileText size={17}/></span><strong>{item}</strong><span className="studio-coming">PLANNED</span></div>)}
+        </div>
+        <button className="primary-button" disabled><Plus size={16}/> Add resource</button>
+        <p className="studio-footnote">Files will be stored in private, access-controlled storage. Only assigned learners will be able to open them.</p>
+      </section>
+      <section className="panel studio-panel">
+        <div className="panel-heading"><div><h2>Activity builder</h2><p>Choose an exercise format to create</p></div><PenTool size={19} className="muted-icon" /></div>
+        <div className="activity-type-list">{activityTypes.map(item => <div className="activity-type-row" key={item.title}><span className="studio-file-icon">{item.icon}</span><span><strong>{item.title}</strong><small>{item.detail}</small></span><span className="studio-coming">PLANNED</span></div>)}</div>
+        <button className="primary-button" disabled><Plus size={16}/> Create activity</button>
+      </section>
+    </div>
+    <section className="panel studio-panel assignment-panel">
+      <div className="panel-heading"><div><h2>Assignment delivery</h2><p>Control who receives each resource or activity</p></div><Users size={19} className="muted-icon" /></div>
+      <div className="assignment-preview-grid"><div><span>RECIPIENTS</span><strong>Individual learners or groups</strong></div><div><span>SUBJECT</span><strong>Link to a learner's subject</strong></div><div><span>DEADLINE</span><strong>Set a due date and time</strong></div><div><span>RESULTS</span><strong>Track submissions and scores</strong></div></div>
+      <p className="studio-footnote">The learner app will show assigned resources and activities in a dedicated Learning Hub. Learners can also upload their own reference books and notes to their private library when personal file storage is enabled.</p>
+    </section>
   </div>
 }
 

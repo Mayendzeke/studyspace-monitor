@@ -110,10 +110,15 @@ create table if not exists public.exercise_questions (
   question_type text not null check (question_type in ('multiple_choice','fill_blank','true_false','matching','word_puzzle','short_answer')),
   prompt text not null,
   content jsonb not null default '{}'::jsonb,
-  answer_key jsonb not null default '{}'::jsonb,
   explanation text not null default '',
   points numeric(7,2) not null default 1 check (points > 0),
   unique (exercise_set_id, position)
+);
+
+create table if not exists public.exercise_answer_keys (
+  question_id uuid primary key references public.exercise_questions(id) on delete cascade,
+  answer_key jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.exercise_assignments (
@@ -240,15 +245,17 @@ alter table public.learning_resources enable row level security;
 alter table public.resource_assignments enable row level security;
 alter table public.exercise_sets enable row level security;
 alter table public.exercise_questions enable row level security;
+alter table public.exercise_answer_keys enable row level security;
 alter table public.exercise_assignments enable row level security;
 alter table public.exercise_attempts enable row level security;
 alter table public.audit_events enable row level security;
 
 create policy "profiles_read_self_or_admin" on public.profiles for select to authenticated
 using (id = auth.uid() or public.is_studyspace_admin());
-create policy "profiles_update_self_or_admin" on public.profiles for update to authenticated
-using ((id = auth.uid() and role = 'learner') or public.is_studyspace_admin())
-with check ((id = auth.uid() and role = 'learner') or public.is_studyspace_admin());
+-- Learner profile writes will be exposed through a restricted RPC; learners cannot
+-- directly modify role or account_status. Admins can manage profiles. 
+create policy "profiles_update_admin_only" on public.profiles for update to authenticated
+using (public.is_studyspace_admin()) with check (public.is_studyspace_admin());
 
 create policy "pins_admin_all" on public.enrolment_pins for all to authenticated
 using (public.is_studyspace_admin()) with check (public.is_studyspace_admin());
@@ -280,7 +287,7 @@ using (public.is_studyspace_admin()) with check (public.is_studyspace_admin());
 create policy "exercise_sets_assigned_read" on public.exercise_sets for select to authenticated
 using (is_published and exists (
   select 1 from public.exercise_assignments ea
-  where ea.exercise_set_id = id and ea.learner_id = auth.uid()
+  where ea.exercise_set_id = exercise_sets.id and ea.learner_id = auth.uid()
 ));
 
 create policy "exercise_questions_admin_manage" on public.exercise_questions for all to authenticated
@@ -289,8 +296,12 @@ create policy "exercise_questions_assigned_read" on public.exercise_questions fo
 using (exists (
   select 1 from public.exercise_assignments ea
   join public.exercise_sets es on es.id = ea.exercise_set_id
-  where es.id = exercise_set_id and ea.learner_id = auth.uid() and es.is_published
+  where es.id = exercise_questions.exercise_set_id and ea.learner_id = auth.uid() and es.is_published
 ));
+
+-- Correct answers are never readable by learner clients.
+create policy "exercise_answer_keys_admin_only" on public.exercise_answer_keys for all to authenticated
+using (public.is_studyspace_admin()) with check (public.is_studyspace_admin());
 
 create policy "exercise_assignments_admin_manage" on public.exercise_assignments for all to authenticated
 using (public.is_studyspace_admin()) with check (public.is_studyspace_admin());

@@ -59,3 +59,58 @@ npm run build
 - Keep uploaded learning resources in a private Storage bucket.
 - Keep answer keys inaccessible to learner clients.
 - Do not describe the platform as production-ready until backend deployment, storage policies, authentication flows, RLS and multi-user tests are complete.
+
+## Content Studio status
+
+The Monitor now includes a local-first authoring workflow:
+
+- Dedicated editors for multiple-choice, fill-in-the-blank (with accepted variants), true/false, structured matching pairs, and clue-based word puzzles.
+- Assessment metadata for subject, level, grade, curriculum, instructions, duration, due date, question topics, difficulty and marks.
+- Validation before review/approval, student preview, draft/review/approved states, and local assignment planning.
+- Resource library metadata for subject, topic, resource type and description, plus search, filters, sorting, metadata editing, download and delete.
+- Browser-local drafts use localStorage; uploaded files use IndexedDB. They are not shared or backed up and must not be treated as durable production storage.
+
+Actual publishing, student targeting, assignment delivery, and attempt grading remain disabled until the Supabase project is configured and the shared data workflow is connected.
+
+## Administrator authentication and password lifecycle
+
+The public GitHub Pages frontend now fails closed:
+
+- If Supabase URL/public key are missing, the dashboard displays a locked setup screen instead of the admin interface.
+- When configured, sign-in uses Supabase Auth email/password.
+- The frontend checks the signed-in profile and permits access only when `role = admin` and `account_status = active`.
+- Password recovery uses Supabase Auth recovery links. Passwords are never stored in this frontend.
+- Password changes are submitted to Supabase Auth; the administrator dashboard never handles or stores plaintext credentials.
+- Supabase Auth MFA should be enabled for administrator accounts before live use. Configure strong password policy, leaked-password protection, email confirmation, rate limits and session settings in the Supabase project.
+
+Privileged learner account operations are implemented in `supabase/functions/manage-learner-account/index.ts`:
+
+- `disable`: bans the Supabase Auth account (blocking sign-in and revoking existing sessions), then marks the learner profile disabled.
+- `enable`: removes the Auth ban and reactivates a disabled learner profile.
+- `send_password_recovery`: asks Supabase Auth to generate a one-time recovery link. The administrator must deliver it privately; the learner chooses their own new password through Supabase Auth. The administrator never sees the password.
+
+The function checks the caller's Supabase JWT and active admin role, validates the target learner, records an audit event, disables caching, and requires an exact `APP_ORIGIN` match. The PIN Edge Functions now also require the configured origin. Do not use wildcard CORS for privileged functions.
+
+Deploy the new function as well as the PIN functions. Configure Edge Function secrets:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (Edge Functions only)
+- `PIN_PEPPER` (at least 32 random bytes)
+- `APP_ORIGIN=https://mayendzeke.github.io` (the origin only; no repository path)
+
+Apply migrations in order:
+1. `20261104000100_studyspace_core.sql`
+2. `20261104000200_studyspace_security_hardening.sql`
+
+The security hardening migration removes direct learner write access to assessment scores and direct browser writes to audit events. It also adds private Storage object policies for administrator management and assigned learner reads.
+
+### Before live use
+
+- Configure Supabase Auth email delivery with a verified SMTP provider; default test email delivery is not suitable for production.
+- Enable MFA for every administrator and require a second factor for admin sessions.
+- Configure password policy (minimum 12 characters), leaked-password protection, email verification and Auth rate limits.
+- Restrict the first admin account to an email address you control; promote it through the Supabase SQL Editor only after verifying its Auth user ID.
+- Deploy all Edge Functions and set secrets; never place the service-role key in GitHub Pages variables or client code.
+- Test disabled-account session revocation, recovery-link expiry and single use, RLS isolation, private file access and answer-key confidentiality.
+- The account management Edge Function is prepared but not yet wired into a live learner management screen.
+- The dashboard cannot be considered production-ready until a real Supabase project is connected and end-to-end security tests pass.

@@ -32,6 +32,7 @@ function App() {
   const [mfaVerified, setMfaVerified] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [adminName, setAdminName] = useState('Administrator')
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -59,9 +60,10 @@ function App() {
       setSession(data.session)
       setAuthLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession)
-      if (!nextSession) { setAdminAllowed(false); setMfaVerified(false) }
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
+      if (!nextSession) { setAdminAllowed(false); setMfaVerified(false); setPasswordRecovery(false) }
     })
     return () => { alive = false; subscription.unsubscribe() }
   }, [])
@@ -92,6 +94,7 @@ function App() {
   }
 
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
+  if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} />
   if (authLoading || adminLoading) return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner" /><p>Verifying administrator access…</p></div></div>
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
   if (!mfaVerified) return <AdminMfaGate onVerified={() => setMfaVerified(true)} />

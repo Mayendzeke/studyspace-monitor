@@ -3,10 +3,10 @@ import type { FormEvent } from 'react'
 import { Activity, GraduationCap, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-type Props = { mode: 'unconfigured' | 'signin'; error: string; onError: (message: string) => void }
+type Props = { mode: 'unconfigured' | 'signin' | 'recovery'; error: string; onError: (message: string) => void }
 
 export default function AuthGate({ mode, error, onError }: Props) {
-  const [screen, setScreen] = useState<'signin' | 'reset' | 'update'>('signin')
+  const [screen, setScreen] = useState<'signin' | 'reset' | 'update'>(() => mode === 'recovery' ? 'update' : 'signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')

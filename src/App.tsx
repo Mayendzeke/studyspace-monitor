@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import {
-  Activity, ArrowUpRight, Bell, BookOpen, FileText, PenTool, ClipboardCheck,
+  Activity, ArrowUpRight, Bell, BookOpen, PenTool,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,

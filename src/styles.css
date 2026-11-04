@@ -377,3 +377,11 @@ h1 span { color: #8278d9; }
 .review-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
 .review-actions .primary-button,.review-actions .subtle-button{padding:8px 10px;font-size:10px}
 @media(max-width:720px){.auth-card{padding:25px 20px}.resource-upload-fields{grid-template-columns:1fr}.resource-toolbar{flex-wrap:wrap}.resource-toolbar select{flex:1}.resource-meta-edit{grid-template-columns:1fr 1fr}.resource-meta-edit select{grid-column:1/-1}.matching-pair{grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) 26px}.review-card{align-items:flex-start;flex-direction:column}.review-actions{width:100%}}
+
+
+.mfa-qr{display:flex;flex-direction:column;align-items:center;gap:10px;padding:15px;border-radius:13px;background:#fff;box-shadow:var(--inset)}
+.mfa-qr img{width:190px;height:190px;object-fit:contain}
+.mfa-qr small{max-width:290px;text-align:center;color:#596176;font-size:10px;line-height:1.5}
+.mfa-secret{display:flex;flex-direction:column;gap:6px;padding:11px;border-radius:10px;background:rgba(113,100,216,.08);overflow-wrap:anywhere}
+.mfa-secret small{font-size:10px;color:var(--muted);font-weight:700}
+.mfa-secret code{font-size:11px;letter-spacing:.05em;user-select:all}

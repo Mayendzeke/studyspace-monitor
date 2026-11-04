@@ -1,5 +1,6 @@
 import ContentStudio from './components/ContentStudio'
 import AuthGate from './components/AuthGate'
+import AdminMfaGate from './components/AdminMfaGate'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
@@ -28,6 +29,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [adminAllowed, setAdminAllowed] = useState(false)
+  const [mfaVerified, setMfaVerified] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [adminName, setAdminName] = useState('Administrator')
@@ -59,7 +61,7 @@ function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
-      if (!nextSession) setAdminAllowed(false)
+      if (!nextSession) { setAdminAllowed(false); setMfaVerified(false) }
     })
     return () => { alive = false; subscription.unsubscribe() }
   }, [])
@@ -92,6 +94,7 @@ function App() {
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
   if (authLoading || adminLoading) return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner" /><p>Verifying administrator access…</p></div></div>
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
+  if (!mfaVerified) return <AdminMfaGate onVerified={() => setMfaVerified(true)} />
 
   return (
     <div className="app-shell" data-theme={theme}>

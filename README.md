@@ -91,7 +91,7 @@ Privileged learner account operations are implemented in `supabase/functions/man
 - `enable`: removes the Auth ban and reactivates a disabled learner profile.
 - `send_password_recovery`: asks Supabase Auth to generate a one-time recovery link. The administrator must deliver it privately; the learner chooses their own new password through Supabase Auth. The administrator never sees the password.
 
-The function checks the caller's Supabase JWT and active admin role, validates the target learner, records an audit event, disables caching, and requires an exact `APP_ORIGIN` match. The PIN Edge Functions now also require the configured origin. Do not use wildcard CORS for privileged functions.
+The function checks the caller's Supabase JWT, AAL2 MFA and active admin role, validates the target learner, records an audit event, disables caching, and requires an exact `APP_ORIGIN` match. The PIN creation function also requires AAL2. The PIN Edge Functions now also require the configured origin. Do not use wildcard CORS for privileged functions.
 
 Deploy the new function as well as the PIN functions. Configure Edge Function secrets:
 - `SUPABASE_URL`
@@ -103,8 +103,9 @@ Deploy the new function as well as the PIN functions. Configure Edge Function se
 Apply migrations in order:
 1. `20261104000100_studyspace_core.sql`
 2. `20261104000200_studyspace_security_hardening.sql`
+3. `20261104000300_studyspace_admin_mfa_enforcement.sql`
 
-The security hardening migration removes direct learner write access to assessment scores and direct browser writes to audit events. It adds private Storage object policies and checks learner account status in RLS, so disabled learners lose data access even while an already-issued JWT has not yet expired.
+The security hardening migration removes direct learner write access to assessment scores and direct browser writes to audit events. The third migration requires an AAL2 (MFA-verified) session for all database administrator privileges. It adds private Storage object policies and checks learner account status in RLS, so disabled learners lose data access even while an already-issued JWT has not yet expired.
 
 ### Before live use
 

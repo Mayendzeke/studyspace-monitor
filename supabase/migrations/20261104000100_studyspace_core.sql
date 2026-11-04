@@ -158,7 +158,8 @@ create table if not exists public.audit_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_pin_attempts_user_time on public.pin_redemption_attempts(user_id, attempted_at desc);\ncreate index if not exists idx_subjects_learner on public.student_subjects(learner_id);
+create index if not exists idx_pin_attempts_user_time on public.pin_redemption_attempts(user_id, attempted_at desc);
+create index if not exists idx_subjects_learner on public.student_subjects(learner_id);
 create index if not exists idx_tasks_learner_due on public.planner_tasks(learner_id, due_at);
 create index if not exists idx_sessions_learner_date on public.study_sessions(learner_id, started_at desc);
 create index if not exists idx_resource_assignments_learner on public.resource_assignments(learner_id);
@@ -210,6 +211,13 @@ begin
     raise exception 'Authentication required';
   end if;
 
+  if (
+    select count(*) from public.pin_redemption_attempts
+    where user_id = auth.uid() and attempted_at > now() - interval '15 minutes'
+  ) >= 5 then
+    raise exception 'Too many PIN attempts. Try again in 15 minutes.';
+  end if;
+
   if not exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'learner' and account_status = 'pending'
@@ -227,13 +235,16 @@ begin
   returning id into redeemed_id;
 
   if redeemed_id is null then
+    insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),false);
     return false;
   end if;
 
   update public.profiles set account_status = 'active', updated_at = now()
   where id = auth.uid();
 
-  insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),true);\n\n  insert into public.audit_events(actor_id,event_type,target_type,target_id)
+  insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),true);
+
+  insert into public.audit_events(actor_id,event_type,target_type,target_id)
   values (auth.uid(),'enrolment_pin_redeemed','profile',auth.uid()::text);
 
   return true;
@@ -244,7 +255,8 @@ revoke all on function public.redeem_studyspace_pin(text) from public;
 grant execute on function public.redeem_studyspace_pin(text) to authenticated;
 
 alter table public.profiles enable row level security;
-alter table public.enrolment_pins enable row level security;\nalter table public.pin_redemption_attempts enable row level security;
+alter table public.enrolment_pins enable row level security;
+alter table public.pin_redemption_attempts enable row level security;
 alter table public.student_subjects enable row level security;
 alter table public.planner_tasks enable row level security;
 alter table public.study_sessions enable row level security;

@@ -1,4 +1,7 @@
 import ContentStudio from './components/ContentStudio'
+import AuthGate from './components/AuthGate'
+import { isSupabaseConfigured, supabase } from './lib/supabase'
+import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, FileText, PenTool, ClipboardCheck,
@@ -22,6 +25,12 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
 function App() {
   const [page, setPage] = useState<Page>('Overview')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [adminAllowed, setAdminAllowed] = useState(false)
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [adminName, setAdminName] = useState('Administrator')
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       return localStorage.getItem('studyspace-monitor-theme') === 'dark' ? 'dark' : 'light'
@@ -39,10 +48,50 @@ function App() {
     }
   }, [theme])
 
+  useEffect(() => {
+    if (!supabase) { setAuthLoading(false); return }
+    let alive = true
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!alive) return
+      if (error) setAuthError(error.message)
+      setSession(data.session)
+      setAuthLoading(false)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      if (!nextSession) setAdminAllowed(false)
+    })
+    return () => { alive = false; subscription.unsubscribe() }
+  }, [])
+
+  useEffect(() => {
+    if (!supabase || !session) { setAdminAllowed(false); return }
+    let alive = true
+    setAdminLoading(true)
+    supabase.from('profiles').select('role,account_status,preferred_name,full_name').eq('id', session.user.id).single().then(({ data, error }) => {
+      if (!alive) return
+      if (error || data?.role !== 'admin' || data?.account_status !== 'active') {
+        setAuthError('This account does not have active Studyspace administrator access.')
+        setAdminAllowed(false)
+        void supabase?.auth.signOut()
+      } else {
+        setAdminName(data.preferred_name || data.full_name || session.user.email || 'Administrator')
+        setAdminAllowed(true)
+        setAuthError('')
+      }
+      setAdminLoading(false)
+    })
+    return () => { alive = false }
+  }, [session])
+
   const navigate = (next: Page) => {
     setPage(next)
     setMobileOpen(false)
   }
+
+  if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
+  if (authLoading || adminLoading) return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner" /><p>Verifying administrator access…</p></div></div>
+  if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
 
   return (
     <div className="app-shell" data-theme={theme}>
@@ -56,7 +105,7 @@ function App() {
 
         <div className="workspace-switcher">
           <div className="workspace-avatar">SZ</div>
-          <div className="workspace-copy"><strong>Administrator</strong><small>Studyspace workspace</small></div>
+          <div className="workspace-copy"><strong>{adminName}</strong><small>Administrator workspace</small></div>
           <ChevronDown size={16} className="muted-icon" />
         </div>
 
@@ -80,7 +129,7 @@ function App() {
           </div>
           <div className="sidebar-profile">
             <div className="profile-avatar">A</div>
-            <div className="profile-copy"><strong>Admin account</strong><small>Backend not connected</small></div>
+            <div className="profile-copy"><strong>{adminName}</strong><small>Authenticated administrator</small></div>
             <MoreHorizontal size={19} className="muted-icon" />
           </div>
         </div>
@@ -93,12 +142,12 @@ function App() {
             <div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div>
           </div>
           <div className="topbar-actions">
-            <div className="system-status"><span className="status-dot" /> Setup mode</div>
+            <div className="system-status"><span className="status-dot" /> Authenticated</div>
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
-            <div className="top-avatar">A</div>
+            <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div>
           </div>
         </header>
 

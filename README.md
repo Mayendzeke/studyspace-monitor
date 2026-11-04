@@ -7,7 +7,7 @@ The administrator dashboard for the Studyspace Student Academic Planner.
 The Supabase foundation is stored in this repository:
 
 - `supabase/migrations/20261104000100_studyspace_core.sql` — profiles, learner subjects, planner tasks, study sessions, resources, exercise sets/questions, assignments, attempts, audit events, RLS policies, one-time PIN redemption and attempt throttling.
-- `supabase/functions/create-enrolment-pin/index.ts` — authenticated administrator-only PIN creation. The raw PIN is returned once; only its SHA-256 digest is stored.
+- `supabase/functions/create-enrolment-pin/index.ts` — authenticated administrator-only PIN creation. The raw PIN is returned once; only its HMAC-SHA-256 digest is stored. A server-only pepper protects low-entropy numeric PINs against offline guessing if the database is exposed.
 - `supabase/functions/redeem-enrolment-pin/index.ts` — authenticated learner redemption.
 - `supabase/config.toml` — Supabase CLI project/function configuration.
 
@@ -26,7 +26,7 @@ The migration separates correct answers from learner-visible question content. L
 1. Create a Supabase project.
 2. Install the Supabase CLI on a trusted development machine, link the project, and apply the migration in `supabase/migrations`. Alternatively, paste the migration SQL into the Supabase SQL Editor.
 3. Deploy both Edge Functions: `create-enrolment-pin` and `redeem-enrolment-pin`.
-4. Set Edge Function secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and (when known) `APP_ORIGIN`. The service-role key belongs only in Supabase function secrets and must never be placed in Vite variables or committed to GitHub.
+4. Set Edge Function secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, a long random `PIN_PEPPER` (at least 32 random bytes), and (when known) `APP_ORIGIN`. The service-role key belongs only in Supabase function secrets and must never be placed in Vite variables or committed to GitHub.
 5. Create the first administrator through Supabase Auth, then promote that exact profile to admin and active using the Supabase SQL Editor. Do this only for the account you control:
    `UPDATE public.profiles SET role = 'admin', account_status = 'active' WHERE id = '<your-auth-user-uuid>';`
 6. Configure the frontend with the Supabase project URL and public anon/publishable key. Never use the service-role key in either frontend.

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BookOpen, Check, CheckCircle2, ChevronDown, ClipboardList, Download, FileText,
+  BookOpen, Check, CheckCircle2, ClipboardList, Download, FileText,
   Filter, Plus, Save, Search, Send, Trash2, Upload, X,
 } from 'lucide-react'
 

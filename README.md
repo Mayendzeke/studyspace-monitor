@@ -31,7 +31,8 @@ The migration separates correct answers from learner-visible question content. L
 5. Create the first administrator through Supabase Auth, then promote that exact profile to admin and active using the Supabase SQL Editor. Do this only for the account you control:
    `UPDATE public.profiles SET role = 'admin', account_status = 'active' WHERE id = '<your-auth-user-uuid>';`
 6. Configure the frontend with the Supabase project URL and public anon/publishable key. Never use the service-role key in either frontend.
-7. Test learner isolation, administrator permissions, PIN expiry/revocation/single-use, failed-attempt throttling, private file access and exercise answer confidentiality before using real learner records.
+7. In GitHub, open the repository **Settings → Secrets and variables → Actions → Variables** and add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (public anon/publishable key only). The deployment workflow injects these at build time. Never add `SUPABASE_SERVICE_ROLE_KEY` here.
+8. Test learner isolation, administrator permissions, PIN expiry/revocation/single-use, failed-attempt throttling, private file access and exercise answer confidentiality before using real learner records.
 
 ## Frontend configuration
 

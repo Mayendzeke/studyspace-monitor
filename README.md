@@ -9,6 +9,7 @@ The Supabase foundation is stored in this repository:
 - `supabase/migrations/20261104000100_studyspace_core.sql` — profiles, learner subjects, planner tasks, study sessions, resources, exercise sets/questions, assignments, attempts, audit events, RLS policies, one-time PIN redemption and attempt throttling.
 - `supabase/functions/create-enrolment-pin/index.ts` — authenticated administrator-only PIN creation. The raw PIN is returned once; only its HMAC-SHA-256 digest is stored. A server-only pepper protects low-entropy numeric PINs against offline guessing if the database is exposed.
 - `supabase/functions/redeem-enrolment-pin/index.ts` — authenticated learner redemption.
+- `supabase/functions/manage-learner-account/index.ts` — administrator-only learner account disable/enable and one-time password recovery link generation.
 - `supabase/config.toml` — Supabase CLI project/function configuration.
 
 The migration separates correct answers from learner-visible question content. Learners cannot query answer keys. Learner profiles cannot directly change their own role or account status. PIN redemption is single-use, expiry-checked, revocation-aware and throttled after five attempts in a rolling 15-minute window.
@@ -81,7 +82,7 @@ The public GitHub Pages frontend now fails closed:
 - The frontend checks the signed-in profile and permits access only when `role = admin` and `account_status = active`.
 - Password recovery uses Supabase Auth recovery links. Passwords are never stored in this frontend.
 - Password changes are submitted to Supabase Auth; the administrator dashboard never handles or stores plaintext credentials.
-- Supabase Auth MFA should be enabled for administrator accounts before live use. Configure strong password policy, leaked-password protection, email confirmation, rate limits and session settings in the Supabase project.
+- The Monitor requires TOTP authenticator MFA for active administrator sessions. The first administrator sign-in is routed through MFA enrolment; subsequent sessions require a fresh authenticator challenge when Supabase reports AAL1. Configure strong password policy, leaked-password protection, email confirmation, rate limits and session settings in the Supabase project.
 
 Privileged learner account operations are implemented in `supabase/functions/manage-learner-account/index.ts`:
 
@@ -102,12 +103,12 @@ Apply migrations in order:
 1. `20261104000100_studyspace_core.sql`
 2. `20261104000200_studyspace_security_hardening.sql`
 
-The security hardening migration removes direct learner write access to assessment scores and direct browser writes to audit events. It also adds private Storage object policies for administrator management and assigned learner reads.
+The security hardening migration removes direct learner write access to assessment scores and direct browser writes to audit events. It adds private Storage object policies and checks learner account status in RLS, so disabled learners lose data access even while an already-issued JWT has not yet expired.
 
 ### Before live use
 
 - Configure Supabase Auth email delivery with a verified SMTP provider; default test email delivery is not suitable for production.
-- Enable MFA for every administrator and require a second factor for admin sessions.
+- Configure Supabase Auth MFA/TOTP support and test the Monitor's mandatory AAL2 administrator gate.
 - Configure password policy (minimum 12 characters), leaked-password protection, email verification and Auth rate limits.
 - Restrict the first admin account to an email address you control; promote it through the Supabase SQL Editor only after verifying its Auth user ID.
 - Deploy all Edge Functions and set secrets; never place the service-role key in GitHub Pages variables or client code.

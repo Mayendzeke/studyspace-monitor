@@ -67,3 +67,68 @@ create index if not exists idx_profiles_role_status on public.profiles(role, acc
 create index if not exists idx_resources_subject_level on public.learning_resources(subject_name, education_level);
 create index if not exists idx_exercise_sets_subject on public.exercise_sets(subject_name, education_level);
 create index if not exists idx_assignments_due on public.exercise_assignments(learner_id, due_at);
+
+
+-- Enforce account status at the data layer as well as in Supabase Auth.
+-- A banned learner's already-issued JWT must not continue reading planner data.
+create or replace function public.is_active_studyspace_learner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'learner' and account_status = 'active'
+  );
+$$;
+
+drop policy if exists "subjects_owner_or_admin" on public.student_subjects;
+create policy "subjects_active_learner_or_admin" on public.student_subjects for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+
+drop policy if exists "tasks_owner_or_admin" on public.planner_tasks;
+create policy "tasks_active_learner_or_admin" on public.planner_tasks for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+
+drop policy if exists "sessions_owner_or_admin" on public.study_sessions;
+create policy "sessions_active_learner_or_admin" on public.study_sessions for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+
+drop policy if exists "resources_assigned_read" on public.learning_resources;
+create policy "resources_assigned_active_learner_read" on public.learning_resources for select to authenticated
+using (public.is_active_studyspace_learner() and exists (
+  select 1 from public.resource_assignments ra
+  where ra.resource_id = learning_resources.id and ra.learner_id = auth.uid()
+));
+
+drop policy if exists "resource_assignments_learner_read" on public.resource_assignments;
+create policy "resource_assignments_active_learner_read" on public.resource_assignments for select to authenticated
+using (learner_id = auth.uid() and public.is_active_studyspace_learner());
+
+drop policy if exists "exercise_sets_assigned_read" on public.exercise_sets;
+create policy "exercise_sets_assigned_active_learner_read" on public.exercise_sets for select to authenticated
+using (is_published and public.is_active_studyspace_learner() and exists (
+  select 1 from public.exercise_assignments ea
+  where ea.exercise_set_id = exercise_sets.id and ea.learner_id = auth.uid()
+));
+
+drop policy if exists "exercise_questions_assigned_read" on public.exercise_questions;
+create policy "exercise_questions_assigned_active_learner_read" on public.exercise_questions for select to authenticated
+using (public.is_active_studyspace_learner() and exists (
+  select 1 from public.exercise_assignments ea
+  join public.exercise_sets es on es.id = ea.exercise_set_id
+  where es.id = exercise_questions.exercise_set_id and ea.learner_id = auth.uid() and es.is_published
+));
+
+drop policy if exists "exercise_assignments_learner_read" on public.exercise_assignments;
+create policy "exercise_assignments_active_learner_read" on public.exercise_assignments for select to authenticated
+using (learner_id = auth.uid() and public.is_active_studyspace_learner());
+
+drop policy if exists "attempts_learner_read_own" on public.exercise_attempts;
+create policy "attempts_active_learner_read_own" on public.exercise_attempts for select to authenticated
+using (learner_id = auth.uid() and public.is_active_studyspace_learner());

@@ -15,6 +15,19 @@ revoke insert, update, delete on public.exercise_attempts from authenticated;
 drop policy if exists "audit_actor_insert" on public.audit_events;
 revoke insert, update, delete on public.audit_events from authenticated;
 
+create or replace function public.is_active_studyspace_learner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'learner' and account_status = 'active'
+  );
+$;
+
 -- Private resource bucket access: admins manage objects; learners read only
 -- objects assigned to their own account.
 drop policy if exists "studyspace_resources_admin_all" on storage.objects;

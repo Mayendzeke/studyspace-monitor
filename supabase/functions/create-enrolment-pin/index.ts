@@ -11,9 +11,12 @@ function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function sha256(value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+async function pinDigest(value: string, pepper: string) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(pepper), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async request => {
@@ -24,7 +27,8 @@ Deno.serve(async request => {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!authorization || !url || !anonKey || !serviceKey) return json(500, { error: "Function configuration is incomplete." });
+  const pinPepper = Deno.env.get("PIN_PEPPER");
+  if (!authorization || !url || !anonKey || !serviceKey || !pinPepper) return json(500, { error: "Function configuration is incomplete." });
 
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser();
@@ -39,7 +43,7 @@ Deno.serve(async request => {
   if (!Number.isInteger(days) || days < 1 || days > 30) return json(400, { error: "Expiry must be between 1 and 30 days." });
 
   const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
-  const pinHash = await sha256(pin);
+  const pinHash = await pinDigest(pin, pinPepper);
   const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { error: insertError } = await admin.from("enrolment_pins").insert({

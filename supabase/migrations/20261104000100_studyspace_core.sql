@@ -32,6 +32,13 @@ create table if not exists public.enrolment_pins (
   constraint pin_redemption_pair check ((redeemed_by is null) = (redeemed_at is null))
 );
 
+create table if not exists public.pin_redemption_attempts (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  was_successful boolean not null default false,
+  attempted_at timestamptz not null default now()
+);
+
 create table if not exists public.student_subjects (
   id uuid primary key default gen_random_uuid(),
   learner_id uuid not null references public.profiles(id) on delete cascade,
@@ -151,7 +158,7 @@ create table if not exists public.audit_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_subjects_learner on public.student_subjects(learner_id);
+create index if not exists idx_pin_attempts_user_time on public.pin_redemption_attempts(user_id, attempted_at desc);\ncreate index if not exists idx_subjects_learner on public.student_subjects(learner_id);
 create index if not exists idx_tasks_learner_due on public.planner_tasks(learner_id, due_at);
 create index if not exists idx_sessions_learner_date on public.study_sessions(learner_id, started_at desc);
 create index if not exists idx_resource_assignments_learner on public.resource_assignments(learner_id);
@@ -226,7 +233,7 @@ begin
   update public.profiles set account_status = 'active', updated_at = now()
   where id = auth.uid();
 
-  insert into public.audit_events(actor_id,event_type,target_type,target_id)
+  insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),true);\n\n  insert into public.audit_events(actor_id,event_type,target_type,target_id)
   values (auth.uid(),'enrolment_pin_redeemed','profile',auth.uid()::text);
 
   return true;
@@ -237,7 +244,7 @@ revoke all on function public.redeem_studyspace_pin(text) from public;
 grant execute on function public.redeem_studyspace_pin(text) to authenticated;
 
 alter table public.profiles enable row level security;
-alter table public.enrolment_pins enable row level security;
+alter table public.enrolment_pins enable row level security;\nalter table public.pin_redemption_attempts enable row level security;
 alter table public.student_subjects enable row level security;
 alter table public.planner_tasks enable row level security;
 alter table public.study_sessions enable row level security;

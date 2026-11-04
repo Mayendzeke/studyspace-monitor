@@ -28,6 +28,7 @@ create policy "studyspace_resources_assigned_read" on storage.objects
   for select to authenticated
   using (
     bucket_id = 'studyspace-resources'
+    and public.is_active_studyspace_learner()
     and exists (
       select 1
       from public.learning_resources lr

@@ -100,10 +100,10 @@ export default function ContentStudio() {
   const updateQuestion=(patch:Partial<Question>)=>setQuestions(current=>current.map((q,i)=>i===editing?{...q,...patch}:q))
   const addQuestion=()=>{setQuestions(current=>[...current,newQuestion()]);setEditing(questions.length);setPreview(false)}
   const removeQuestion=(index:number)=>{setQuestions(current=>current.filter((_,i)=>i!==index));setEditing(Math.max(0,Math.min(editing,questions.length-2)))}
-  const validationErrors=(list=questions)=>{
+  const validationErrors=(list=questions, assessmentTitle=title, assessmentSubject=subject)=>{
     const errors:string[]=[]
-    if(!title.trim())errors.push('Add an assessment title.')
-    if(!subject.trim())errors.push('Choose or enter a subject.')
+    if(!assessmentTitle.trim())errors.push('Add an assessment title.')
+    if(!assessmentSubject.trim())errors.push('Choose or enter a subject.')
     if(!list.length)errors.push('Add at least one question.')
     list.forEach((q,i)=>{
       const n=i+1
@@ -135,7 +135,7 @@ export default function ContentStudio() {
   }
   const setStatus=(d:ExerciseDraft,status:Status)=>{
     if(status!=='draft'){
-      const errors=validationErrors(d.questions)
+      const errors=validationErrors(d.questions,d.title,d.subject)
       if(errors.length){setNotice(`${d.title}: ${errors[0]}`);return}
     }
     setDrafts(current=>current.map(x=>x.id===d.id?{...x,status,updatedAt:new Date().toISOString()}:x))

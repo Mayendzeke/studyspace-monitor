@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.redeem-enrolment-pin]
 verify_jwt = true
+
+[functions.manage-learner-account]
+verify_jwt = true

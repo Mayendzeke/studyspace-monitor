@@ -47,10 +47,20 @@ const openResourceDb = () => new Promise<IDBDatabase>((resolve, reject) => {
   request.onerror = () => reject(request.error)
 })
 const bytes = (n:number) => n < 1024*1024 ? `${(n/1024).toFixed(0)} KB` : `${(n/1024/1024).toFixed(2)} MB`
+const readDrafts = (): ExerciseDraft[] => readJson<ExerciseDraft[]>(DRAFTS_KEY, []).map(d => ({
+  ...d,
+  status: d.status || 'draft',
+  questions: (d.questions || []).map(q => ({
+    ...q,
+    acceptedAnswers: q.acceptedAnswers || [],
+    pairs: q.pairs || [{left:'',right:''},{left:'',right:''}],
+    options: q.options || ['', '', '', ''],
+  })),
+}))
 
 export default function ContentStudio() {
   const [tab,setTab] = useState<'builder'|'library'|'assign'>('builder')
-  const [drafts,setDrafts] = useState<ExerciseDraft[]>(() => readJson(DRAFTS_KEY,[]))
+  const [drafts,setDrafts] = useState<ExerciseDraft[]>(readDrafts)
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
   const [activeId,setActiveId] = useState<string|null>(null)
@@ -73,7 +83,7 @@ export default function ContentStudio() {
     let alive=true
     openResourceDb().then(db=>{
       const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll()
-      req.onsuccess=()=>{if(alive)setResources((req.result as (ResourceRecord & {blob:Blob})[]).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))}
+      req.onsuccess=()=>{if(alive)setResources((req.result as (ResourceRecord & {blob:Blob})[]).map(r=>({...r,category:r.category||'Other',description:r.description||'',topic:r.topic||'',subject:r.subject||'Uncategorised'})).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))}
     }).catch(()=>setNotice('Browser file storage could not be opened.'))
     return ()=>{alive=false}
   },[])
@@ -169,7 +179,7 @@ export default function ContentStudio() {
     req.onsuccess=()=>{if(req.result)store.put({...req.result,...patch})}
     tx.oncomplete=()=>{
       const read=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll()
-      read.onsuccess=()=>setResources((read.result as (ResourceRecord & {blob:Blob})[]).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))
+      read.onsuccess=()=>setResources((read.result as (ResourceRecord & {blob:Blob})[]).map(r=>({...r,category:r.category||'Other',description:r.description||'',topic:r.topic||'',subject:r.subject||'Uncategorised'})).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))
     }
   }
   const downloadResource=async(id:string)=>{

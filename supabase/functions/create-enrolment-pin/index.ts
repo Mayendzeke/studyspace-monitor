@@ -1,10 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "*",
+  "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "null",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
+  "Vary": "Origin",
+  "Cache-Control": "no-store",
 };
 
 function json(status: number, body: Record<string, unknown>) {
@@ -22,6 +24,9 @@ async function pinDigest(value: string, pepper: string) {
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
+  const allowedOrigin = Deno.env.get("APP_ORIGIN");
+  const requestOrigin = request.headers.get("Origin");
+  if (!allowedOrigin || !requestOrigin || requestOrigin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
 
   const authorization = request.headers.get("Authorization");
   const url = Deno.env.get("SUPABASE_URL");

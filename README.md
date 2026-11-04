@@ -26,7 +26,7 @@ The migration separates correct answers from learner-visible question content. L
 
 1. Create a Supabase project.
 2. Install the Supabase CLI on a trusted development machine, link the project, and apply the migration in `supabase/migrations`. Alternatively, paste the migration SQL into the Supabase SQL Editor.
-3. Deploy both Edge Functions: `create-enrolment-pin` and `redeem-enrolment-pin`.
+3. Deploy all three Edge Functions: `create-enrolment-pin`, `redeem-enrolment-pin` and `manage-learner-account`.
 4. Set Edge Function secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, a long random `PIN_PEPPER` (at least 32 random bytes), and (when known) `APP_ORIGIN`. The service-role key belongs only in Supabase function secrets and must never be placed in Vite variables or committed to GitHub.
 5. Create the first administrator through Supabase Auth, then promote that exact profile to admin and active using the Supabase SQL Editor. Do this only for the account you control:
    `UPDATE public.profiles SET role = 'admin', account_status = 'active' WHERE id = '<your-auth-user-uuid>';`

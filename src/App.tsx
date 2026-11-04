@@ -147,7 +147,7 @@ function App() {
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
-            <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div>
+            <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LockKeyhole size={16} /></button>
           </div>
         </header>
 

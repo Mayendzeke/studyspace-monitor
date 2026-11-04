@@ -1,0 +1,7 @@
+project_id = "studyspace"
+
+[functions.create-enrolment-pin]
+verify_jwt = true
+
+[functions.redeem-enrolment-pin]
+verify_jwt = true

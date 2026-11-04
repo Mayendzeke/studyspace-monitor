@@ -11,9 +11,12 @@ function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function sha256(value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+async function pinDigest(value: string, pepper: string) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(pepper), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async request => {
@@ -23,7 +26,8 @@ Deno.serve(async request => {
   const authorization = request.headers.get("Authorization");
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!authorization || !url || !anonKey) return json(500, { error: "Function configuration is incomplete." });
+  const pinPepper = Deno.env.get("PIN_PEPPER");
+  if (!authorization || !url || !anonKey || !pinPepper) return json(500, { error: "Function configuration is incomplete." });
 
   const client = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await client.auth.getUser();
@@ -34,8 +38,8 @@ Deno.serve(async request => {
   const pin = String(body.pin ?? "").replace(/\s+/g, "");
   if (!/^\d{8}$/.test(pin)) return json(400, { error: "Enter the 8-digit enrolment PIN." });
 
-  const pinDigest = await sha256(pin);
-  const { data, error } = await client.rpc("redeem_studyspace_pin", { pin_digest: pinDigest });
+  const digest = await pinDigest(pin, pinPepper);
+  const { data, error } = await client.rpc("redeem_studyspace_pin", { pin_digest: digest });
   if (error) {
     const throttled = error.message.toLowerCase().includes("too many pin attempts");
     return json(throttled ? 429 : 400, { error: throttled ? "Too many attempts. Try again in 15 minutes." : "This PIN is invalid, expired, revoked, or already used." });

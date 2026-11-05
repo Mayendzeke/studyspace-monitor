@@ -58,7 +58,7 @@ jobs:
 
           console.log('Supabase project URL and public-key format validated. Key value was not printed.')
           NODE
-      - name: Verify assessment Edge Function rejects invalid session tokens
+      - name: Verify assessment Edge Function authentication
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
@@ -66,24 +66,36 @@ jobs:
           node --input-type=module <<'NODE'
           const url = process.env.VITE_SUPABASE_URL?.trim()
           const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
-          const response = await fetch(url + '/functions/v1/submit-exercise-attempt', {
+          const endpoint = url + '/functions/v1/submit-exercise-attempt'
+          const commonHeaders = {
+            apikey: key,
+            'Content-Type': 'application/json',
+            Origin: 'https://mayendzeke.github.io',
+          }
+
+          const missingToken = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              apikey: key,
-              Authorization: 'Bearer invalid.invalid.invalid',
-              'Content-Type': 'application/json',
-              Origin: 'https://mayendzeke.github.io',
-            },
+            headers: commonHeaders,
             body: JSON.stringify({}),
           })
-          const responseBody = await response.text()
-          let payload
-          try { payload = JSON.parse(responseBody) } catch { payload = null }
-          if (response.status !== 401 || payload?.error !== 'Sign in is required.') {
-            const detail = responseBody.slice(0, 180)
-            throw new Error('submit-exercise-attempt expected HTTP 401 for an invalid learner token, received HTTP ' + response.status + ': ' + detail)
+          const missingBody = await missingToken.text()
+          let missingPayload
+          try { missingPayload = JSON.parse(missingBody) } catch { missingPayload = null }
+          if (missingToken.status !== 401 || missingPayload?.error !== 'Sign in is required.') {
+            throw new Error('Assessment function expected its missing-token HTTP 401 response, received HTTP ' + missingToken.status + ': ' + missingBody.slice(0, 180))
           }
-          console.log('submit-exercise-attempt is deployed and correctly rejects requests with an invalid learner token.')
+
+          const invalidToken = await fetch(endpoint, {
+            method: 'POST',
+            headers: { ...commonHeaders, Authorization: 'Bearer invalid.invalid.invalid' },
+            body: JSON.stringify({}),
+          })
+          if (invalidToken.status !== 401) {
+            const detail = (await invalidToken.text()).slice(0, 180)
+            throw new Error('Assessment function must reject invalid JWTs with HTTP 401, received HTTP ' + invalidToken.status + ': ' + detail)
+          }
+
+          console.log('Assessment endpoint is deployed; missing and invalid learner credentials are rejected with HTTP 401.')
           NODE
       - name: Build
         env:

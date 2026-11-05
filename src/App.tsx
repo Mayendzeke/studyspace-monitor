@@ -161,7 +161,7 @@ function App() {
 
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} />}
-          {page === 'Learners' && <LearnersPage />}
+          {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
@@ -317,7 +317,7 @@ function PinPage() {
 }
 
 
-function LearnersPage() {
+function LearnersPage({ onCreatePin }: { onCreatePin: () => void }) {
   type Learner = { id: string; student_id: string | null; full_name: string; preferred_name: string; account_status: string; created_at: string; grade: string; curriculum: string }
   const [learners, setLearners] = useState<Learner[]>([])
   const [loading, setLoading] = useState(true)
@@ -361,7 +361,7 @@ function LearnersPage() {
   const visible = learners.filter(x => [x.student_id,x.full_name,x.preferred_name,x.grade,x.curriculum].some(v => (v || '').toLowerCase().includes(search.toLowerCase())))
   return <div className="subpage learners-page">
     <div className="eyebrow">LEARNER MANAGEMENT</div><h1>Learner accounts</h1><p className="page-subtitle">Review enrolled learners, control account access and rotate passwords without requiring student email addresses.</p>
-    <div className="panel learners-toolbar"><div><strong>{learners.length} learner account(s)</strong><small>Account changes require administrator MFA.</small></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button><button className="primary-button" onClick={()=>{window.dispatchEvent(new CustomEvent('studyspace-navigate-pins'))}}>Create enrolment PIN</button></div>
+    <div className="panel learners-toolbar"><div><strong>{learners.length} learner account(s)</strong><small>Account changes require administrator MFA.</small></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button><button className="primary-button" onClick={onCreatePin}>Create enrolment PIN</button></div>
     <label className="learners-search"><span>Search learners</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Student ID, name, grade or curriculum"/></label>
     {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
     {temporary&&<div className="pin-issued-card"><strong>Temporary password · shown once</strong><div><span>Student ID</span><code>{temporary.studentId}</code></div><div><span>New password</span><code>{temporary.password}</code><button className="subtle-button" onClick={copyPassword}>Copy password</button></div><small>The previous password has been replaced. Deliver this password directly to the learner.</small></div>}

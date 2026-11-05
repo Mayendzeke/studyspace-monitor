@@ -164,13 +164,15 @@ export default function ContentStudio() {
       const ids=(setsResult.data||[]).map(row=>row.id);
       let questions:any[]=[];let keys:any[]=[];
       if(ids.length){
-        const [qResult,kResult]=await Promise.all([
-          supabase.from('exercise_questions').select('*').in('exercise_set_id',ids).order('position'),
-          supabase.from('exercise_answer_keys').select('question_id,answer_key').in('question_id',(await supabase.from('exercise_questions').select('id').in('exercise_set_id',ids)).data?.map(q=>q.id)||[]),
-        ]);
+        const qResult=await supabase.from('exercise_questions').select('*').in('exercise_set_id',ids).order('position');
         if(qResult.error) throw qResult.error;
-        if(kResult.error) throw kResult.error;
-        questions=qResult.data||[];keys=kResult.data||[];
+        questions=qResult.data||[];
+        const questionIds=questions.map(q=>q.id);
+        if(questionIds.length){
+          const kResult=await supabase.from('exercise_answer_keys').select('question_id,answer_key').in('question_id',questionIds);
+          if(kResult.error) throw kResult.error;
+          keys=kResult.data||[];
+        }
       }
       let loaded=(setsResult.data||[]).map(set=>mapCloudDraft(set,questions.filter(q=>q.exercise_set_id===set.id),keys));
       const cloudIds=new Set(loaded.map(d=>d.id));

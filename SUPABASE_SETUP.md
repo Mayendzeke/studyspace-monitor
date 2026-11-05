@@ -44,6 +44,12 @@ The current migration sequence is:
 12. `supabase/migrations/20261105000900_studyspace_manual_assessment_marking.sql`
 13. `supabase/migrations/20261105001000_studyspace_word_puzzle_clue_visibility.sql`
 14. `supabase/migrations/20261105001100_studyspace_isolate_personal_resource_storage.sql`
+15. `supabase/migrations/20261105221739_studyspace_restrict_security_definer_function_grants.sql`
+16. `supabase/migrations/20261105224535_studyspace_add_foreign_key_indexes.sql`
+17. `supabase/migrations/20261105224637_studyspace_optimize_rls_and_lock_attempt_logs.sql`
+18. `supabase/migrations/20261105224728_studyspace_remove_identical_duplicate_policies.sql`
+19. `supabase/migrations/20261105224839_studyspace_harden_security_definer_search_paths.sql`
+20. `supabase/migrations/20261105225421_studyspace_remove_duplicate_storage_read_policy.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 
@@ -121,3 +127,25 @@ Before configuring the Student Planner, confirm its current Supabase client code
 - AI lesson recaps are teacher drafts. Review every recap before publishing and submit anonymised lesson material only.
 - Jitsi video/audio links are hosted by a third party and are not private database content. Do not share a class link outside the assigned class.
 - The planner sync migrations add updated timestamps, account-owned personal file records, private Storage policies, and a server-side deletion ledger. The student client synchronises tasks, subjects, sessions, calendar entries, study preferences, test attempts, flashcard progress and personal files while signed in; the browser database remains the offline cache. The Content Studio migration stores assessments, answer keys, review state, resources and assignment records in the shared project. Apply all migrations to the production Supabase project before enabling these newer cloud-sync and assessment workflows.
+
+
+## 8. Final database hardening
+
+The production database has six additional forward-only hardening migrations after the original application schema:
+
+- The SECURITY DEFINER helper functions are not executable by `anon` or `PUBLIC`; only the required authenticated helper/RPC grants remain.
+- Foreign-key indexes were added for the learner, assignment, classroom, resource and audit relationships.
+- RLS helper checks are evaluated through statement-level scalar subqueries, internal authentication-attempt logs have no direct client table privileges, and five exact duplicate public-table policies were removed.
+- SECURITY DEFINER routines use an empty search path and schema-qualified object names.
+- An exact duplicate learner Storage read policy was removed. The bucket remains private, with a single assigned-resource read policy, a separate owner-only personal-file policy, and administrator resource management limited to each administrator's own resource path.
+
+These changes preserve the existing learner/admin authorization rules. The remaining multiple-permissive-policy performance notices are separate admin and learner access paths; do not merge them without reviewing the underlying row-access semantics. Unused-index notices are retained because the project has little production query history and these indexes support foreign-key and expected application queries.
+
+## 9. Final Auth dashboard setting
+
+One Auth security improvement still requires a dashboard action; the connected project tools do not expose this Auth setting:
+
+1. Open **Supabase Dashboard → Authentication → Settings → Password Security**.
+2. Enable **Leaked password protection** and save.
+
+The administrator workflow already requires TOTP MFA/AAL2. The advisor also reports that only a limited set of MFA methods is enabled. That notice is not a reason to enable weaker or unneeded methods; keep the current TOTP requirement unless you deliberately choose and test another factor.

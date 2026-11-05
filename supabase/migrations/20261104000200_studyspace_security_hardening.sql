@@ -64,9 +64,10 @@ set search_path = public
 as $$
 begin
   if (new.role is distinct from old.role or new.account_status is distinct from old.account_status)
+     and session_user not in ('postgres', 'supabase_admin')
      and coalesce(auth.role(), '') <> 'service_role'
      and not public.is_studyspace_admin() then
-    raise exception 'Only an active administrator may change account role or status';
+    raise exception 'Only an active administrator or trusted database administrator may change account role or status';
   end if;
   return new;
 end;

@@ -251,73 +251,161 @@ export default function ContentStudio() {
     })
     return errors
   }
-  const saveDraft=(status:Status='draft')=>{
+  const saveDraft=async(status:Status='draft')=>{
     const errors=validationErrors()
     if(status!=='draft'&&errors.length){setNotice(errors[0]);return}
     if(!title.trim()||!subject.trim()){setNotice(errors[0]||'Add an assessment title and subject.');return}
-    const d:ExerciseDraft={id:activeId||crypto.randomUUID(),title:title.trim(),subject:subject.trim(),level,grade,curriculum,instructions,duration:Math.max(1,duration),dueDate,questions,status,updatedAt:new Date().toISOString()}
+    const d:ExerciseDraft={id:activeId||crypto.randomUUID(),title:title.trim(),subject:subject.trim(),level,grade,curriculum,instructions,duration:Math.max(1,Math.min(300,duration)),dueDate,questions,status,updatedAt:new Date().toISOString()}
     setDrafts(current=>[d,...current.filter(x=>x.id!==d.id)])
     setActiveId(d.id)
-    setNotice(status==='review'?'Assessment submitted to the local review queue.':status==='approved'?'Assessment approved locally. Publishing still requires the secure backend.':'Draft saved in this browser only.')
+    try{
+      const saved=await saveCloudDraft(d,status)
+      setDrafts(current=>[saved,...current.filter(x=>x.id!==saved.id)])
+      setNotice(status==='review'?'Assessment saved to Studyspace and submitted for review.':status==='approved'?'Assessment approved in Studyspace. Assign it to learners to publish.':'Draft saved securely to Studyspace.')
+    }catch(reason){
+      setNotice('The draft remains saved in this browser cache, but cloud saving failed: '+(reason instanceof Error?reason.message:'Unknown error.'))
+    }
   }
-  const setStatus=(d:ExerciseDraft,status:Status)=>{
+  const setStatus=async(d:ExerciseDraft,status:Status)=>{
     if(status!=='draft'){
       const errors=validationErrors(d.questions,d.title,d.subject)
       if(errors.length){setNotice(`${d.title}: ${errors[0]}`);return}
     }
-    setDrafts(current=>current.map(x=>x.id===d.id?{...x,status,updatedAt:new Date().toISOString()}:x))
-    setNotice(status==='approved'?'Assessment approved. It is not yet published to learners.':status==='review'?'Moved to review.':'Returned to draft.')
+    try{
+      if(!supabase) throw new Error('Supabase is not connected.')
+      const {error}=await supabase.from('exercise_sets').update({review_status:status,updated_at:new Date().toISOString()}).eq('id',d.id)
+      if(error) throw error
+      setDrafts(current=>current.map(x=>x.id===d.id?{...x,status,updatedAt:new Date().toISOString()}:x))
+      setNotice(status==='approved'?'Assessment approved in Studyspace. Assign it to learners to publish.':status==='review'?'Moved to the cloud review queue.':'Returned to draft.')
+    }catch(reason){setNotice('The review status could not be saved to Studyspace: '+(reason instanceof Error?reason.message:'Unknown error.'))}
   }
   const addFiles=async(files:FileList|null)=>{
     if(!files?.length)return
     const allowed=/\.(pdf|doc|docx|ppt|pptx|txt|rtf|jpg|jpeg|png|webp|csv|xlsx)$/i
     const selected=Array.from(files)
-    const invalid=selected.find(f=>!allowed.test(f.name))
+    const invalid=selected.find(file=>!allowed.test(file.name))
     if(invalid){setNotice(`Unsupported file type: ${invalid.name}`);return}
-    const oversized=selected.find(f=>f.size>25*1024*1024)
+    const oversized=selected.find(file=>file.size>25*1024*1024)
     if(oversized){setNotice(`${oversized.name} exceeds the 25 MB per-file limit.`);return}
+    if(!supabase){setNotice('Connect the Studyspace cloud before uploading shared teaching resources.');return}
     try{
-      const db=await openResourceDb();const tx=db.transaction(RESOURCE_STORE,'readwrite')
+      const {data:authState,error:authError}=await supabase.auth.getUser()
+      if(authError||!authState.user) throw new Error('Sign in again before uploading teaching resources.')
+      const db=await openResourceDb()
+      const uploaded:ResourceRecord & {blob:Blob;mimeType:string}[]=[]
       for(const file of selected){
-        const record:ResourceRecord & {blob:Blob;mimeType:string}={id:crypto.randomUUID(),name:file.name,subject:uploadSubject.trim()||subject.trim()||'Uncategorised',topic:uploadTopic.trim(),category:uploadCategory,description:uploadDescription.trim(),kind:file.type||'application/octet-stream',size:file.size,savedAt:new Date().toISOString(),blob:file,mimeType:file.type||'application/octet-stream'}
-        tx.objectStore(RESOURCE_STORE).put(record)
+        const id=crypto.randomUUID()
+        const safeName=file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,100)||'resource'
+        const storagePath=authState.user.id+'/resources/'+id+'/'+safeName
+        const mimeType=file.type||'application/octet-stream'
+        const {error:storageError}=await supabase.storage.from('studyspace-resources').upload(storagePath,file,{contentType:mimeType,upsert:false})
+        if(storageError) throw new Error('Could not upload '+file.name+': '+storageError.message)
+        const record={id,created_by:authState.user.id,title:file.name,description:uploadDescription.trim(),subject_name:uploadSubject.trim()||subject.trim()||'Uncategorised',topic:uploadTopic.trim(),resource_type:uploadCategory,education_level:level,curriculum,storage_path:storagePath,mime_type:mimeType,file_size:file.size}
+        const {data:cloud,error:insertError}=await supabase.from('learning_resources').insert(record).select('*').single()
+        if(insertError){
+          await supabase.storage.from('studyspace-resources').remove([storagePath])
+          throw new Error('Could not save resource details: '+insertError.message)
+        }
+        const localRecord:ResourceRecord & {blob:Blob;mimeType:string;storagePath:string;cloudId:string}={id:cloud.id,cloudId:cloud.id,storagePath,name:cloud.title,subject:cloud.subject_name,topic:cloud.topic,category:cloud.resource_type,description:cloud.description,kind:mimeType,size:file.size,savedAt:cloud.created_at,blob:file,mimeType}
+        uploaded.push(localRecord)
+        const tx=db.transaction(RESOURCE_STORE,'readwrite')
+        tx.objectStore(RESOURCE_STORE).put(localRecord)
+        await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})
       }
-      tx.oncomplete=()=>{
-        const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll()
-        req.onsuccess=()=>setResources((req.result as (ResourceRecord & {blob:Blob})[]).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))
-        setNotice('Files saved in this browser. They are not shared with learners or other devices.')
-      }
-      tx.onerror=()=>setNotice('File storage failed. Check browser storage capacity.')
-    }catch{setNotice('Browser file storage is unavailable.')}
+      setResources(current=>[...uploaded,...current.filter(item=>!uploaded.some(next=>next.id===item.id))])
+      setNotice(uploaded.length+' resource(s) uploaded securely and saved to the cloud library.')
+    }catch(reason){setNotice(reason instanceof Error?reason.message:'Cloud upload failed.')}
   }
   const updateResource=async(id:string,patch:Partial<ResourceRecord>)=>{
-    const db=await openResourceDb();const tx=db.transaction(RESOURCE_STORE,'readwrite');const store=tx.objectStore(RESOURCE_STORE)
-    const req=store.get(id)
-    req.onsuccess=()=>{if(req.result)store.put({...req.result,...patch})}
-    tx.oncomplete=()=>{
-      const read=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll()
-      read.onsuccess=()=>setResources((read.result as (ResourceRecord & {blob:Blob})[]).map(r=>({...r,category:r.category||'Other',description:r.description||'',topic:r.topic||'',subject:r.subject||'Uncategorised'})).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))
-    }
+    const resource=resources.find(item=>item.id===id)
+    if(!resource||!supabase)return
+    const cloudPatch:any={}
+    if(patch.subject!==undefined)cloudPatch.subject_name=patch.subject
+    if(patch.topic!==undefined)cloudPatch.topic=patch.topic
+    if(patch.category!==undefined)cloudPatch.resource_type=patch.category
+    if(patch.description!==undefined)cloudPatch.description=patch.description
+    const {error}=await supabase.from('learning_resources').update(cloudPatch).eq('id',resource.cloudId||id)
+    if(error){setNotice('Resource details could not be saved to the cloud: '+error.message);return}
+    const db=await openResourceDb()
+    const record={...resource,...patch}
+    const tx=db.transaction(RESOURCE_STORE,'readwrite');tx.objectStore(RESOURCE_STORE).put(record)
+    await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})
+    setResources(current=>current.map(item=>item.id===id?record:item))
   }
   const downloadResource=async(id:string)=>{
-    const db=await openResourceDb();const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).get(id)
-    req.onsuccess=()=>{
-      const item=req.result as (ResourceRecord & {blob:Blob})|undefined
-      if(!item?.blob)return
-      const url=URL.createObjectURL(item.blob);const a=document.createElement('a');a.href=url;a.download=item.name;a.click()
-      setTimeout(()=>URL.revokeObjectURL(url),1000)
-    }
+    const item=resources.find(resource=>resource.id===id)
+    if(!item||!supabase)return
+    try{
+      let blob=item.blob
+      if(!blob){
+        const {data,error}=await supabase.storage.from('studyspace-resources').download(item.storagePath||'')
+        if(error) throw error
+        blob=data
+        const db=await openResourceDb();const tx=db.transaction(RESOURCE_STORE,'readwrite')
+        tx.objectStore(RESOURCE_STORE).put({...item,blob,mimeType:item.kind})
+        await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})
+        setResources(current=>current.map(resource=>resource.id===id?{...resource,blob}:resource))
+      }
+      const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=item.name;link.click()
+      window.setTimeout(()=>URL.revokeObjectURL(url),1000)
+    }catch(reason){setNotice(reason instanceof Error?reason.message:'The resource could not be downloaded.')}
   }
   const deleteResource=async(id:string)=>{
-    if(!window.confirm('Delete this resource from this browser?'))return
-    const db=await openResourceDb();const tx=db.transaction(RESOURCE_STORE,'readwrite');tx.objectStore(RESOURCE_STORE).delete(id)
-    tx.oncomplete=()=>setResources(current=>current.filter(r=>r.id!==id))
+    const item=resources.find(resource=>resource.id===id)
+    if(!item||!supabase||!window.confirm('Delete this resource from the cloud library and remove its assignments?'))return
+    try{
+      const {data:assignments,error:assignmentError}=await supabase.from('resource_assignments').select('learner_id').eq('resource_id',item.cloudId||id)
+      if(assignmentError) throw assignmentError
+      if(assignments?.length){
+        const {error}=await supabase.from('resource_assignments').delete().eq('resource_id',item.cloudId||id)
+        if(error) throw error
+      }
+      if(item.storagePath){
+        const {error}=await supabase.storage.from('studyspace-resources').remove([item.storagePath])
+        if(error) throw error
+      }
+      const {error:deleteError}=await supabase.from('learning_resources').delete().eq('id',item.cloudId||id)
+      if(deleteError) throw deleteError
+      const db=await openResourceDb();const tx=db.transaction(RESOURCE_STORE,'readwrite');tx.objectStore(RESOURCE_STORE).delete(id)
+      await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})
+      setResources(current=>current.filter(resource=>resource.id!==id))
+      setNotice('Resource deleted from the cloud library.')
+    }catch(reason){setNotice(reason instanceof Error?reason.message:'Resource deletion failed.')}
   }
-  const createAssignment=()=>{
+  const createAssignment=async()=>{
     const selected=drafts.find(d=>d.id===assignmentExercise)
     if(!selected||selected.status!=='approved'){setNotice('Select an approved assessment first.');return}
-    const a:AssignmentDraft={id:crypto.randomUUID(),exerciseId:selected.id,target:assignmentTarget,dueDate:assignmentDue,availability:assignmentAvailability,updatedAt:new Date().toISOString()}
-    setAssignments(current=>[a,...current]);setNotice('Assignment plan saved locally. It has not been delivered to learners.')
+    if(!supabase){setNotice('Connect the Studyspace cloud before assigning assessments.');return}
+    const targets=assignmentTarget==='All learners'?learners:(learners.filter(student=>student.id===selectedLearner))
+    if(!targets.length){setNotice('Choose at least one active learner.');return}
+    try{
+      const {data:authState,error:authError}=await supabase.auth.getUser()
+      if(authError||!authState.user) throw new Error('Sign in again before assigning work.')
+      const releaseAt=assignmentAvailability==='Immediately after publishing'||!assignmentDue
+        ? new Date().toISOString()
+        : new Date(assignmentDue+'T00:00:00').toISOString()
+      const dueAt=assignmentDue?new Date(assignmentDue+'T23:59:59').toISOString():null
+      const {error:publishError}=await supabase.from('exercise_sets').update({is_published:true,review_status:'approved',updated_at:new Date().toISOString()}).eq('id',selected.id)
+      if(publishError) throw publishError
+      const rows=targets.map(student=>({exercise_set_id:selected.id,learner_id:student.id,assigned_by:authState.user.id,due_at:dueAt,available_at:releaseAt}))
+      const {data:created,error:assignmentError}=await supabase.from('exercise_assignments').upsert(rows,{onConflict:'exercise_set_id,learner_id'}).select('*')
+      if(assignmentError) throw assignmentError
+      const a:AssignmentDraft={id:crypto.randomUUID(),exerciseId:selected.id,target:assignmentTarget==='All learners'?'All learners':(targets[0].preferred_name||targets[0].full_name||targets[0].student_id||'One learner'),dueDate:assignmentDue,availability:assignmentAvailability,updatedAt:new Date().toISOString(),assignedCount:created?.length||targets.length}
+      setAssignments(current=>[a,...current])
+      setNotice('Assessment published and assigned to '+targets.length+' learner(s). It will appear in their Study & Exams workspace.')
+    }catch(reason){setNotice('Assignment could not be published: '+(reason instanceof Error?reason.message:'Unknown error.'))}
+  }
+  const assignResourceToLearner=async()=>{
+    if(!supabase||!resourceAssignId||!resourceAssignLearner){setNotice('Choose a resource and learner first.');return}
+    const resource=resources.find(item=>item.id===resourceAssignId)
+    if(!resource){setNotice('Resource not found.');return}
+    try{
+      const {data:authState,error:authError}=await supabase.auth.getUser()
+      if(authError||!authState.user) throw new Error('Sign in again before assigning resources.')
+      const {error}=await supabase.from('resource_assignments').upsert({resource_id:resource.cloudId||resource.id,learner_id:resourceAssignLearner,assigned_by:authState.user.id},{onConflict:'resource_id,learner_id'})
+      if(error) throw error
+      setNotice('Resource assigned successfully. It will appear in the learner’s Student Library.')
+    }catch(reason){setNotice(reason instanceof Error?reason.message:'Resource assignment failed.')}
   }
   const resourceLabel=(r:ResourceRecord)=>r.topic?`${r.subject} · ${r.topic}`:r.subject
 

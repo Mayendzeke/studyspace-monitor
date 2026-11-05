@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
@@ -21,8 +22,8 @@ Deno.serve(async request => {
 
   const authorization = request.headers.get("Authorization");
   const url = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = getPublishableKey();
+  const serviceKey = getSecretKey();
   const provider = (Deno.env.get("AI_PROVIDER") ?? "gemini").toLowerCase();
   if (!["gemini", "openai"].includes(provider)) return json(500, { error: "Unsupported AI provider configuration." });
   const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");

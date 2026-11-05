@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { BookOpen, Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
+import { Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'true_false' | 'matching' | 'word_puzzle'
 type Difficulty = 'Foundation' | 'Standard' | 'Advanced'
@@ -190,8 +190,10 @@ export default function ContentStudio() {
       const remotePlans:AssignmentDraft[]=[];
       for(const rows of groupedAssignments.values()){
         const first=rows[0];
+        if(!first) continue;
         const learnerNames=rows.map(row=>activeLearners.find(student=>student.id===row.learner_id)).filter(Boolean);
-        const target=rows.length===activeLearners.length?'All learners':learnerNames.length===1?(learnerNames[0].preferred_name||learnerNames[0].full_name||learnerNames[0].student_id||'One learner'):`${learnerNames.length} learners`;
+        const firstLearner=learnerNames[0];
+        const target=rows.length===activeLearners.length?'All learners':learnerNames.length===1&&firstLearner?(firstLearner.preferred_name||firstLearner.full_name||firstLearner.student_id||'One learner'):`${learnerNames.length} learners`;
         const release=first.available_at&&new Date(first.available_at).getTime()>Date.now()?'Scheduled for '+new Date(first.available_at).toLocaleDateString():'Immediately after publishing';
         remotePlans.push({id:String(first.id),exerciseId:String(first.exercise_set_id),target,dueDate:first.due_at?String(first.due_at).slice(0,10):'',availability:release,updatedAt:String(first.assigned_at||''),assignedCount:rows.length});
       }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users } from 'lucide-react'
+import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send } from 'lucide-react'
 
 type LessonRecap = { summary: string; keyPoints: string[]; workedExample: string; exitQuestion: string }
 type LessonPlan = {
@@ -36,8 +36,56 @@ export default function ClassroomStudio() {
   const [publishing, setPublishing] = useState(false)
   const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
+  const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
+  const [chatDraft, setChatDraft] = useState('')
+  const [sessionStatus, setSessionStatus] = useState<'scheduled'|'live'|'ended'|'cancelled'|null>(null)
+  const [boardImage, setBoardImage] = useState('')
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
+  useEffect(() => {
+    if (!supabase || !draft.publishedSessionId) return;
+    let alive = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const load = async () => {
+      const [{data: auth},{data: messages},{data: session},{data: board}] = await Promise.all([
+        supabase!.auth.getUser(),
+        supabase!.from('session_messages').select('id,sender_id,message,created_at').eq('session_id',draft.publishedSessionId).order('created_at'),
+        supabase!.from('class_sessions').select('status').eq('id',draft.publishedSessionId).single(),
+        supabase!.from('session_whiteboards').select('board_state').eq('session_id',draft.publishedSessionId).maybeSingle()
+      ]);
+      if (!alive) return;
+      if (auth.user) setAdminId(auth.user.id);
+      if (messages) setTeacherMessages(messages);
+      if (session?.status) setSessionStatus(session.status);
+      const imageData=(board?.board_state as {imageData?:string}|null)?.imageData;
+      if (imageData) setBoardImage(imageData);
+      channel=supabase!.channel('monitor-session-'+draft.publishedSessionId)
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'session_messages',filter:'session_id=eq.'+draft.publishedSessionId},payload=>{
+          const row=payload.new as {id:string;sender_id:string;message:string;created_at:string};
+          if(alive) setTeacherMessages(current=>current.some(item=>item.id===row.id)?current:[...current,row]);
+        })
+        .on('postgres_changes',{event:'*',schema:'public',table:'session_whiteboards',filter:'session_id=eq.'+draft.publishedSessionId},payload=>{
+          const image=(payload.new as {board_state?:{imageData?:string}}).board_state?.imageData;
+          if(alive&&image) setBoardImage(image);
+        }).subscribe();
+    };
+    void load();
+    return ()=>{alive=false;if(channel&&supabase)void supabase.removeChannel(channel)};
+  },[draft.publishedSessionId]);
+  const [adminId,setAdminId] = useState('');
+  const sendTeacherMessage = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if(!supabase||!draft.publishedSessionId||!adminId||!chatDraft.trim())return;
+    const {error}=await supabase.from('session_messages').insert({session_id:draft.publishedSessionId,sender_id:adminId,message:chatDraft.trim()});
+    if(error)setNotice('Message could not be sent: '+error.message);else setChatDraft('');
+  };
+  const changeSessionStatus = async (status:'live'|'ended') => {
+    if(!supabase||!draft.publishedSessionId)return;
+    const {error}=await supabase.from('class_sessions').update({status,updated_at:new Date().toISOString()}).eq('id',draft.publishedSessionId);
+    if(error)setNotice('Session status could not be changed: '+error.message);
+    else {setSessionStatus(status);setNotice(status==='live'?'Class is now live.':'Class has been ended.')}
+  };
+
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
   const generateRecap = async () => {
@@ -91,6 +139,7 @@ export default function ClassroomStudio() {
       const { error: boardError } = await supabase.from('session_whiteboards').insert({session_id:session.id,updated_by:adminId})
       if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
       update({publishedSessionId:session.id})
+      setSessionStatus('scheduled')
       setPlans(current => current.map(plan => plan.id === draft.id ? {...plan,publishedSessionId:session.id} : plan))
       setNotice("Session published to " + selectedLearners.length + " learner(s). Their Today’s Session workspace can now load the shared lesson, notes and homework.")
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
@@ -132,7 +181,11 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
-        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}</section>
+        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
+        <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}</div></div>
+        <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':'Learner'}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
+        {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}
+      </div>}</section>
         <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
         {notice&&<p className="inline-message" role="status">{notice}</p>}
       </section>

@@ -97,7 +97,7 @@ Deno.serve(async request => {
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+          generationConfig: { responseMimeType: "application/json" },
         }),
         signal: AbortSignal.timeout(30000),
       });

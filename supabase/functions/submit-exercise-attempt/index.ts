@@ -73,9 +73,11 @@ Deno.serve(async request => {
       correct = null;
       manualReview += 1;
     } else if (question.question_type === "matching") {
-      const expected = key.pairs && typeof key.pairs === "object" ? key.pairs : null;
-      const actual = submitted && typeof submitted === "object" ? submitted : null;
-      correct = Boolean(expected && actual && JSON.stringify(expected) === JSON.stringify(actual));
+      const expected = Array.isArray(key.pairs) ? key.pairs as {left:string;right:string}[] : [];
+      const actual = submitted && typeof submitted === "object" && !Array.isArray(submitted) ? submitted as Record<string,unknown> : null;
+      correct = Boolean(actual && expected.length > 0
+        && expected.every(pair => normalize(actual[pair.left]) === normalize(pair.right))
+        && Object.keys(actual).length === expected.length);
     } else {
       const answer = normalize(submitted);
       const accepted = [correctAnswer, ...acceptedAnswers].map(normalize).filter(Boolean);

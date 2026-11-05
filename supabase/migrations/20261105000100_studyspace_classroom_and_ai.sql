@@ -20,6 +20,7 @@ create table if not exists public.class_sessions (
   starts_at timestamptz not null default now(),
   duration_minutes integer not null default 45 check (duration_minutes between 5 and 360),
   status text not null default 'scheduled' check (status in ('scheduled','live','ended','cancelled')),
+  meeting_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

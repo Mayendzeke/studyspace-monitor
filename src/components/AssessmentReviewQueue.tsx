@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, ClipboardCheck, Clock3, LoaderCircle, RefreshCw, Save } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardCheck, LoaderCircle, RefreshCw, Save } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Attempt = {

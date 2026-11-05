@@ -52,12 +52,13 @@ Deno.serve(async request => {
     .select("id,title,is_published,question_count").eq("id", assignment.exercise_set_id).maybeSingle();
   if (setError || !set?.is_published) return json(404, { error: "This assessment is not currently available." });
 
-  const [{ data: questions, error: questionError }, { data: keys, error: keyError }] = await Promise.all([
-    admin.from("exercise_questions").select("id,question_type,points,content").eq("exercise_set_id", set.id).order("position"),
-    admin.from("exercise_answer_keys").select("question_id,answer_key").in("question_id",
-      (await admin.from("exercise_questions").select("id").eq("exercise_set_id", set.id)).data?.map(row => row.id) ?? []),
-  ]);
-  if (questionError || keyError || !questions?.length) return json(503, { error: "Assessment marking data is unavailable. Try again later." });
+  const { data: questions, error: questionError } = await admin.from("exercise_questions")
+    .select("id,question_type,points,content").eq("exercise_set_id", set.id).order("position");
+  if (questionError || !questions?.length) return json(503, { error: "Assessment marking data is unavailable. Try again later." });
+  const questionIds = questions.map(question => question.id);
+  const { data: keys, error: keyError } = await admin.from("exercise_answer_keys")
+    .select("question_id,answer_key").in("question_id", questionIds);
+  if (keyError) return json(503, { error: "Assessment marking data is unavailable. Try again later." });
   const keyMap = new Map((keys ?? []).map(row => [row.question_id, row.answer_key as Record<string, unknown>]));
   let score = 0;
   let totalPoints = 0;

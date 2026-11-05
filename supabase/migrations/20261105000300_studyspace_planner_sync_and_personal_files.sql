@@ -6,6 +6,7 @@ alter table public.student_subjects
   add column if not exists color text not null default '#8db9ff',
   add column if not exists description text not null default '',
   add column if not exists target_mark integer,
+  add column if not exists period_ids jsonb not null default '[]'::jsonb,
   add column if not exists updated_at timestamptz not null default now();
 
 alter table public.planner_tasks

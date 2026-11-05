@@ -1,19 +1,19 @@
 project_id = "studyspace"
 
 [functions.create-enrolment-pin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.redeem-enrolment-pin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.manage-learner-account]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-lesson-recap]
-verify_jwt = true
+verify_jwt = false
 
 [functions.manage-enrolment-pin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.enrol-learner]
 verify_jwt = false

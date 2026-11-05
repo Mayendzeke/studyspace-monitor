@@ -162,20 +162,20 @@ function App() {
         </header>
 
         <div className="content-wrap">
-          {page === 'Overview' && <Overview navigate={navigate} />}
+          {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <EmptyPage icon={<Activity size={25} />} title="Academic progress" description="Once learners are connected, this area will summarise study activity, subject progress and planner engagement." />}
-          {page === 'Settings' && <SettingsPage />}
+          {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} />}
         </div>
       </main>
     </div>
   )
 }
 
-function Overview({ navigate }: { navigate: (page: Page) => void }) {
+function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => void; supabaseConfigured: boolean }) {
   return (
     <>
       <div className="welcome-row">
@@ -190,8 +190,8 @@ function Overview({ navigate }: { navigate: (page: Page) => void }) {
       <div className="setup-banner">
         <div className="setup-banner-icon"><ShieldCheck size={21} /></div>
         <div className="setup-banner-copy">
-          <strong>Let's connect your Studyspace workspace</strong>
-          <p>The dashboard interface is ready. Connect a secure backend before creating real learner accounts or enrolment PINs.</p>
+          <strong>{supabaseConfigured ? 'Supabase configuration detected' : 'Connect your Studyspace workspace'}</strong>
+          <p>{supabaseConfigured ? 'The browser has the project URL and public key. Confirm that production migrations and Edge Functions are deployed before using live learner enrolment.' : 'The dashboard remains locked until its Supabase project URL and publishable key are configured.'}</p>
         </div>
         <button className="text-button" onClick={() => navigate('Settings')}>Continue setup <ArrowUpRight size={15} /></button>
       </div>
@@ -373,11 +373,11 @@ function LearnersPage({ onCreatePin }: { onCreatePin: () => void }) {
   </div>
 }
 
-function SettingsPage() {
+function SettingsPage({ supabaseConfigured }: { supabaseConfigured: boolean }) {
   return <div className="subpage">
     <div className="eyebrow">CONFIGURATION</div><h1>Workspace settings</h1><p className="page-subtitle">Prepare the secure services that power Studyspace Monitor.</p>
     <div className="panel settings-card">
-      <div className="settings-row"><div className="settings-symbol"><ShieldCheck size={19} /></div><div><strong>Authentication and database</strong><p>Supabase project connection for administrator sign-in, learner records and secure PIN workflows.</p></div><span className="connection-pill"><i /> Not connected</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldCheck size={19} /></div><div><strong>Authentication and database</strong><p>The browser has its Supabase project URL and public key. This confirms frontend configuration only; it does not verify the live database, migrations or Edge Functions.</p></div><span className="connection-pill"><i /> {supabaseConfigured ? 'Client config present' : 'Not configured'}</span></div>
       <div className="settings-divider" />
       <div className="settings-row"><div className="settings-symbol"><BookOpen size={19} /></div><div><strong>Studyspace Planner integration</strong><p>Connect the learner planner to the same account and academic data services.</p></div><span className="connection-pill"><i /> Pending</span></div>
       <div className="settings-divider" />

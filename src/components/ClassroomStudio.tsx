@@ -163,7 +163,7 @@ export default function ClassroomStudio() {
   return <div className="subpage classroom-studio">
     <div className="eyebrow">TEACHING WORKSPACE</div><h1>Classroom Studio</h1>
     <p className="page-subtitle">Prepare short, focused lessons, student-friendly recaps and follow-up work for Today's Session.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>AI and learner delivery are backend-connected features</strong><p>This front end prepares the lesson structure. Once Supabase and the secure AI service are connected, lesson content can be generated from your supplied materials, reviewed, approved and delivered to selected learners.</p></div></div>
+    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>Classroom delivery uses the Supabase backend</strong><p>Live sessions, learner assignments, shared notes and class chat require the classroom migrations to be deployed. AI recaps additionally require a provider API key. Lesson-plan drafts remain local to this browser.</p></div></div>
     <div className="classroom-layout">
       <section className="panel classroom-editor">
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>

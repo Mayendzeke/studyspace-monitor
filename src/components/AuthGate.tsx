@@ -60,7 +60,7 @@ export default function AuthGate({ mode, error, onError }: Props) {
     <h1>Administrator access is locked</h1>
     <p>Supabase authentication must be configured before the Monitor dashboard can open. This prevents an unprotected public administrator console.</p>
     <div className="auth-security-list"><span><ShieldCheck size={16}/> Supabase-managed passwords</span><span><LockKeyhole size={16}/> Active administrator role required</span><span><Activity size={16}/> Audited privileged actions</span></div>
-    <p className="auth-footnote">Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment, then create and promote your administrator account through Supabase.</p>
+    <p className="auth-footnote">Configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in the deployment environment, then create and promote your administrator account through Supabase. The legacy VITE_SUPABASE_ANON_KEY is accepted only as a fallback.</p>
   </section></div>
 
   return <div className="auth-screen"><form className="auth-card" onSubmit={submit}>

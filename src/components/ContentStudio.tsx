@@ -207,7 +207,7 @@ export default function ContentStudio() {
   return <div className="subpage content-studio-page">
     <div className="eyebrow">LEARNING MATERIALS</div><h1>Content Studio</h1>
     <p className="page-subtitle">Build question banks, organise teaching resources, review assessments and prepare assignments.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><BookOpen size={21}/></div><div className="setup-banner-copy"><strong>Administrator-only local workspace</strong><p>Content is saved in this browser. Secure cloud storage, publishing and learner delivery activate after Supabase is configured.</p></div></div>
+    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><BookOpen size={21}/></div><div className="setup-banner-copy"><strong>Local content workspace</strong><p>Assessment drafts, assignment plans and uploaded files are currently saved in this browser only. They are not uploaded to Supabase or shared with learners or other devices.</p></div></div>
     <div className="studio-tabs" role="tablist" aria-label="Content Studio sections">
       <button className={tab==='builder'?'selected':''} onClick={()=>setTab('builder')}><ClipboardList size={16}/> Builder</button>
       <button className={tab==='library'?'selected':''} onClick={()=>setTab('library')}><FileText size={16}/> Resource library <span>{resources.length}</span></button>

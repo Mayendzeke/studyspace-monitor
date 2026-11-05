@@ -9,7 +9,7 @@ The Supabase foundation is stored in this repository:
 - `supabase/migrations/20261104000100_studyspace_core.sql` — profiles, learner subjects, planner tasks, study sessions, resources, exercise sets/questions, assignments, attempts, audit events, RLS policies, one-time PIN redemption and attempt throttling.
 - `supabase/functions/create-enrolment-pin/index.ts` — authenticated administrator-only PIN creation. The raw PIN is returned once; only its HMAC-SHA-256 digest is stored. A server-only pepper protects low-entropy numeric PINs against offline guessing if the database is exposed.
 - `supabase/functions/redeem-enrolment-pin/index.ts` — authenticated learner redemption.
-- `supabase/functions/manage-learner-account/index.ts` — administrator-only learner account disable/enable and one-time password recovery link generation.
+- `supabase/functions/manage-learner-account/index.ts` — administrator-only learner account disable/enable and one-time temporary-password reset.
 - `supabase/config.toml` — Supabase CLI project/function configuration.
 
 The migration separates correct answers from learner-visible question content. Learners cannot query answer keys. Learner profiles cannot directly change their own role or account status. PIN redemption is single-use, expiry-checked, revocation-aware and throttled after five attempts in a rolling 15-minute window.
@@ -26,12 +26,12 @@ The migration separates correct answers from learner-visible question content. L
 
 1. Create a Supabase project.
 2. Install the Supabase CLI on a trusted development machine, link the project, and apply the migration in `supabase/migrations`. Alternatively, paste the migration SQL into the Supabase SQL Editor.
-3. Deploy all three Edge Functions: `create-enrolment-pin`, `redeem-enrolment-pin` and `manage-learner-account`.
-4. Set Edge Function secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, a long random `PIN_PEPPER` (at least 32 random bytes), and (when known) `APP_ORIGIN`. The service-role key belongs only in Supabase function secrets and must never be placed in Vite variables or committed to GitHub.
+3. Deploy the Edge Functions declared in `supabase/config.toml`: `create-enrolment-pin`, `manage-enrolment-pin`, `enrol-learner`, `student-sign-in`, `manage-learner-account`, `generate-lesson-recap` and the legacy `redeem-enrolment-pin`.
+4. Supabase injects its project URL and named publishable/secret key maps into hosted Edge Functions. Do not manually create secrets whose names start with `SUPABASE_`. Add `PIN_PEPPER`, a distinct `AUTH_RATE_LIMIT_PEPPER`, and `APP_ORIGIN=https://mayendzeke.github.io` as Edge Function secrets. Never place a secret/service-role key in GitHub Actions Variables or the browser build.
 5. Create the first administrator through Supabase Auth, then promote that exact profile to admin and active using the Supabase SQL Editor. Do this only for the account you control:
    `UPDATE public.profiles SET role = 'admin', account_status = 'active' WHERE id = '<your-auth-user-uuid>';`
 6. Configure the frontend with the Supabase project URL and public anon/publishable key. Never use the service-role key in either frontend.
-7. In GitHub, open the repository **Settings → Secrets and variables → Actions → Variables** and add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (public anon/publishable key only). The deployment workflow injects these at build time. Never add `SUPABASE_SERVICE_ROLE_KEY` here.
+7. In GitHub, open the repository **Settings → Secrets and variables → Actions → Variables** and add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The workflow validates that the URL targets the configured production project and that the key has a supported public-key format before building. The legacy `VITE_SUPABASE_ANON_KEY` is accepted only as a fallback. Never add a secret/service-role key here.
 8. Test learner isolation, administrator permissions, PIN expiry/revocation/single-use, failed-attempt throttling, private file access and exercise answer confidentiality before using real learner records.
 
 ## Frontend configuration
@@ -39,9 +39,9 @@ The migration separates correct answers from learner-visible question content. L
 Copy `.env.example` to `.env.local` and set:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY` (or the supported public publishable key)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` (preferred; the legacy anon key is supported as a temporary fallback)
 
-The dashboard is not yet connected to a configured Supabase project. The migration and Edge Functions are prepared in source control; they are not deployed until a project is supplied and configured.
+The frontend reads its Supabase project URL and public publishable key at build time. A successful frontend build confirms compilation and key format, not that the live database, migrations, Edge Functions or sign-in are working. Verify those separately before live use.
 
 ## Development
 
@@ -89,16 +89,11 @@ Privileged learner account operations are implemented in `supabase/functions/man
 
 - `disable`: bans the Supabase Auth account (blocking sign-in and revoking existing sessions), then marks the learner profile disabled.
 - `enable`: removes the Auth ban and reactivates a disabled learner profile.
-- `send_password_recovery`: asks Supabase Auth to generate a one-time recovery link. The administrator must deliver it privately; the learner chooses their own new password through Supabase Auth. The administrator never sees the password.
+- `reset_password`: generates a cryptographically random temporary password and returns it once to the administrator for private delivery. The current Monitor does not issue a Supabase recovery link for this learner action.
 
 The function checks the caller's Supabase JWT, AAL2 MFA and active admin role, validates the target learner, records an audit event, disables caching, and requires an exact `APP_ORIGIN` match. The PIN creation function also requires AAL2. The PIN Edge Functions now also require the configured origin. Do not use wildcard CORS for privileged functions.
 
-Deploy the new function as well as the PIN functions. Configure Edge Function secrets:
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (Edge Functions only)
-- `PIN_PEPPER` (at least 32 random bytes)
-- `APP_ORIGIN=https://mayendzeke.github.io` (the origin only; no repository path)
+All declared Edge Functions are deployed through the Supabase GitHub integration. Configure Edge Function secrets `PIN_PEPPER`, `AUTH_RATE_LIMIT_PEPPER` and `APP_ORIGIN=https://mayendzeke.github.io`. Supabase injects its own `SUPABASE_*` project/key variables; do not manually override them.
 
 Apply migrations in order:
 1. `20261104000100_studyspace_core.sql`
@@ -115,5 +110,5 @@ The security hardening migration removes direct learner write access to assessme
 - Restrict the first admin account to an email address you control; promote it through the Supabase SQL Editor only after verifying its Auth user ID.
 - Deploy all Edge Functions and set secrets; never place the service-role key in GitHub Pages variables or client code.
 - Test disabled-account session revocation, recovery-link expiry and single use, RLS isolation, private file access and answer-key confidentiality.
-- The account management Edge Function is prepared but not yet wired into a live learner management screen.
+- The learner management screen invokes the account-management Edge Function for disable, enable and temporary-password reset. End-to-end behaviour still requires live verification.
 - The dashboard cannot be considered production-ready until a real Supabase project is connected and end-to-end security tests pass.

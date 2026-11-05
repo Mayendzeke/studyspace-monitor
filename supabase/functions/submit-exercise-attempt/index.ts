@@ -43,9 +43,10 @@ Deno.serve(async request => {
 
   const admin = createClient(url, secretKey, { auth: { persistSession: false } });
   const { data: assignment, error: assignmentError } = await admin.from("exercise_assignments")
-    .select("id,exercise_set_id,due_at").eq("id", assignmentId)
+    .select("id,exercise_set_id,due_at,available_at").eq("id", assignmentId)
     .eq("learner_id", authData.user.id).maybeSingle();
   if (assignmentError || !assignment) return json(404, { error: "This assessment is not assigned to your account." });
+  if (new Date(assignment.available_at).getTime() > Date.now()) return json(403, { error: "This assessment is scheduled and is not available yet." });
   const { data: set, error: setError } = await admin.from("exercise_sets")
     .select("id,title,is_published,question_count").eq("id", assignment.exercise_set_id).maybeSingle();
   if (setError || !set?.is_published) return json(404, { error: "This assessment is not currently available." });
@@ -95,7 +96,7 @@ Deno.serve(async request => {
     total_points: totalPoints,
   }).select("id,submitted_at").single();
   if (attemptError) return json(503, { error: "Your answers could not be saved. Please try again." });
-  await admin.from("progress_events").insert({
+  const { error: progressError } = await admin.from("progress_events").insert({
     learner_id: authData.user.id,
     event_type: "assigned_assessment",
     score,
@@ -111,6 +112,7 @@ Deno.serve(async request => {
     totalPoints,
     percentage: totalPoints > 0 ? Math.round(score / totalPoints * 10000) / 100 : 0,
     manualReview,
+    progressRecorded: !progressError,
     results,
   });
 });

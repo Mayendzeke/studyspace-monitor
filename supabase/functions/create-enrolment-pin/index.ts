@@ -50,11 +50,13 @@ Deno.serve(async request => {
   if (!Number.isInteger(days) || days < 1 || days > 30) return json(400, { error: "Expiry must be between 1 and 30 days." });
 
   const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
+  const studentId = "STU-" + Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => (byte % 36).toString(36)).join("").toUpperCase();
   const pinHash = await pinDigest(pin, pinPepper);
   const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { error: insertError } = await admin.from("enrolment_pins").insert({
     pin_hash: pinHash,
+    student_id: studentId,
     created_by: authData.user.id,
     expires_at: expiresAt,
   });
@@ -67,5 +69,5 @@ Deno.serve(async request => {
     details: { expires_at: expiresAt },
   });
 
-  return json(200, { pin, expiresAt, message: "Copy this PIN now. It will not be shown again." });
+  return json(200, { pin, studentId, expiresAt, message: "Copy the student ID and one-time PIN now. The PIN will not be shown again." });
 });

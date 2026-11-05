@@ -20,7 +20,7 @@ type ResourceCategory = 'Notes' | 'Revision' | 'Worksheet' | 'Past paper' | 'Ref
 type ResourceRecord = {
   id: string; name: string; subject: string; topic: string; category: ResourceCategory
   description: string; kind: string; size: number; savedAt: string
-  storagePath?: string; cloudId?: string; blob?: Blob
+  storagePath?: string; cloudId?: string; blob?: Blob; mimeType?: string
 }
 type AssignmentDraft = { id: string; exerciseId: string; target: string; dueDate: string; availability: string; updatedAt: string; assignedCount?: number }
 
@@ -309,7 +309,7 @@ export default function ContentStudio() {
       const {data:authState,error:authError}=await supabase.auth.getUser()
       if(authError||!authState.user) throw new Error('Sign in again before uploading teaching resources.')
       const db=await openResourceDb()
-      const uploaded:ResourceRecord & {blob:Blob;mimeType:string}[]=[]
+      const uploaded:(ResourceRecord & {blob:Blob;mimeType:string})[]=[]
       for(const file of selected){
         const id=crypto.randomUUID()
         const safeName=file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,100)||'resource'

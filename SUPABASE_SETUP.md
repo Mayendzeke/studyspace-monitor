@@ -20,6 +20,8 @@ The GitHub integration watches commits to the production branch. When Deploy to 
 
 Migration 006 is a corrective, forward-only repair for the two production columns `student_subjects.period_ids` and `exercise_assignments.available_at`. It uses `ADD COLUMN IF NOT EXISTS`, preserving existing rows and values. It also normalizes learner assessment-read policies so scheduled assessments remain hidden until release, restores authenticated table privileges for administrators to manage answer keys through Content Studio, and keeps answer-key access restricted by the AAL2 administrator-only RLS policy. It is safe to apply if the columns or policies are already present.
 
+Migrations 007 and 008 close the last assessment/resource access gaps: answer variants, correct matching pairs and explanations are moved out of learner-readable question records into the AAL2-protected answer-key table; matching choices are shuffled for learners; and the private Storage bucket receives policies for administrator uploads and assigned learner downloads. The bucket remains private.
+
 The current migration sequence is:
 
 1. `supabase/migrations/20261104000100_studyspace_core.sql`
@@ -31,6 +33,8 @@ The current migration sequence is:
 7. `supabase/migrations/20261105000400_studyspace_content_studio_cloud.sql`
 8. `supabase/migrations/20261105000500_studyspace_sync_deletion_ledger.sql`
 9. `supabase/migrations/20261105000600_studyspace_schema_repair_missing_sync_columns.sql`
+10. `supabase/migrations/20261105000700_studyspace_protect_assessment_answers.sql`
+11. `supabase/migrations/20261105000800_studyspace_resource_storage_access.sql`
 
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 

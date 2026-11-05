@@ -80,10 +80,10 @@ Deno.serve(async request => {
     return json(409, { error: "This invitation has just been used or revoked. Ask your administrator for a new one." });
   }
 
-  const { error: profileError } = await admin.from("profiles").update({
+  const { data: completedProfile, error: profileError } = await admin.from("profiles").update({
     student_id: studentId, account_status: "active", full_name: fullName, preferred_name: preferredName, updated_at: new Date().toISOString(),
-  }).eq("id", created.user.id);
-  if (profileError) {
+  }).eq("id", created.user.id).select("id").single();
+  if (profileError || !completedProfile) {
     await admin.from("enrolment_pins").update({ redeemed_by: null, redeemed_at: null }).eq("id", invitation.id);
     await admin.auth.admin.deleteUser(created.user.id);
     return json(500, { error: "The account was not completed. The invitation has been released; contact your administrator." });

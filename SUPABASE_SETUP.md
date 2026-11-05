@@ -13,6 +13,7 @@ In **Project Settings → Integrations → GitHub**, confirm:
 - Repository: `Mayendzeke/studyspace-monitor`
 - Production branch: `main`
 - Working directory: `.` (the repository root, where the `supabase/` folder exists)
+- Production project reference: `tibcoottzstnqkfpwabk` (declared under `[remotes.production]` in `supabase/config.toml`)
 - **Deploy to production**: enabled
 
 The GitHub integration watches commits to the production branch. When Deploy to production is enabled, Supabase applies pending migrations in `supabase/migrations/` and deploys the Edge Functions declared in `supabase/config.toml`. The migration files are applied in timestamp order. Do not manually run the same SQL files in the SQL Editor or run `supabase db push` as a second deployment route; that can desynchronise migration history.

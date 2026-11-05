@@ -83,7 +83,7 @@ export default function AssessmentReviewQueue() {
             q.exercise_set_id === assignment?.exercise_set_id && q.question_type === "short_answer"
           ) as Question[],
         };
-      }).filter(item => item.questions.some(q => Object.prototype.hasOwnProperty.call(item.attempt.answers, q.id)));
+      }).filter(item => item.questions.length > 0);
       setItems(next);
       setMarks(current => {
         const updated = { ...current };

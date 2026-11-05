@@ -58,7 +58,7 @@ jobs:
 
           console.log('Supabase project URL and public-key format validated. Key value was not printed.')
           NODE
-      - name: Verify assessment Edge Function is deployed
+      - name: Verify assessment Edge Function rejects unauthenticated requests
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
@@ -75,11 +75,14 @@ jobs:
             },
             body: JSON.stringify({}),
           })
-          if (response.status !== 401) {
-            const detail = (await response.text()).slice(0, 180)
-            throw new Error('submit-exercise-attempt route check expected HTTP 401 from its JWT gate, received HTTP ' + response.status + ': ' + detail)
+          const responseBody = await response.text()
+          let payload
+          try { payload = JSON.parse(responseBody) } catch { payload = null }
+          if (response.status !== 401 || payload?.error !== 'Sign in is required.') {
+            const detail = responseBody.slice(0, 180)
+            throw new Error('submit-exercise-attempt expected an unauthenticated HTTP 401 response, received HTTP ' + response.status + ': ' + detail)
           }
-          console.log('submit-exercise-attempt is deployed and its JWT gate rejects unauthenticated requests as expected.')
+          console.log('submit-exercise-attempt is deployed and correctly rejects requests without a learner token.')
           NODE
       - name: Build
         env:

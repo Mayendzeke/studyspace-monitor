@@ -23,10 +23,12 @@ Deno.serve(async request => {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
+  const provider = (Deno.env.get("AI_PROVIDER") ?? "gemini").toLowerCase();
+  if (!["gemini", "openai"].includes(provider)) return json(500, { error: "Unsupported AI provider configuration." });
+  const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");
+  const model = Deno.env.get(provider === "openai" ? "OPENAI_MODEL" : "GEMINI_MODEL") ?? (provider === "openai" ? "gpt-4.1-mini" : "gemini-3.8-flash");
   if (!authorization || !url || !anonKey || !serviceKey) return json(500, { error: "Supabase function configuration is incomplete." });
-  if (!apiKey) return json(503, { error: "The AI provider is not configured yet. Add GEMINI_API_KEY to Supabase Edge Function secrets." });
+  if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
 
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser();
@@ -71,28 +73,43 @@ Deno.serve(async request => {
   ].join("\n\n");
 
   const { data: usageRecord, error: usageError } = await admin.from("ai_generation_usage").insert({
-    actor_id: authData.user.id, provider: "gemini", purpose: "lesson_recap",
+    actor_id: authData.user.id, provider, purpose: "lesson_recap",
     input_characters: prompt.length, output_characters: 0,
   }).select("id").single();
   if (usageError || !usageRecord) return json(503, { error: "AI usage could not be recorded. Try again later." });
 
   let response: Response;
   try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
+    if (provider === "openai") {
+      response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+        body: JSON.stringify({
+          model, temperature: 0.2, response_format: { type: "json_object" },
+          messages: [{ role: "system", content: "Return only valid JSON. Follow the lesson recap schema exactly." }, { role: "user", content: prompt }]
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+    } else {
+      response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+    }
   } catch {
     return json(502, { error: "The AI provider could not be reached. No lesson recap was generated." });
   }
   if (!response.ok) return json(response.status === 429 ? 429 : 502, { error: "The AI provider did not complete the request. Check provider limits and configuration." });
   const payload = await response.json();
-  const generated = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? "").join("").trim();
+  const generated = (provider === "openai"
+    ? payload?.choices?.[0]?.message?.content
+    : payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? "").join("")
+  )?.trim();
   if (!generated) return json(502, { error: "The AI provider returned an empty response." });
   let recap: { summary?: string; keyPoints?: string[]; workedExample?: string; exitQuestion?: string };
   try { recap = JSON.parse(generated); } catch { return json(502, { error: "The AI provider returned an invalid recap format." }); }
@@ -107,5 +124,5 @@ Deno.serve(async request => {
   await admin.from("ai_generation_usage").update({
     output_characters: JSON.stringify(recap).length,
   }).eq("id", usageRecord.id);
-  return json(200, { success: true, provider: "gemini", model, recap });
+  return json(200, { success: true, provider, model, recap });
 });

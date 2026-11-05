@@ -476,3 +476,36 @@ h1 span { color: #8278d9; }
 .classroom-board-preview strong{font-size:11px}
 .classroom-board-preview img{width:100%;max-height:360px;object-fit:contain;background:#fff;border:1px solid var(--line,rgba(100,110,140,.2));border-radius:9px}
 @media(max-width:560px){.classroom-teacher-chat form{flex-direction:column}.classroom-live-heading>div:last-child{width:100%}.classroom-live-heading button{width:100%}}
+
+
+/* Assessment review queue and protected written-response marking. */
+.assessment-review-queue{margin-top:16px;padding:20px;min-width:0}
+.assessment-review-tools{display:flex;align-items:center;gap:9px}
+.assessment-review-count{padding:6px 9px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:9px;font-weight:700}
+.assessment-review-message{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin:10px 0;border-radius:9px;font-size:10px;line-height:1.5}
+.assessment-review-message.is-error{background:rgba(220,70,90,.08);color:#cb5265;border:1px solid rgba(220,70,90,.2)}
+.assessment-review-message.is-success{background:rgba(40,170,130,.09);color:#2d9b7b;border:1px solid rgba(40,170,130,.2)}
+.assessment-review-empty{display:flex;min-height:100px;align-items:center;justify-content:center;flex-direction:column;gap:7px;color:var(--muted);font-size:10px;text-align:center}
+.assessment-review-empty strong{color:var(--ink);font-size:11px}
+.assessment-review-list{display:grid;gap:12px}
+.assessment-review-card{min-width:0;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.assessment-review-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.assessment-review-card-head>div{display:grid;gap:5px;min-width:0}
+.assessment-review-card-head strong{font-size:11px;color:var(--ink)}
+.assessment-review-card-head span{font-size:9px;color:var(--muted);overflow-wrap:anywhere}
+.assessment-review-status{padding:5px 8px;border-radius:99px;background:rgba(220,160,55,.12);color:#ab812e;font-size:8px;font-weight:800;white-space:nowrap}
+.assessment-review-status.is-marked{background:rgba(40,170,130,.12);color:#2d9b7b}
+.assessment-review-card-meta{display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap;padding:10px 0;margin-bottom:5px;border-bottom:1px solid var(--line);font-size:9px;color:var(--muted)}
+.assessment-review-answer{padding:12px 0;border-bottom:1px solid var(--line)}
+.assessment-review-question{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ink)}
+.assessment-review-question span{color:var(--muted);font-size:9px}
+.assessment-review-answer>p{margin:7px 0;font-size:10px;line-height:1.5;color:var(--ink)}
+.assessment-review-answer blockquote{margin:0 0 9px;padding:10px 11px;border-left:2px solid var(--accent,#55bda1);border-radius:0 8px 8px 0;background:var(--surface-2,rgba(110,120,145,.07));font-size:10px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.assessment-review-answer>label,.assessment-review-feedback{display:grid;gap:5px;font-size:9px;font-weight:700;color:var(--muted)}
+.assessment-review-answer input,.assessment-review-feedback textarea{width:100%;max-width:180px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:10px}
+.assessment-review-answer small{font-size:8px;font-weight:400;color:var(--muted)}
+.assessment-review-feedback{margin-top:12px}
+.assessment-review-feedback textarea{max-width:none;resize:vertical;min-height:55px}
+.assessment-review-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
+.assessment-review-card-footer>span{font-size:8px;color:var(--muted)}
+@media(max-width:560px){.assessment-review-queue{padding:13px}.assessment-review-card{padding:12px}.assessment-review-card-head{flex-direction:column}.assessment-review-tools{gap:5px}.assessment-review-card-footer .primary-button{width:100%}}

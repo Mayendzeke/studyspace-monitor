@@ -152,7 +152,7 @@ function App() {
             <button key={label} className={`nav-item ${page === label ? 'active' : ''}`} onClick={() => navigate(label)}>
               <Icon size={18} strokeWidth={1.9} />
               <span>{label}</span>
-              {label === 'Learners' && <span className="nav-count">0</span>}
+              
             </button>
           ))}
         </nav>
@@ -179,7 +179,7 @@ function App() {
             <div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div>
           </div>
           <div className="topbar-actions">
-            <div className="system-status"><span className="status-dot" /> Authenticated</div>
+            <div className="system-status"><span className="status-dot" /> MFA verified</div>
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>

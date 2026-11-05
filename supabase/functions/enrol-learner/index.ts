@@ -28,16 +28,13 @@ Deno.serve(async request => {
   const serviceKey = getSecretKey();
   const pinPepper = Deno.env.get("PIN_PEPPER"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
   if (!url || !anonKey || !serviceKey || !pinPepper || !ratePepper) return json(500, { error: "Enrolment service configuration is incomplete." });
-  let body: { studentId?: string; pin?: string; password?: string; fullName?: string; preferredName?: string };
+  let body: { studentId?: string; pin?: string; password?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
   const studentId = String(body.studentId ?? "").trim().toUpperCase();
   const pin = String(body.pin ?? "").replace(/\s+/g, "");
   const password = String(body.password ?? "");
-  const fullName = String(body.fullName ?? "").trim().slice(0, 120);
-  const preferredName = String(body.preferredName ?? "").trim().slice(0, 80);
   if (!/^STU-[A-Z0-9]{8}$/.test(studentId) || !/^\d{8}$/.test(pin)) return json(400, { error: "Check the Student ID and 8-digit enrolment PIN." });
   if (password.length < 10 || password.length > 128) return json(400, { error: "Choose a password between 10 and 128 characters." });
-  if (!fullName || !preferredName) return json(400, { error: "Enter your name and the name you want your teacher to use." });
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const source = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -64,7 +61,7 @@ Deno.serve(async request => {
   const email = studentId.toLowerCase() + "@students.studyspace.invalid";
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
-    user_metadata: { full_name: fullName, preferred_name: preferredName, student_id: studentId },
+    user_metadata: { student_id: studentId },
   });
   if (createError || !created.user) {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: false });
@@ -82,7 +79,7 @@ Deno.serve(async request => {
   }
 
   const { data: completedProfile, error: profileError } = await admin.from("profiles").update({
-    student_id: studentId, account_status: "active", full_name: fullName, preferred_name: preferredName, updated_at: new Date().toISOString(),
+    student_id: studentId, account_status: "active", updated_at: new Date().toISOString(),
   }).eq("id", created.user.id).select("id").single();
   if (profileError || !completedProfile) {
     await admin.from("enrolment_pins").update({ redeemed_by: null, redeemed_at: null }).eq("id", invitation.id);

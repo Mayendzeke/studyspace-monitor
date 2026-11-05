@@ -26,7 +26,8 @@ Deno.serve(async request => {
   const url = Deno.env.get("SUPABASE_URL");
   const publishableKey = getPublishableKey();
   const secretKey = getSecretKey();
-  if (!accessToken || !url || !publishableKey || !secretKey) return json(500, { error: "Function configuration is incomplete." });
+  if (!accessToken) return json(401, { error: "Sign in is required." });
+  if (!url || !publishableKey || !secretKey) return json(500, { error: "Function configuration is incomplete." });
 
   const caller = createClient(url, publishableKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { BookOpen, Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'true_false' | 'matching' | 'word_puzzle'
@@ -19,8 +20,9 @@ type ResourceCategory = 'Notes' | 'Revision' | 'Worksheet' | 'Past paper' | 'Ref
 type ResourceRecord = {
   id: string; name: string; subject: string; topic: string; category: ResourceCategory
   description: string; kind: string; size: number; savedAt: string
+  storagePath?: string; cloudId?: string; blob?: Blob
 }
-type AssignmentDraft = { id: string; exerciseId: string; target: string; dueDate: string; availability: string; updatedAt: string }
+type AssignmentDraft = { id: string; exerciseId: string; target: string; dueDate: string; availability: string; updatedAt: string; assignedCount?: number }
 
 const DRAFTS_KEY = 'studyspace-monitor-exercise-drafts-v1'
 const ASSIGNMENTS_KEY = 'studyspace-monitor-assignment-drafts-v1'
@@ -63,6 +65,12 @@ export default function ContentStudio() {
   const [drafts,setDrafts] = useState<ExerciseDraft[]>(readDrafts)
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
+  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string}[]>([])
+  const [selectedLearner,setSelectedLearner] = useState('')
+  const [cloudLoading,setCloudLoading] = useState(true)
+  const [cloudError,setCloudError] = useState('')
+  const [resourceAssignId,setResourceAssignId] = useState('')
+  const [resourceAssignLearner,setResourceAssignLearner] = useState('')
   const [activeId,setActiveId] = useState<string|null>(null)
   const [title,setTitle] = useState(''); const [subject,setSubject] = useState('')
   const [level,setLevel] = useState('Secondary'); const [grade,setGrade] = useState('')
@@ -79,14 +87,123 @@ export default function ContentStudio() {
 
   useEffect(()=>{ localStorage.setItem(DRAFTS_KEY,JSON.stringify(drafts)) },[drafts])
   useEffect(()=>{ localStorage.setItem(ASSIGNMENTS_KEY,JSON.stringify(assignments)) },[assignments])
-  useEffect(()=>{
-    let alive=true
-    openResourceDb().then(db=>{
-      const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll()
-      req.onsuccess=()=>{if(alive)setResources((req.result as (ResourceRecord & {blob:Blob})[]).map(r=>({...r,category:r.category||'Other',description:r.description||'',topic:r.topic||'',subject:r.subject||'Uncategorised'})).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)))}
-    }).catch(()=>setNotice('Browser file storage could not be opened.'))
-    return ()=>{alive=false}
-  },[])
+
+  const mapCloudDraft = (set: any, questions: any[], answerKeys: any[]): ExerciseDraft => {
+    const keys = new Map(answerKeys.map((item:any)=>[item.question_id,item.answer_key||{}]));
+    return {
+      id: String(set.id), title: String(set.title||''), subject: String(set.subject_name||''),
+      level: String(set.education_level||'Secondary'), grade: String(set.grade||''),
+      curriculum: String(set.curriculum||''), instructions: String(set.instructions||''),
+      duration: Number(set.duration_minutes||30), dueDate: set.due_date||'',
+      status: (set.review_status||'draft') as Status, updatedAt: String(set.updated_at||set.created_at),
+      questions: questions.map((q:any)=>({
+        id:String(q.id), type:q.question_type as QuestionType, prompt:String(q.prompt||''),
+        options:Array.isArray(q.content?.options)?q.content.options:['','','',''],
+        answer:String(keys.get(q.id)?.answer||''),
+        acceptedAnswers:Array.isArray(keys.get(q.id)?.acceptedAnswers)?keys.get(q.id).acceptedAnswers:[],
+        pairs:Array.isArray(keys.get(q.id)?.pairs)?keys.get(q.id).pairs:[{left:'',right:''},{left:'',right:''}],
+        explanation:String(q.explanation||''), points:Number(q.points||1),
+        difficulty:(q.difficulty||q.content?.difficulty||'Standard') as Difficulty,
+        topic:String(q.topic||q.content?.topic||''),
+      })),
+    };
+  };
+
+  async function saveCloudDraft(draft:ExerciseDraft, status:Status):Promise<ExerciseDraft> {
+    if(!supabase) throw new Error('Supabase is not connected.');
+    const {data:authState,error:authError}=await supabase.auth.getUser();
+    if(authError||!authState.user) throw new Error('Sign in again to save content to Studyspace.');
+    const {error:setError}=await supabase.from('exercise_sets').upsert({
+      id:draft.id,created_by:authState.user.id,title:draft.title,instructions:draft.instructions,
+      subject_name:draft.subject,education_level:draft.level,grade:draft.grade,curriculum:draft.curriculum,
+      question_count:draft.questions.length,is_published:false,review_status:status,
+      duration_minutes:draft.duration,due_date:draft.dueDate||null,updated_at:new Date().toISOString()
+    },{onConflict:'id'});
+    if(setError) throw setError;
+    const {data:oldQuestions,error:oldError}=await supabase.from('exercise_questions').select('id').eq('exercise_set_id',draft.id);
+    if(oldError) throw oldError;
+    if(oldQuestions?.length){
+      const {error:deleteError}=await supabase.from('exercise_questions').delete().eq('exercise_set_id',draft.id);
+      if(deleteError) throw deleteError;
+    }
+    if(draft.questions.length){
+      const rows=draft.questions.map((q,index)=>({
+        id:q.id,exercise_set_id:draft.id,position:index+1,question_type:q.type,prompt:q.prompt,
+        content:{options:q.options,acceptedAnswers:q.acceptedAnswers,pairs:q.pairs,difficulty:q.difficulty,topic:q.topic},
+        explanation:q.explanation,points:q.points,topic:q.topic,difficulty:q.difficulty,
+      }));
+      const {error:questionError}=await supabase.from('exercise_questions').insert(rows);
+      if(questionError) throw questionError;
+      const keys=draft.questions.map(q=>({
+        question_id:q.id,
+        answer_key:{answer:q.answer,acceptedAnswers:q.acceptedAnswers,pairs:q.type==='matching'?q.pairs:undefined}
+      }));
+      const {error:keyError}=await supabase.from('exercise_answer_keys').upsert(keys,{onConflict:'question_id'});
+      if(keyError) throw keyError;
+    }
+    return {...draft,status,updatedAt:new Date().toISOString()};
+  }
+
+  async function loadCloudWorkspace() {
+    if(!supabase){setCloudLoading(false);setCloudError('Supabase is not configured.');return;}
+    try {
+      const {data:authState,error:authError}=await supabase.auth.getUser();
+      if(authError||!authState.user) throw new Error('Sign in again to access the cloud content workspace.');
+      const adminId=authState.user.id;
+      const [setsResult,learnersResult,resourcesResult,localResourceRecords]=await Promise.all([
+        supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
+        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum').eq('role','learner').eq('account_status','active').order('preferred_name'),
+        supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
+        openResourceDb().then(db=>new Promise<any[]>((resolve,reject)=>{const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})),
+      ]);
+      if(setsResult.error) throw setsResult.error;
+      if(learnersResult.error) throw learnersResult.error;
+      if(resourcesResult.error) throw resourcesResult.error;
+      const ids=(setsResult.data||[]).map(row=>row.id);
+      let questions:any[]=[];let keys:any[]=[];
+      if(ids.length){
+        const [qResult,kResult]=await Promise.all([
+          supabase.from('exercise_questions').select('*').in('exercise_set_id',ids).order('position'),
+          supabase.from('exercise_answer_keys').select('question_id,answer_key').in('question_id',(await supabase.from('exercise_questions').select('id').in('exercise_set_id',ids)).data?.map(q=>q.id)||[]),
+        ]);
+        if(qResult.error) throw qResult.error;
+        if(kResult.error) throw kResult.error;
+        questions=qResult.data||[];keys=kResult.data||[];
+      }
+      let loaded=(setsResult.data||[]).map(set=>mapCloudDraft(set,questions.filter(q=>q.exercise_set_id===set.id),keys));
+      const cloudIds=new Set(loaded.map(d=>d.id));
+      const legacyDrafts=readDrafts().filter(d=>!cloudIds.has(d.id));
+      for(const legacy of legacyDrafts){
+        try{const saved=await saveCloudDraft(legacy,legacy.status);loaded.unshift(saved);cloudIds.add(saved.id);}
+        catch{/* Preserve an offline-only draft when the network or schema is unavailable. */}
+      }
+      if(loaded.length||!readDrafts().length) setDrafts(loaded);
+      setLearners((learnersResult.data||[]) as typeof learners);
+      const localById=new Map(localResourceRecords.map((r:any)=>[String(r.id),r]));
+      const cloudResources=(resourcesResult.data||[]).map((r:any)=>{
+        const local=localById.get(String(r.id));
+        return {id:String(r.id),cloudId:String(r.id),storagePath:r.storage_path,name:r.title,subject:r.subject_name||'Uncategorised',topic:r.topic||'',category:(r.resource_type||'Other') as ResourceCategory,description:r.description||'',kind:r.mime_type||'application/octet-stream',size:Number(r.file_size||0),savedAt:r.created_at,blob:local?.blob||undefined,mimeType:r.mime_type||'application/octet-stream'} as ResourceRecord;
+      });
+      const cloudResourceIds=new Set(cloudResources.map(r=>r.id));
+      const legacyFiles=localResourceRecords.filter((r:any)=>!cloudResourceIds.has(String(r.id))&&r.blob instanceof Blob);
+      for(const local of legacyFiles){
+        try{
+          const id=String(local.id);
+          const path=adminId+'/resources/'+id+'/'+String(local.name).replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,100);
+          const {error:uploadError}=await supabase.storage.from('studyspace-resources').upload(path,local.blob,{contentType:local.kind||local.mimeType||'application/octet-stream',upsert:true});
+          if(uploadError) throw uploadError;
+          const {data:row,error:insertError}=await supabase.from('learning_resources').insert({id,created_by:adminId,title:local.name,description:local.description||'',subject_name:local.subject||'Uncategorised',topic:local.topic||'',resource_type:local.category||'Other',education_level:'',curriculum:'',storage_path:path,mime_type:local.kind||local.mimeType||'application/octet-stream',file_size:local.size}).select('*').single();
+          if(insertError) throw insertError;
+          cloudResources.unshift({id:row.id,cloudId:row.id,storagePath:path,name:row.title,subject:row.subject_name,topic:row.topic,category:row.resource_type,description:row.description,kind:row.mime_type,size:row.file_size,savedAt:row.created_at,blob:local.blob,mimeType:row.mime_type});
+        }catch{/* Keep this resource in local cache until cloud migration succeeds. */}
+      }
+      setResources(cloudResources);
+      setCloudError('');
+    }catch(reason){setCloudError(reason instanceof Error?reason.message:'The cloud content workspace could not be loaded.');}
+    finally{setCloudLoading(false);}
+  }
+
+  useEffect(()=>{void loadCloudWorkspace();},[])
 
   const totalPoints=useMemo(()=>questions.reduce((sum,q)=>sum+(Number(q.points)||0),0),[questions])
   const activeQuestion=questions[editing] || newQuestion()

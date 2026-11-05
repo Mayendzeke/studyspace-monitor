@@ -63,7 +63,7 @@ Deno.serve(async request => {
   let score = 0;
   let totalPoints = 0;
   let manualReview = 0;
-  const results: Record<string, { correct: boolean | null; points: number; awarded: number }> = {};
+  const results: Record<string, { correct: boolean | null; points: number; awarded: number; explanation: string }> = {};
   for (const question of questions) {
     const points = Number(question.points || 1);
     totalPoints += points;
@@ -88,7 +88,7 @@ Deno.serve(async request => {
     }
     const awarded = correct === true ? points : 0;
     score += awarded;
-    results[question.id] = { correct, points, awarded };
+    results[question.id] = { correct, points, awarded, explanation: String(key.explanation || "") };
   }
   const { data: attempt, error: attemptError } = await admin.from("exercise_attempts").insert({
     assignment_id: assignment.id,

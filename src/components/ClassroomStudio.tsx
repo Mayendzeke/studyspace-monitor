@@ -143,7 +143,7 @@ export default function ClassroomStudio() {
       if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
       update({publishedSessionId:session.id,meetingUrl})
       setSessionStatus('scheduled')
-      setPlans(current => current.map(plan => plan.id === draft.id ? {...plan,publishedSessionId:session.id,meetingUrl} : plan))
+      setPlans(current => [{...draft,publishedSessionId:session.id,meetingUrl,updatedAt:new Date().toISOString()},...current.filter(plan=>plan.id!==draft.id)])
       setNotice("Session published to " + selectedLearners.length + " learner(s). Their Today’s Session workspace can now load the shared lesson, notes and homework.")
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
     finally { setPublishing(false) }

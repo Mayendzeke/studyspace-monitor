@@ -116,7 +116,7 @@ export default function ContentStudio() {
     const {error:setError}=await supabase.from('exercise_sets').upsert({
       id:draft.id,created_by:authState.user.id,title:draft.title,instructions:draft.instructions,
       subject_name:draft.subject,education_level:draft.level,grade:draft.grade,curriculum:draft.curriculum,
-      question_count:draft.questions.length,is_published:false,review_status:status,
+      question_count:draft.questions.length,review_status:status,
       duration_minutes:draft.duration,due_date:draft.dueDate||null,updated_at:new Date().toISOString()
     },{onConflict:'id'});
     if(setError) throw setError;
@@ -150,15 +150,17 @@ export default function ContentStudio() {
       const {data:authState,error:authError}=await supabase.auth.getUser();
       if(authError||!authState.user) throw new Error('Sign in again to access the cloud content workspace.');
       const adminId=authState.user.id;
-      const [setsResult,learnersResult,resourcesResult,localResourceRecords]=await Promise.all([
+      const [setsResult,learnersResult,resourcesResult,assignmentsResult,localResourceRecords]=await Promise.all([
         supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
         supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum').eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
+        supabase.from('exercise_assignments').select('id,exercise_set_id,learner_id,due_at,available_at,assigned_at').order('assigned_at',{ascending:false}),
         openResourceDb().then(db=>new Promise<any[]>((resolve,reject)=>{const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})),
       ]);
       if(setsResult.error) throw setsResult.error;
       if(learnersResult.error) throw learnersResult.error;
       if(resourcesResult.error) throw resourcesResult.error;
+      if(assignmentsResult.error) throw assignmentsResult.error;
       const ids=(setsResult.data||[]).map(row=>row.id);
       let questions:any[]=[];let keys:any[]=[];
       if(ids.length){
@@ -178,7 +180,22 @@ export default function ContentStudio() {
         catch{/* Preserve an offline-only draft when the network or schema is unavailable. */}
       }
       if(loaded.length||!readDrafts().length) setDrafts(loaded);
-      setLearners((learnersResult.data||[]) as typeof learners);
+      const activeLearners=(learnersResult.data||[]) as typeof learners;
+      setLearners(activeLearners);
+      const groupedAssignments=new Map<string,any[]>();
+      for(const row of assignmentsResult.data||[]){
+        const key=String(row.exercise_set_id)+'|'+String(row.due_at||'');
+        groupedAssignments.set(key,[...(groupedAssignments.get(key)||[]),row]);
+      }
+      const remotePlans:AssignmentDraft[]=[];
+      for(const rows of groupedAssignments.values()){
+        const first=rows[0];
+        const learnerNames=rows.map(row=>activeLearners.find(student=>student.id===row.learner_id)).filter(Boolean);
+        const target=rows.length===activeLearners.length?'All learners':learnerNames.length===1?(learnerNames[0].preferred_name||learnerNames[0].full_name||learnerNames[0].student_id||'One learner'):`${learnerNames.length} learners`;
+        const release=first.available_at&&new Date(first.available_at).getTime()>Date.now()?'Scheduled for '+new Date(first.available_at).toLocaleDateString():'Immediately after publishing';
+        remotePlans.push({id:String(first.id),exerciseId:String(first.exercise_set_id),target,dueDate:first.due_at?String(first.due_at).slice(0,10):'',availability:release,updatedAt:String(first.assigned_at||''),assignedCount:rows.length});
+      }
+      if(remotePlans.length) setAssignments(remotePlans);
       const localById=new Map(localResourceRecords.map((r:any)=>[String(r.id),r]));
       const cloudResources=(resourcesResult.data||[]).map((r:any)=>{
         const local=localById.get(String(r.id));
@@ -412,7 +429,7 @@ export default function ContentStudio() {
   return <div className="subpage content-studio-page">
     <div className="eyebrow">LEARNING MATERIALS</div><h1>Content Studio</h1>
     <p className="page-subtitle">Build question banks, organise teaching resources, review assessments and prepare assignments.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><BookOpen size={21}/></div><div className="setup-banner-copy"><strong>Local content workspace</strong><p>Assessment drafts, assignment plans and uploaded files are currently saved in this browser only. They are not uploaded to Supabase or shared with learners or other devices.</p></div></div>
+    <div className={cloudError?'setup-banner warning-banner':'setup-banner'}><div className="setup-banner-icon"><ShieldCheck size={21}/></div><div className="setup-banner-copy"><strong>{cloudLoading?'Connecting to Studyspace…':cloudError?'Cloud workspace needs attention':'Cloud content workspace'}</strong><p>{cloudError||'Assessments, answer keys, teaching resources and learner assignments are stored in the shared Studyspace project. Your browser cache is retained for continuity.'}</p></div><button className="subtle-button" onClick={()=>void loadCloudWorkspace()} disabled={cloudLoading}>Refresh</button></div>
     <div className="studio-tabs" role="tablist" aria-label="Content Studio sections">
       <button className={tab==='builder'?'selected':''} onClick={()=>setTab('builder')}><ClipboardList size={16}/> Builder</button>
       <button className={tab==='library'?'selected':''} onClick={()=>setTab('library')}><FileText size={16}/> Resource library <span>{resources.length}</span></button>
@@ -452,7 +469,7 @@ export default function ContentStudio() {
         <div className="studio-actions"><button className="subtle-button" onClick={()=>setPreview(!preview)}><Eye size={15}/>{preview?'Close preview':'Preview'}</button><button className="subtle-button" onClick={()=>saveDraft('draft')}><Save size={15}/> Save draft</button><button className="primary-button" onClick={()=>saveDraft('review')}><Send size={15}/> Submit for review</button></div>
         {preview&&<div className="assessment-preview"><span className="eyebrow">LEARNER PREVIEW</span><h2>{title||'Untitled assessment'}</h2><p>{instructions}</p><small>{subject||'No subject'} · {duration} minutes · {totalPoints} marks</small>{questions.map((q,i)=><article key={q.id}><strong>{i+1}. {q.prompt||'Question prompt'}</strong><small>{labelFor(q.type)} · {q.points} marks · {q.difficulty}</small>{q.type==='multiple_choice'&&q.options.filter(Boolean).map((o,j)=><p key={j}>◯ {o}</p>)}{q.type==='matching'&&<><p>Match each item to the correct definition:</p>{q.pairs.map((p,j)=><p key={j}>{j+1}. {p.left||'Item'} → ______</p>)}<small>Available matches: {q.pairs.map(p=>p.right).filter(Boolean).reverse().join(' · ')}</small></>}{q.type==='fill_blank'&&<p>Answer: __________________</p>}{q.type==='true_false'&&<p>◯ True　 ◯ False</p>}{q.type==='word_puzzle'&&<p>Clue: {q.explanation}</p>}</article>)}</div>}
       </section>
-      <aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assessment queue</h2><p>Local drafts and review states</p></div><ClipboardList size={18}/></div>{drafts.length===0?<div className="draft-empty">Your assessments will appear here.</div>:drafts.map(d=><div className="saved-draft" key={d.id}><div><strong>{d.title}</strong><small>{d.subject} · {d.questions.length} questions</small><span className={`status-chip status-${d.status}`}>{d.status}</span></div><button className="subtle-button" onClick={()=>loadDraft(d)}>Open</button></div>)}<button className="subtle-button full-width" onClick={resetBuilder}><Plus size={15}/> New assessment</button></aside>
+      <aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assessment queue</h2><p>Cloud drafts and review states</p></div><ClipboardList size={18}/></div>{drafts.length===0?<div className="draft-empty">Your assessments will appear here.</div>:drafts.map(d=><div className="saved-draft" key={d.id}><div><strong>{d.title}</strong><small>{d.subject} · {d.questions.length} questions</small><span className={`status-chip status-${d.status}`}>{d.status}</span></div><button className="subtle-button" onClick={()=>loadDraft(d)}>Open</button></div>)}<button className="subtle-button full-width" onClick={resetBuilder}><Plus size={15}/> New assessment</button></aside>
     </div>}
 
     {tab==='library'&&<section className="panel studio-library-panel"><div className="panel-heading"><div><h2>Resource library</h2><p>Organise teaching materials by subject, topic and resource type</p></div><FileText size={19}/></div>
@@ -461,15 +478,19 @@ export default function ContentStudio() {
         <label className="primary-button"><Plus size={16}/> Choose files<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx" onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} hidden/></label>
       </div>
       <div className="resource-toolbar"><div className="resource-search"><Search size={16}/><input value={resourceSearch} onChange={e=>setResourceSearch(e.target.value)} placeholder="Search file, subject or topic..."/></div><select aria-label="Filter by subject" value={resourceSubjectFilter} onChange={e=>setResourceSubjectFilter(e.target.value)}><option>All</option>{subjects.map(s=><option key={s}>{s}</option>)}</select><select aria-label="Filter by resource type" value={resourceCategoryFilter} onChange={e=>setResourceCategoryFilter(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select><select aria-label="Sort resources" value={resourceSort} onChange={e=>setResourceSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select></div>
-      <div className="resource-count-row"><span>{filteredResources.length} of {resources.length} resources</span><span><Filter size={13}/> Filters apply immediately</span></div>
+      <div className="resource-assignment-controls">
+        <label className="studio-field">Resource to assign<select value={resourceAssignId} onChange={e=>setResourceAssignId(e.target.value)}><option value="">Choose a resource</option>{resources.map(resource=><option key={resource.id} value={resource.id}>{resource.name} — {resource.subject}</option>)}</select></label>
+        <label className="studio-field">Learner<select value={resourceAssignLearner} onChange={e=>setResourceAssignLearner(e.target.value)}><option value="">Choose a learner</option>{learners.map(student=><option key={student.id} value={student.id}>{student.preferred_name||student.full_name||student.student_id||'Learner'} · {student.student_id||'No ID'}</option>)}</select></label>
+        <button className="primary-button" onClick={()=>void assignResourceToLearner()} disabled={!resourceAssignId||!resourceAssignLearner}><Send size={15}/> Assign resource</button>
+      </div><div className="resource-count-row"><span>{filteredResources.length} of {resources.length} resources</span><span><Filter size={13}/> Filters apply immediately</span></div>
       {filteredResources.length===0?<div className="draft-empty">No resources match these filters. Upload a file or change the search.</div>:<div className="resource-list">{filteredResources.map(r=><div className="resource-list-row resource-expanded-row" key={r.id}><span className="studio-file-icon"><FileText size={18}/></span><div className="resource-main"><strong>{r.name}</strong><small>{resourceLabel(r)} · {r.category} · {bytes(r.size)}</small><small>{r.description||'No description'} · Added {new Date(r.savedAt).toLocaleDateString()}</small><div className="resource-meta-edit"><input aria-label="Edit resource subject" value={r.subject} onChange={e=>setResources(current=>current.map(x=>x.id===r.id?{...x,subject:e.target.value}:x))} onBlur={e=>void updateResource(r.id,{subject:e.target.value})}/><input aria-label="Edit resource topic" value={r.topic} onChange={e=>setResources(current=>current.map(x=>x.id===r.id?{...x,topic:e.target.value}:x))} onBlur={e=>void updateResource(r.id,{topic:e.target.value})}/><select aria-label="Edit resource type" value={r.category} onChange={e=>void updateResource(r.id,{category:e.target.value as ResourceCategory})}>{categories.map(c=><option key={c}>{c}</option>)}</select></div></div><button className="icon-button" aria-label={`Download ${r.name}`} onClick={()=>void downloadResource(r.id)}><Download size={16}/></button><button className="icon-button" aria-label={`Delete ${r.name}`} onClick={()=>void deleteResource(r.id)}><Trash2 size={16}/></button></div>)}</div>}
     </section>}
 
     {tab==='assign'&&<div className="studio-builder-layout"><section className="panel assignment-setup-panel"><div className="panel-heading"><div><h2>Review and approve</h2><p>Only validated assessments can move to approved</p></div><ShieldCheck size={19}/></div>
       {drafts.length===0?<div className="draft-empty">Create an assessment first.</div>:drafts.map(d=><div className="review-card" key={d.id}><div><strong>{d.title}</strong><small>{d.subject} · {d.questions.length} questions · {d.questions.reduce((s,q)=>s+q.points,0)} marks</small><span className={`status-chip status-${d.status}`}>{d.status}</span></div><div className="review-actions"><button className="subtle-button" onClick={()=>loadDraft(d)}>Edit</button>{d.status!=='approved'&&<button className="primary-button" onClick={()=>setStatus(d,'approved')}><Check size={14}/> Approve</button>}{d.status==='approved'&&<button className="subtle-button" onClick={()=>setStatus(d,'draft')}>Return to draft</button>}</div></div>)}
-      <div className="settings-divider"/><h2>Assignment preparation</h2><p className="builder-hint">This creates a local delivery plan only. Learner targeting and actual delivery require connected accounts and server-side permissions.</p>
-      <div className="studio-form-grid"><label className="studio-field studio-field-wide">Approved assessment<select value={assignmentExercise} onChange={e=>setAssignmentExercise(e.target.value)}><option value="">Choose an approved assessment</option>{drafts.filter(d=>d.status==='approved').map(d=><option key={d.id} value={d.id}>{d.title} — {d.subject}</option>)}</select></label><label className="studio-field">Intended recipients<select value={assignmentTarget} onChange={e=>setAssignmentTarget(e.target.value)}><option>One learner</option><option>Selected learners</option><option>All learners</option></select></label><label className="studio-field">Due date<input type="date" value={assignmentDue} onChange={e=>setAssignmentDue(e.target.value)}/></label><label className="studio-field studio-field-wide">Availability<select value={assignmentAvailability} onChange={e=>setAssignmentAvailability(e.target.value)}><option>Immediately after publishing</option><option>Schedule for due date</option><option>Manually release later</option></select></label></div><div className="studio-actions"><button className="primary-button" onClick={createAssignment}><Save size={15}/> Save assignment plan</button></div>
-      </section><aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assignment plans</h2><p>Saved locally · not delivered</p></div><Send size={18}/></div>{assignments.length===0?<div className="draft-empty">Your assignment plans will appear here.</div>:assignments.map(a=>{const d=drafts.find(x=>x.id===a.exerciseId);return <div className="saved-draft" key={a.id}><div><strong>{d?.title||'Assessment'}</strong><small>{a.target} · {a.dueDate||'No due date'}</small><small>{a.availability}</small></div></div>})}</aside></div>}
-    <footer className="page-footer"><span>STUDYSPACE MONITOR · CONTENT STUDIO</span><span>Local browser storage · no student delivery</span></footer>
+      <div className="settings-divider"/><h2>Assignment preparation</h2><p className="builder-hint">Choose active learners. Published assessments appear in their Student Planner; correct answers remain server-side.</p>
+      <div className="studio-form-grid"><label className="studio-field studio-field-wide">Approved assessment<select value={assignmentExercise} onChange={e=>setAssignmentExercise(e.target.value)}><option value="">Choose an approved assessment</option>{drafts.filter(d=>d.status==='approved').map(d=><option key={d.id} value={d.id}>{d.title} — {d.subject}</option>)}</select></label><label className="studio-field">Intended recipients<select value={assignmentTarget} onChange={e=>setAssignmentTarget(e.target.value)}><option>One learner</option><option>All learners</option></select></label>{assignmentTarget==='One learner'&&<label className="studio-field">Learner<select value={selectedLearner} onChange={e=>setSelectedLearner(e.target.value)}><option value="">Choose an active learner</option>{learners.map(student=><option key={student.id} value={student.id}>{student.preferred_name||student.full_name||student.student_id||'Learner'} · {student.student_id||'No ID'}</option>)}</select></label>}<label className="studio-field">Due date<input type="date" value={assignmentDue} onChange={e=>setAssignmentDue(e.target.value)}/></label><label className="studio-field studio-field-wide">Availability<select value={assignmentAvailability} onChange={e=>setAssignmentAvailability(e.target.value)}><option>Immediately after publishing</option><option>Schedule for due date</option></select></label></div><div className="studio-actions"><button className="primary-button" onClick={createAssignment}><Save size={15}/> Save assignment plan</button></div>
+      </section><aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assignment plans</h2><p>Cloud assignment records</p></div><Send size={18}/></div>{assignments.length===0?<div className="draft-empty">Your assignment plans will appear here.</div>:assignments.map(a=>{const d=drafts.find(x=>x.id===a.exerciseId);return <div className="saved-draft" key={a.id}><div><strong>{d?.title||'Assessment'}</strong><small>{a.target} · {a.dueDate||'No due date'}</small><small>{a.availability}</small></div></div>})}</aside></div>}
+    <footer className="page-footer"><span>STUDYSPACE MONITOR · CONTENT STUDIO</span><span>Cloud-backed assessments and resources</span></footer>
   </div>
 }

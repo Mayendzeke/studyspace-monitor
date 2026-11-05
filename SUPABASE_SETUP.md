@@ -27,6 +27,7 @@ The current migration sequence is:
 5. `supabase/migrations/20261105000200_studyspace_admin_bootstrap_fix.sql`
 6. `supabase/migrations/20261105000300_studyspace_planner_sync_and_personal_files.sql`
 7. `supabase/migrations/20261105000400_studyspace_content_studio_cloud.sql`
+8. `supabase/migrations/20261105000500_studyspace_sync_deletion_ledger.sql`
 
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 
@@ -101,4 +102,4 @@ Before configuring the Student Planner, confirm its current Supabase client code
 - Admin functions require MFA; student enrolment and sign-in have server-side attempt throttling.
 - AI lesson recaps are teacher drafts. Review every recap before publishing and submit anonymised lesson material only.
 - Jitsi video/audio links are hosted by a third party and are not private database content. Do not share a class link outside the assigned class.
-- The planner sync migration adds updated timestamps, account-owned personal file records, and private Storage policies. The student client synchronises local tasks, subjects, sessions, calendar entries and personal files while signed in; the browser database remains the offline cache.
+- The planner sync migrations add updated timestamps, account-owned personal file records, private Storage policies, and a server-side deletion ledger. The student client synchronises tasks, subjects, sessions, calendar entries, study preferences, test attempts, flashcard progress and personal files while signed in; the browser database remains the offline cache. The Content Studio migration stores assessments, answer keys, review state, resources and assignment records in the shared project. Apply all migrations to the production Supabase project before enabling these newer cloud-sync and assessment workflows.

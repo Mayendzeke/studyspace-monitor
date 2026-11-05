@@ -103,7 +103,7 @@ export default function ContentStudio() {
         answer:String(keys.get(q.id)?.answer||''),
         acceptedAnswers:Array.isArray(keys.get(q.id)?.acceptedAnswers)?keys.get(q.id).acceptedAnswers:[],
         pairs:Array.isArray(keys.get(q.id)?.pairs)?keys.get(q.id).pairs:[{left:'',right:''},{left:'',right:''}],
-        explanation:String(keys.get(q.id)?.explanation||''), points:Number(q.points||1),
+        explanation:q.question_type==='word_puzzle'?String(q.content?.clue||''):String(keys.get(q.id)?.explanation||''), points:Number(q.points||1),
         difficulty:(q.difficulty||q.content?.difficulty||'Standard') as Difficulty,
         topic:String(q.topic||q.content?.topic||''),
       })),
@@ -139,7 +139,8 @@ export default function ContentStudio() {
             ? q.pairs.map((pair,index)=>({left:pair.left,right:q.pairs[(index+1)%q.pairs.length].right}))
             : q.type==='matching'?q.pairs.map(pair=>({left:pair.left,right:pair.right})) : undefined,
           difficulty:q.difficulty,
-          topic:q.topic
+          topic:q.topic,
+          clue:q.type==='word_puzzle'?q.explanation:undefined
         },
         explanation:'',points:q.points,topic:q.topic,difficulty:q.difficulty,
       }));
@@ -147,7 +148,7 @@ export default function ContentStudio() {
       if(questionError) throw questionError;
       const keys=draft.questions.map(q=>({
         question_id:q.id,
-        answer_key:{answer:q.answer,acceptedAnswers:q.acceptedAnswers,pairs:q.type==='matching'?q.pairs:undefined,explanation:q.explanation}
+        answer_key:{answer:q.answer,acceptedAnswers:q.acceptedAnswers,pairs:q.type==='matching'?q.pairs:undefined,explanation:q.type==='word_puzzle'?'':q.explanation}
       }));
       const {error:keyError}=await supabase.from('exercise_answer_keys').upsert(keys,{onConflict:'question_id'});
       if(keyError) throw keyError;

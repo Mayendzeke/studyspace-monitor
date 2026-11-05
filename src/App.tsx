@@ -203,6 +203,42 @@ function App() {
 }
 
 function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => void; supabaseConfigured: boolean }) {
+  const [stats, setStats] = useState<{ learners: number; activeLearners: number; activePins: number; sessions: number } | null>(null);
+  const [activity, setActivity] = useState<{ id: number; event_type: string; created_at: string }[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
+
+  const refreshOverview = async () => {
+    if (!supabase) { setStatsLoading(false); setStatsError("Supabase is not configured."); return; }
+    setStatsLoading(true);
+    setStatsError("");
+    const now = new Date().toISOString();
+    const [learners, activeLearners, pins, sessions, events] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "learner"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "learner").eq("account_status", "active"),
+      supabase.from("enrolment_pins").select("id", { count: "exact", head: true }).is("redeemed_at", null).is("revoked_at", null).gt("expires_at", now),
+      supabase.from("study_sessions").select("id", { count: "exact", head: true }),
+      supabase.from("audit_events").select("id,event_type,created_at").order("created_at", { ascending: false }).limit(5),
+    ]);
+    const failed = [learners.error, activeLearners.error, pins.error, sessions.error, events.error].find(Boolean);
+    if (failed) {
+      setStatsError("Some dashboard data could not be loaded. Confirm the latest Studyspace database migrations and administrator permissions, then refresh.");
+      setStats(null);
+      setActivity([]);
+    } else {
+      setStats({
+        learners: learners.count ?? 0,
+        activeLearners: activeLearners.count ?? 0,
+        activePins: pins.count ?? 0,
+        sessions: sessions.count ?? 0,
+      });
+      setActivity((events.data ?? []) as { id: number; event_type: string; created_at: string }[]);
+    }
+    setStatsLoading(false);
+  };
+
+  useEffect(() => { void refreshOverview(); }, []);
+
   return (
     <>
       <div className="welcome-row">
@@ -217,34 +253,41 @@ function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => 
       <div className="setup-banner">
         <div className="setup-banner-icon"><ShieldCheck size={21} /></div>
         <div className="setup-banner-copy">
-          <strong>{supabaseConfigured ? 'Supabase configuration detected' : 'Connect your Studyspace workspace'}</strong>
-          <p>{supabaseConfigured ? 'The browser has the project URL and public key. Confirm that production migrations and Edge Functions are deployed before using live learner enrolment.' : 'The dashboard remains locked until its Supabase project URL and publishable key are configured.'}</p>
+          <strong>{supabaseConfigured ? 'Studyspace connection configured' : 'Connect your Studyspace workspace'}</strong>
+          <p>{supabaseConfigured ? 'The Monitor is connected to the shared Studyspace project. Live dashboard records are checked below.' : 'The dashboard remains locked until its Supabase project URL and publishable key are configured.'}</p>
         </div>
-        <button className="text-button" onClick={() => navigate('Settings')}>Continue setup <ArrowUpRight size={15} /></button>
+        <button className="text-button" onClick={() => navigate('Settings')}>Connection settings <ArrowUpRight size={15} /></button>
       </div>
 
       <section className="stats-grid" aria-label="Workspace summary">
-        <StatCard label="Total learners" value="0" detail="No accounts registered" icon={<Users size={19} />} />
-        <StatCard label="Active PINs" value="0" detail="No invitations issued" icon={<KeyRound size={19} />} />
-        <StatCard label="Linked accounts" value="0" detail="Planner connections" icon={<CheckCircle2 size={19} />} />
-        <StatCard label="Study activity" value="—" detail="Waiting for learner data" icon={<Activity size={19} />} />
+        <StatCard label="Total learners" value={statsLoading ? "…" : stats ? String(stats.learners) : "—"} detail={stats ? stats.activeLearners + " active" : "Live database count"} icon={<Users size={19} />} />
+        <StatCard label="Active PINs" value={statsLoading ? "…" : stats ? String(stats.activePins) : "—"} detail="Unused and not expired" icon={<KeyRound size={19} />} />
+        <StatCard label="Active learners" value={statsLoading ? "…" : stats ? String(stats.activeLearners) : "—"} detail="Accounts allowed to sign in" icon={<CheckCircle2 size={19} />} />
+        <StatCard label="Study sessions" value={statsLoading ? "…" : stats ? String(stats.sessions) : "—"} detail="Recorded learner sessions" icon={<Activity size={19} />} />
       </section>
+      <div className="dashboard-refresh-row">
+        {statsError && <p className="inline-message error-message" role="alert">{statsError}</p>}
+        <button className="subtle-button" onClick={() => void refreshOverview()} disabled={statsLoading}>{statsLoading ? "Refreshing…" : "Refresh live counts"}</button>
+      </div>
 
       <div className="dashboard-grid">
         <section className="panel activity-panel">
           <div className="panel-heading">
-            <div><h2>Recent activity</h2><p>Updates from your learner workspace</p></div>
-            <button className="subtle-button" onClick={() => navigate('Academic progress')}>View all <ArrowUpRight size={14} /></button>
+            <div><h2>Recent activity</h2><p>Latest account and workspace events</p></div>
+            <button className="subtle-button" onClick={() => void refreshOverview()} disabled={statsLoading}>Refresh <ArrowUpRight size={14} /></button>
           </div>
-          <div className="empty-activity">
+          {activity.length ? <div className="dashboard-activity-list">{activity.map(event => <article className="dashboard-activity-row" key={event.id}>
+            <span className="activity-event-dot" />
+            <div><strong>{event.event_type.replaceAll("_", " ")}</strong><small>{new Date(event.created_at).toLocaleString()}</small></div>
+          </article>)}</div> : <div className="empty-activity">
             <div className="empty-illustration">
               <div className="orbit orbit-one" /><div className="orbit orbit-two" />
               <div className="illustration-core"><Activity size={27} /></div>
               <span className="float-dot dot-one" /><span className="float-dot dot-two" />
             </div>
-            <strong>Your activity feed is waiting</strong>
-            <p>When learners join and begin using their planners, their activity summaries will appear here.</p>
-          </div>
+            <strong>{statsLoading ? "Loading recent activity…" : statsError ? "Activity is unavailable" : "Your activity feed is waiting"}</strong>
+            <p>When administrators create invitations and learners join or study, their recorded events will appear here.</p>
+          </div>}
         </section>
 
         <section className="panel quick-panel">
@@ -259,16 +302,16 @@ function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => 
             <span><strong>Manage learners</strong><small>View learner accounts</small></span>
             <ArrowUpRight size={16} />
           </button>
-          <button className="quick-action" onClick={() => navigate('Settings')}>
-            <span className="quick-icon green"><Settings size={18} /></span>
-            <span><strong>Workspace settings</strong><small>Connect your backend</small></span>
+          <button className="quick-action" onClick={() => navigate('Content Studio')}>
+            <span className="quick-icon green"><BookOpen size={18} /></span>
+            <span><strong>Content Studio</strong><small>Prepare learning materials</small></span>
             <ArrowUpRight size={16} />
           </button>
-          <div className="quick-note"><LockKeyhole size={14} /> Secure account controls will activate after backend setup.</div>
+          <div className="quick-note"><LockKeyhole size={14} /> Administrator access and privileged actions require verified MFA.</div>
         </section>
       </div>
 
-      <footer className="page-footer"><span>STUDYSPACE MONITOR <b>·</b> FOUNDATION 0.2</span><span>Built for focused learning.</span></footer>
+      <footer className="page-footer"><span>STUDYSPACE MONITOR <b>·</b> FOUNDATION 0.3</span><span>Live workspace data.</span></footer>
     </>
   )
 }

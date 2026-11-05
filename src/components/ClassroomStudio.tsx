@@ -125,7 +125,7 @@ export default function ClassroomStudio() {
       const { error: notesError } = await supabase.from('session_lesson_notes').insert({
         session_id:session.id, summary:draft.aiRecap?.summary || draft.sourceNotes.slice(0,1200),
         key_points:draft.aiRecap?.keyPoints || completePoints,
-        worked_example:draft.aiRecap?.workedExample || '', recap_markdown:draft.aiRecap ? JSON.stringify(draft.aiRecap) : '',
+        worked_example:draft.aiRecap?.workedExample || '', exit_question:draft.aiRecap?.exitQuestion || '', recap_markdown:draft.aiRecap ? JSON.stringify(draft.aiRecap) : '',
         is_published:true, updated_by:adminId
       })
       if (notesError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw notesError }

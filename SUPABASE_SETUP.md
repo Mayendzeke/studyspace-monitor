@@ -26,6 +26,8 @@ Migration 009 adds a protected teacher-marking workflow for written assessment a
 
 Migration 010 restores Word Puzzle clues to learner-visible question content after answer-key sanitisation, while keeping the answer word in the protected key.
 
+Migration 011 removes a legacy administrator-wide Storage policy. Administrators can manage teacher resources only in their own `/resources/` path; learners can read resources assigned to them; personal `/personal/` files remain owner-only.
+
 The current migration sequence is:
 
 1. `supabase/migrations/20261104000100_studyspace_core.sql`
@@ -41,6 +43,7 @@ The current migration sequence is:
 11. `supabase/migrations/20261105000800_studyspace_resource_storage_access.sql`
 12. `supabase/migrations/20261105000900_studyspace_manual_assessment_marking.sql`
 13. `supabase/migrations/20261105001000_studyspace_word_puzzle_clue_visibility.sql`
+14. `supabase/migrations/20261105001100_studyspace_isolate_personal_resource_storage.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 

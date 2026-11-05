@@ -9,8 +9,8 @@ set answer_key =
   coalesce(ak.answer_key, '{}'::jsonb)
   || case
        when not (coalesce(ak.answer_key, '{}'::jsonb) ? 'answer')
-         and q.content ? 'answer'
-       then jsonb_build_object('answer', q.content->'answer')
+         and coalesce(q.content->'answer', q.content->'correctAnswer', q.content->'correct_answer') is not null
+       then jsonb_build_object('answer', coalesce(q.content->'answer', q.content->'correctAnswer', q.content->'correct_answer'))
        else '{}'::jsonb
      end
   || case
@@ -41,13 +41,15 @@ insert into public.exercise_answer_keys (question_id, answer_key)
 select
   q.id,
   jsonb_strip_nulls(jsonb_build_object(
-    'answer', q.content->'answer',
+    'answer', coalesce(q.content->'answer', q.content->'correctAnswer', q.content->'correct_answer'),
     'acceptedAnswers', q.content->'acceptedAnswers',
     'pairs', case when q.question_type = 'matching' then q.content->'pairs' else null end,
     'explanation', nullif(q.explanation, '')
   ))
 from public.exercise_questions q
 where (q.content ? 'answer')
+   or (q.content ? 'correctAnswer')
+   or (q.content ? 'correct_answer')
    or (q.content ? 'acceptedAnswers')
    or (q.question_type = 'matching' and q.content ? 'pairs')
    or coalesce(q.explanation, '') <> ''

@@ -283,6 +283,9 @@ export default function ContentStudio() {
       } else if(q.type==='short_answer'){
         // Written responses are marked by a teacher after submission.
         if(q.explanation.trim().length>2000)errors.push(`Question ${n}: marking guidance must be under 2,000 characters.`)
+      } else if(q.type==='word_puzzle'){
+        if(!q.explanation.trim())errors.push(`Question ${n}: add a learner-visible clue.`)
+        if(!q.answer.trim())errors.push(`Question ${n}: provide the answer word.`)
       } else if(!q.answer.trim())errors.push(`Question ${n}: provide the answer key.`)
     })
     return errors

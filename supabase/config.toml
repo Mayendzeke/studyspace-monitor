@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.generate-lesson-recap]
 verify_jwt = true
+
+[functions.manage-enrolment-pin]
+verify_jwt = true

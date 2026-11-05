@@ -1,4 +1,7 @@
 -- Cloud-backed Monitor Content Studio: review workflow and resource metadata.
+alter table public.exercise_assignments
+  add column if not exists available_at timestamptz not null default now();
+
 alter table public.exercise_sets
   add column if not exists review_status text not null default 'draft'
     check (review_status in ('draft','review','approved')),
@@ -68,6 +71,7 @@ create policy "exercise_sets_assigned_read"
       select 1 from public.exercise_assignments ea
       where ea.exercise_set_id = exercise_sets.id
         and ea.learner_id = auth.uid()
+        and ea.available_at <= now()
     )
   );
 
@@ -81,6 +85,7 @@ create policy "exercise_questions_assigned_read"
       join public.exercise_sets es on es.id = ea.exercise_set_id
       where es.id = exercise_questions.exercise_set_id
         and ea.learner_id = auth.uid()
+        and ea.available_at <= now()
         and es.is_published
     )
   );
@@ -88,7 +93,7 @@ create policy "exercise_questions_assigned_read"
 drop policy if exists "exercise_assignments_learner_read" on public.exercise_assignments;
 create policy "exercise_assignments_learner_read"
   on public.exercise_assignments for select to authenticated
-  using (learner_id = auth.uid() and public.is_active_studyspace_learner());
+  using (learner_id = auth.uid() and public.is_active_studyspace_learner() and available_at <= now());
 
 -- Answer keys remain administrator-only. Students submit answers to a
 -- trusted Edge Function, which calculates marks without exposing answer keys.

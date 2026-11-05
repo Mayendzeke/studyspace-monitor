@@ -56,7 +56,7 @@ Deploy these functions to the same Supabase project:
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 
-The Edge Function gateway JWT check is disabled in `supabase/config.toml` so the modern publishable key can be used correctly. Each protected function validates the user's access token itself; administrator functions additionally require AAL2 MFA and an active administrator profile. The public enrolment and sign-in functions apply server-side throttling.
+Gateway JWT verification is enabled for the protected administrator functions (`create-enrolment-pin`, `manage-enrolment-pin`, `manage-learner-account`, `generate-lesson-recap`, and the legacy `redeem-enrolment-pin`) and disabled only for the public enrolment and student sign-in endpoints (`enrol-learner` and `student-sign-in`). Protected functions also validate the user's access token; administrator operations require AAL2 MFA and an active administrator profile. The public enrolment and sign-in functions apply server-side throttling.
 
 ## 5. Create the first administrator
 

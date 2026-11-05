@@ -6,9 +6,18 @@ Use **one Supabase project for both applications**. The student planner and the 
 
 The Supabase project is linked to the GitHub repository `Mayendzeke/studyspace-monitor`. Keep the Supabase project private. Do not expose database credentials or secret API keys.
 
-## 2. Apply database migrations in this exact order
+## 2. Configure production deployment
 
-The migrations are versioned SQL files. Apply them once, in order:
+In **Project Settings → Integrations → GitHub**, confirm:
+
+- Repository: `Mayendzeke/studyspace-monitor`
+- Production branch: `main`
+- Working directory: `.` (the repository root, where the `supabase/` folder exists)
+- **Deploy to production**: enabled
+
+The GitHub integration watches commits to the production branch. When Deploy to production is enabled, Supabase applies pending migrations in `supabase/migrations/` and deploys the Edge Functions declared in `supabase/config.toml`. The migration files are applied in timestamp order. Do not manually run the same SQL files in the SQL Editor or run `supabase db push` as a second deployment route; that can desynchronise migration history.
+
+The current migration sequence is:
 
 1. `supabase/migrations/20261104000100_studyspace_core.sql`
 2. `supabase/migrations/20261104000200_studyspace_security_hardening.sql`
@@ -16,10 +25,9 @@ The migrations are versioned SQL files. Apply them once, in order:
 4. `supabase/migrations/20261105000100_studyspace_classroom_and_ai.sql`
 5. `supabase/migrations/20261105000200_studyspace_admin_bootstrap_fix.sql`
 
-For the initial setup, use the Supabase Dashboard **SQL Editor** and run one migration at a time, checking for a successful result before continuing. Do not also run `supabase db push` after manually applying these files unless the migration history has been reconciled; otherwise the CLI may try to apply them again.
+These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 
-The migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration ensures the trusted SQL Editor can promote the first administrator while ordinary client requests remain protected.
-
+If Deploy to production is disabled, commits in GitHub will **not** apply these migrations or deploy the functions to the live project. Enable it before expecting the backend to activate.
 ## 3. Configure Edge Function secrets
 
 Supabase automatically injects `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, and `SUPABASE_SECRET_KEYS` into hosted Edge Functions. The functions in this repository read the modern publishable/secret key maps and retain legacy fallbacks. **Do not manually create secrets whose names start with `SUPABASE_`.**

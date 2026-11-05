@@ -26,6 +26,7 @@ The current migration sequence is:
 4. `supabase/migrations/20261105000100_studyspace_classroom_and_ai.sql`
 5. `supabase/migrations/20261105000200_studyspace_admin_bootstrap_fix.sql`
 6. `supabase/migrations/20261105000300_studyspace_planner_sync_and_personal_files.sql`
+7. `supabase/migrations/20261105000400_studyspace_content_studio_cloud.sql`
 
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 
@@ -54,6 +55,7 @@ Deploy these functions to the same Supabase project:
 - `student-sign-in`
 - `manage-learner-account`
 - `generate-lesson-recap`
+- `submit-exercise-attempt`
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 

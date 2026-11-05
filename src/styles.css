@@ -449,3 +449,19 @@ h1 span { color: #8278d9; }
 .classroom-learner-checks label strong{font-size:11px}
 .classroom-learner-checks label small{font-size:9px}
 @media(max-width:620px){.classroom-learner-checks{grid-template-columns:1fr}}
+
+.classroom-live-panel{margin-top:14px;padding:14px;border:1px solid var(--line,rgba(100,110,140,.2));border-radius:13px;background:rgba(100,120,170,.05)}
+.classroom-live-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.classroom-live-heading>div:first-child{display:flex;flex-direction:column;gap:4px}
+.classroom-live-heading strong{font-size:12px}.classroom-live-heading small{font-size:10px;color:var(--muted)}
+.classroom-teacher-chat{margin-top:14px;padding:12px;border-radius:11px;background:var(--surface,rgba(255,255,255,.45));box-shadow:var(--inset)}
+.classroom-chat-title{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800}
+.classroom-chat-list{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:10px 0}
+.classroom-chat-list article{padding:9px;border-radius:9px;background:rgba(120,130,160,.08)}
+.classroom-chat-list article strong{font-size:10px}.classroom-chat-list article p{margin:4px 0;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}.classroom-chat-list article small,.classroom-chat-list>p{font-size:9px;color:var(--muted)}
+.classroom-teacher-chat form{display:flex;gap:8px}
+.classroom-teacher-chat form input{flex:1;min-width:0;padding:10px;border:1px solid var(--line,rgba(100,110,140,.2));border-radius:9px;background:var(--surface);color:var(--ink);font-size:11px}
+.classroom-board-preview{margin-top:13px;display:flex;flex-direction:column;gap:8px}
+.classroom-board-preview strong{font-size:11px}
+.classroom-board-preview img{width:100%;max-height:360px;object-fit:contain;background:#fff;border:1px solid var(--line,rgba(100,110,140,.2));border-radius:9px}
+@media(max-width:560px){.classroom-teacher-chat form{flex-direction:column}.classroom-live-heading>div:last-child{width:100%}.classroom-live-heading button{width:100%}}

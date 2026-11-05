@@ -37,7 +37,7 @@ Deno.serve(async (request) => {
   const learnerId = String(body.learnerId ?? "");
   const action = String(body.action ?? "");
   if (!/^[0-9a-f-]{36}$/i.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
-  if (!["disable", "enable", "send_password_recovery"].includes(action)) return json(400, { error: "Unsupported account action." });
+  if (!["disable", "enable", "reset_password"].includes(action)) return json(400, { error: "Unsupported account action." });
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin.from("profiles").select("id,role,account_status").eq("id", learnerId).single();
@@ -62,10 +62,9 @@ Deno.serve(async (request) => {
     return json(200, { success: true, message: "Learner account re-enabled. A new sign-in is required." });
   }
 
-  const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(learnerId);
-  if (authUserError || !authUser.user?.email) return json(409, { error: "This learner account has no email address for a secure password reset." });
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({ type: "recovery", email: authUser.user.email });
-  if (linkError || !linkData.properties?.action_link) return json(500, { error: "Supabase could not generate a password recovery link." });
-  await admin.from("audit_events").insert({ actor_id: authData.user.id, event_type: "learner_password_recovery_issued", target_type: "profile", target_id: learnerId });
-  return json(200, { success: true, recoveryLink: linkData.properties.action_link, message: "One-time recovery link generated. Deliver it privately to the learner; never post it in a shared channel." });
+  const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, "0")).join("");
+  const { error: passwordError } = await admin.auth.admin.updateUserById(learnerId, { password: temporaryPassword });
+  if (passwordError) return json(500, { error: "Supabase could not rotate the learner password." });
+  await admin.from("audit_events").insert({ actor_id: authData.user.id, event_type: "learner_password_reset_by_admin", target_type: "profile", target_id: learnerId });
+  return json(200, { success: true, temporaryPassword, message: "A new temporary password was generated. Deliver it privately; it is shown only once." });
 });

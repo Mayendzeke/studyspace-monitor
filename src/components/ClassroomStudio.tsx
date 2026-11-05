@@ -19,6 +19,7 @@ type LessonPlan = {
   homeworkDue: string
   aiRecap?: LessonRecap
   updatedAt: string
+  publishedSessionId?: string
 }
 const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
@@ -32,7 +33,11 @@ export default function ClassroomStudio() {
   const [notice, setNotice] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
+  const [selectedLearners, setSelectedLearners] = useState<string[]>([])
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
+  useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
   const generateRecap = async () => {
@@ -50,6 +55,46 @@ export default function ClassroomStudio() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'The AI recap could not be generated.')
     } finally { setAiBusy(false) }
+  }
+  const publishSession = async () => {
+    if (!supabase) { setNotice('Connect Supabase before publishing a class session.'); return }
+    if (!draft.title.trim() || !draft.subject.trim() || selectedLearners.length === 0) { setNotice('Add a lesson title and subject, then select at least one active learner.'); return }
+    setPublishing(true); setNotice('')
+    try {
+      const { data: authState } = await supabase.auth.getSession()
+      const adminId = authState.session?.user.id
+      if (!adminId) throw new Error('Administrator sign-in is required.')
+      const startsAt = new Date(draft.date + 'T09:00:00').toISOString()
+      const { data: session, error: sessionError } = await supabase.from('class_sessions').insert({
+        created_by: adminId, title: draft.title.trim(), subject_name: draft.subject.trim(),
+        education_level: draft.level, grade: draft.grade, curriculum: draft.curriculum,
+        objectives: draft.objectives, starts_at: startsAt, duration_minutes: draft.duration, status: 'scheduled'
+      }).select('id').single()
+      if (sessionError || !session) throw sessionError || new Error('The class session could not be created.')
+      const memberRows = selectedLearners.map(learner_id => ({session_id:session.id,learner_id}))
+      const { error: memberError } = await supabase.from('class_session_members').insert(memberRows)
+      if (memberError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw memberError }
+      const { error: notesError } = await supabase.from('session_lesson_notes').insert({
+        session_id:session.id, summary:draft.aiRecap?.summary || draft.sourceNotes.slice(0,1200),
+        key_points:draft.aiRecap?.keyPoints || completePoints,
+        worked_example:draft.aiRecap?.workedExample || '', recap_markdown:draft.aiRecap ? JSON.stringify(draft.aiRecap) : '',
+        is_published:true, updated_by:adminId
+      })
+      if (notesError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw notesError }
+      if (draft.homework.trim()) {
+        const { error: homeworkError } = await supabase.from('session_homework').insert({
+          session_id:session.id,title:draft.homework.trim(),instructions:draft.homework.trim(),
+          due_at:draft.homeworkDue ? new Date(draft.homeworkDue + 'T23:59:00').toISOString() : null,created_by:adminId
+        })
+        if (homeworkError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw homeworkError }
+      }
+      const { error: boardError } = await supabase.from('session_whiteboards').insert({session_id:session.id,updated_by:adminId})
+      if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
+      update({publishedSessionId:session.id})
+      setPlans(current => current.map(plan => plan.id === draft.id ? {...plan,publishedSessionId:session.id} : plan))
+      setNotice('Session published to ' + selectedLearners.length + ' learner(s). Their Today's Session workspace can now load the shared lesson, notes and homework.')
+    } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
+    finally { setPublishing(false) }
   }
   const save = () => {
     if (!draft.title.trim() || !draft.subject.trim()) { setNotice('Add a lesson title and subject before saving.'); return }
@@ -87,6 +132,7 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
+        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}</section>
         <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
         {notice&&<p className="inline-message" role="status">{notice}</p>}
       </section>

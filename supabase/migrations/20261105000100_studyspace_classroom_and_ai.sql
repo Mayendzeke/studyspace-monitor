@@ -46,6 +46,7 @@ create table if not exists public.session_lesson_notes (
   summary text not null default '',
   key_points jsonb not null default '[]'::jsonb,
   worked_example text not null default '',
+  exit_question text not null default '',
   recap_markdown text not null default '',
   is_published boolean not null default false,
   updated_by uuid references public.profiles(id),

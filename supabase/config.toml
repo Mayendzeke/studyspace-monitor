@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.manage-enrolment-pin]
 verify_jwt = true
+
+[functions.enrol-learner]
+verify_jwt = false
+
+[functions.student-sign-in]
+verify_jwt = false

@@ -256,14 +256,62 @@ function EmptyPage({ icon, title, description, action, onAction }: { icon: React
 }
 
 function PinPage() {
+  type PinRecord = { id: string; student_id: string | null; expires_at: string; redeemed_at: string | null; revoked_at: string | null; created_at: string }
+  const [pins, setPins] = useState<PinRecord[]>([])
+  const [expiresInDays, setExpiresInDays] = useState('7')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [newPin, setNewPin] = useState<{ pin: string; studentId: string; expiresAt: string } | null>(null)
+
+  const refresh = async () => {
+    if (!supabase) return
+    const { data, error: loadError } = await supabase.from('enrolment_pins')
+      .select('id,student_id,expires_at,redeemed_at,revoked_at,created_at')
+      .order('created_at', { ascending: false }).limit(30)
+    if (loadError) setError('Could not load enrolment records. Check the database migration and administrator permissions.')
+    else setPins((data ?? []) as PinRecord[])
+  }
+  useEffect(() => { void refresh() }, [])
+
+  const createPin = async () => {
+    if (!supabase) { setError('Connect Supabase before creating enrolment PINs.'); return }
+    setBusy(true); setError(''); setNotice(''); setNewPin(null)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('create-enrolment-pin', { body: { expiresInDays: Number(expiresInDays) } })
+      if (invokeError) throw invokeError
+      if (!data?.pin || !data?.studentId) throw new Error(data?.error || 'The server did not return the new enrolment details.')
+      setNewPin({ pin: data.pin, studentId: data.studentId, expiresAt: data.expiresAt })
+      setNotice('New learner access created. Copy both values and deliver them privately.')
+      await refresh()
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN creation failed.') }
+    finally { setBusy(false) }
+  }
+  const revokePin = async (id: string) => {
+    if (!supabase || !window.confirm('Revoke this unused enrolment PIN? It cannot be redeemed afterwards.')) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('manage-enrolment-pin', { body: { pinId: id } })
+      if (invokeError) throw invokeError
+      if (!data?.success) throw new Error(data?.error || 'The PIN could not be revoked.')
+      setNotice(data.message || 'PIN revoked.')
+      await refresh()
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN revocation failed.') }
+    finally { setBusy(false) }
+  }
+  const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }
+
   return <div className="subpage">
-    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Issue one-time invitations that connect a learner's planner to your monitoring workspace.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><LockKeyhole size={21} /></div><div className="setup-banner-copy"><strong>PIN generation is not active yet</strong><p>PINs must be generated and validated by a trusted server. This screen will not create pretend or browser-only PINs.</p></div></div>
-    <div className="panel pin-explainer">
-      <div className="pin-step"><span>01</span><div><strong>Generate an invitation</strong><p>The administrator creates a unique, single-use PIN for a learner.</p></div></div>
-      <div className="pin-step"><span>02</span><div><strong>Learner registers once</strong><p>The learner enters the PIN and chooses their own password in Studyspace Planner.</p></div></div>
-      <div className="pin-step"><span>03</span><div><strong>PIN is consumed</strong><p>The server validates and redeems the PIN. Future sign-ins use the learner's password.</p></div></div>
-      <div className="pin-step"><span>04</span><div><strong>Administrator retains control</strong><p>You can revoke unused invitations and issue replacements. Existing learner passwords remain theirs.</p></div></div>
+    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Create one-time invitations with a generated Student ID. PINs are hashed on the server and shown only once.</p>
+    <div className="panel pin-create-panel">
+      <div className="panel-heading"><div><h2>Create learner access</h2><p>Requires an authenticated administrator with MFA verified.</p></div><KeyRound size={20}/></div>
+      <div className="pin-create-controls"><label>PIN expiry<select value={expiresInDays} onChange={e=>setExpiresInDays(e.target.value)}><option value="1">1 day</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></label><button className="primary-button" onClick={()=>void createPin()} disabled={busy}>{busy?'Working…':'Generate Student ID + PIN'}</button></div>
+      {newPin && <div className="pin-issued-card"><strong>New learner credentials · shown once</strong><div><span>Student ID</span><code>{newPin.studentId}</code><button className="subtle-button" onClick={()=>copy(newPin.studentId)}>Copy ID</button></div><div><span>One-time PIN</span><code>{newPin.pin}</code><button className="subtle-button" onClick={()=>copy(newPin.pin)}>Copy PIN</button></div><small>Expires {new Date(newPin.expiresAt).toLocaleString()}. Keep these details private and deliver them directly to the learner.</small></div>}
+      {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
+    </div>
+    <div className="panel pin-history-panel">
+      <div className="panel-heading"><div><h2>Recent invitations</h2><p>{pins.length} recent record(s)</p></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button></div>
+      {pins.length ? <div className="pin-history-list">{pins.map(pin=>{const status=pin.redeemed_at?'Redeemed':pin.revoked_at?'Revoked':new Date(pin.expires_at).getTime()<Date.now()?'Expired':'Unused';return <article key={pin.id}><div><strong>{pin.student_id || 'Student ID unavailable'}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={'pin-status '+status.toLowerCase()}>{status}</span>{status==='Unused'&&<button className="text-button" disabled={busy} onClick={()=>void revokePin(pin.id)}>Revoke</button>}</article>})}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No invitations yet</strong><span>Create a PIN to invite your first learner.</span></div>}
     </div>
   </div>
 }

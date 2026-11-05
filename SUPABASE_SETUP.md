@@ -25,6 +25,7 @@ The current migration sequence is:
 3. `supabase/migrations/20261104000300_studyspace_admin_mfa_enforcement.sql`
 4. `supabase/migrations/20261105000100_studyspace_classroom_and_ai.sql`
 5. `supabase/migrations/20261105000200_studyspace_admin_bootstrap_fix.sql`
+6. `supabase/migrations/20261105000300_studyspace_planner_sync_and_personal_files.sql`
 
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 
@@ -98,4 +99,4 @@ Before configuring the Student Planner, confirm its current Supabase client code
 - Admin functions require MFA; student enrolment and sign-in have server-side attempt throttling.
 - AI lesson recaps are teacher drafts. Review every recap before publishing and submit anonymised lesson material only.
 - Jitsi video/audio links are hosted by a third party and are not private database content. Do not share a class link outside the assigned class.
-- General planner tasks, resources, and some progress data may still be stored locally until the Student Planner's sync and resource-upload paths are fully integrated.
+- The planner sync migration adds updated timestamps, account-owned personal file records, and private Storage policies. The student client synchronises local tasks, subjects, sessions, calendar entries and personal files while signed in; the browser database remains the offline cache.

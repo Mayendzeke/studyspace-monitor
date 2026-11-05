@@ -21,12 +21,12 @@ language sql
 stable
 security definer
 set search_path = public
-as $
+as $$
   select exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'learner' and account_status = 'active'
   );
-$;
+$$;
 
 -- Private resource bucket access: admins manage objects; learners read only
 -- objects assigned to their own account.

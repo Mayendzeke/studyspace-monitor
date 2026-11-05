@@ -15,7 +15,7 @@ type Attempt = {
   marked_by: string | null;
   marked_at: string | null;
 };
-type Question = { id: string; exercise_set_id: string; question_type: string; prompt: string; points: number };
+type Question = { id: string; exercise_set_id: string; question_type: string; prompt: string; points: number; markingGuide?: string };
 type ReviewItem = {
   attempt: Attempt;
   title: string;
@@ -61,6 +61,17 @@ export default function AssessmentReviewQueue() {
       if (setResult.error) throw setResult.error;
       if (questionResult.error) throw questionResult.error;
       if (learnerResult.error) throw learnerResult.error;
+      const shortAnswerIds = (questionResult.data || []).filter(q => q.question_type === "short_answer").map(q => q.id);
+      let markingGuides = new Map<string, string>();
+      if (shortAnswerIds.length) {
+        const { data: answerKeys, error: answerKeyError } = await supabase.from("exercise_answer_keys")
+          .select("question_id,answer_key").in("question_id", shortAnswerIds);
+        if (answerKeyError) throw answerKeyError;
+        markingGuides = new Map((answerKeys || []).map(row => [
+          row.question_id,
+          String((row.answer_key as Record<string, unknown> | null)?.explanation || "")
+        ]));
+      }
       const setMap = new Map((setResult.data || []).map(row => [row.id, row]));
       const learnerMap = new Map((learnerResult.data || []).map(row => [row.id, row]));
       const assignmentMap = new Map(rows.map(row => [row.id, row]));
@@ -81,7 +92,7 @@ export default function AssessmentReviewQueue() {
           studentId: learner?.student_id || "",
           questions: (questionResult.data || []).filter(q =>
             q.exercise_set_id === assignment?.exercise_set_id && q.question_type === "short_answer"
-          ) as Question[],
+          ).map(q => ({ ...q, markingGuide: markingGuides.get(q.id) || "" })) as Question[],
         };
       }).filter(item => item.questions.length > 0);
       setItems(next);
@@ -184,6 +195,7 @@ export default function AssessmentReviewQueue() {
             <div className="assessment-review-question"><strong>Written response {index + 1}</strong><span>{question.points} marks</span></div>
             <p>{question.prompt}</p>
             <blockquote>{String(attempt.answers[question.id] ?? "").trim() || "No answer submitted."}</blockquote>
+            {question.markingGuide && <div className="assessment-review-guidance"><strong>Private marking guidance</strong><p>{question.markingGuide}</p></div>}
             <label>Mark awarded
               <input type="number" min="0" max={question.points} step="0.5" value={attemptMarks[question.id] ?? ""}
                 onChange={event => setMarks(current => ({ ...current, [attempt.id]: { ...(current[attempt.id] || {}), [question.id]: event.target.value } }))}/>

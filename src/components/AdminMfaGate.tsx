@@ -65,6 +65,9 @@ export default function AdminMfaGate({ onVerified }: Props) {
       }
       const {error:verifyError}=await supabase.auth.mfa.verify({factorId,challengeId:currentChallenge,code:code.trim()})
       if(verifyError)throw verifyError
+      const {data:assurance,error:assuranceError}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if(assuranceError)throw assuranceError
+      if(assurance.currentLevel!=='aal2')throw new Error('The code was accepted, but this session has not reached the required MFA level. Refresh the page and verify again.')
       onVerified()
     }catch(err){setError(err instanceof Error?err.message:'The verification code was not accepted.')}
     finally{setBusy(false)}

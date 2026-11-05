@@ -20,6 +20,7 @@ type LessonPlan = {
   aiRecap?: LessonRecap
   updatedAt: string
   publishedSessionId?: string
+  meetingUrl?: string
 }
 const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
@@ -50,13 +51,14 @@ export default function ClassroomStudio() {
       const [{data: auth},{data: messages},{data: session},{data: board}] = await Promise.all([
         supabase!.auth.getUser(),
         supabase!.from('session_messages').select('id,sender_id,message,created_at').eq('session_id',draft.publishedSessionId).order('created_at'),
-        supabase!.from('class_sessions').select('status').eq('id',draft.publishedSessionId).single(),
+        supabase!.from('class_sessions').select('status,meeting_url').eq('id',draft.publishedSessionId).single(),
         supabase!.from('session_whiteboards').select('board_state').eq('session_id',draft.publishedSessionId).maybeSingle()
       ]);
       if (!alive) return;
       if (auth.user) setAdminId(auth.user.id);
       if (messages) setTeacherMessages(messages);
       if (session?.status) setSessionStatus(session.status);
+      if (session?.meeting_url) setDraft(current=>({...current,meetingUrl:session.meeting_url}));
       const imageData=(board?.board_state as {imageData?:string}|null)?.imageData;
       if (imageData) setBoardImage(imageData);
       channel=supabase!.channel('monitor-session-'+draft.publishedSessionId)
@@ -113,10 +115,11 @@ export default function ClassroomStudio() {
       const adminId = authState.session?.user.id
       if (!adminId) throw new Error('Administrator sign-in is required.')
       const startsAt = new Date(draft.date + 'T09:00:00').toISOString()
+      const meetingUrl = 'https://meet.jit.si/Studyspace-' + crypto.randomUUID().replace(/-/g,'')
       const { data: session, error: sessionError } = await supabase.from('class_sessions').insert({
         created_by: adminId, title: draft.title.trim(), subject_name: draft.subject.trim(),
         education_level: draft.level, grade: draft.grade, curriculum: draft.curriculum,
-        objectives: draft.objectives, starts_at: startsAt, duration_minutes: draft.duration, status: 'scheduled'
+        objectives: draft.objectives, starts_at: startsAt, duration_minutes: draft.duration, status: 'scheduled', meeting_url: meetingUrl
       }).select('id').single()
       if (sessionError || !session) throw sessionError || new Error('The class session could not be created.')
       const memberRows = selectedLearners.map(learner_id => ({session_id:session.id,learner_id}))
@@ -138,9 +141,9 @@ export default function ClassroomStudio() {
       }
       const { error: boardError } = await supabase.from('session_whiteboards').insert({session_id:session.id,updated_by:adminId})
       if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
-      update({publishedSessionId:session.id})
+      update({publishedSessionId:session.id,meetingUrl})
       setSessionStatus('scheduled')
-      setPlans(current => current.map(plan => plan.id === draft.id ? {...plan,publishedSessionId:session.id} : plan))
+      setPlans(current => current.map(plan => plan.id === draft.id ? {...plan,publishedSessionId:session.id,meetingUrl} : plan))
       setNotice("Session published to " + selectedLearners.length + " learner(s). Their Today’s Session workspace can now load the shared lesson, notes and homework.")
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
     finally { setPublishing(false) }
@@ -182,7 +185,7 @@ export default function ClassroomStudio() {
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
         <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
-        <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}</div></div>
+        <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{draft.meetingUrl&&<a className="subtle-button" href={draft.meetingUrl} target="_blank" rel="noreferrer">Open video / audio room</a>}{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}</div></div>
         <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':'Learner'}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
         {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}
       </div>}</section>

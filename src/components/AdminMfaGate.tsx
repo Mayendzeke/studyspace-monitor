@@ -26,14 +26,20 @@ export default function AdminMfaGate({ onVerified }: Props) {
         const {data:factorData,error:factorError}=await supabase.auth.mfa.listFactors()
         if(factorError)throw factorError
         const verified=factorData.totp.find(f=>f.status==='verified')
-        const pending=factorData.totp.find(f=>f.status==='unverified' && f.friendly_name==='Studyspace Monitor administrator')
-        if(verified || pending){
+        const pending=factorData.all.find(f=>f.factor_type==='totp' && f.status==='unverified' && f.friendly_name==='Studyspace Monitor administrator')
+        const existingFactor=verified ?? pending
+        if(existingFactor){
           // Reuse an existing factor. A page refresh during setup must not
           // attempt to enrol a second factor with the same friendly name.
-          const factor=verified || pending
-          const {data:challenge,error:challengeError}=await supabase.auth.mfa.challenge({factorId:factor.id})
-          if(challengeError)throw challengeError
-          if(alive){setFactorId(factor.id);setChallengeId(challenge.id);setEnrolling(false)}
+          if(verified){
+            const {data:challenge,error:challengeError}=await supabase.auth.mfa.challenge({factorId:existingFactor.id})
+            if(challengeError)throw challengeError
+            if(alive){setFactorId(existingFactor.id);setChallengeId(challenge.id);setEnrolling(false)}
+          }else if(alive){
+            // Keep the pending factor's existing authenticator secret; never
+            // create a duplicate or silently discard an in-progress enrolment.
+            setFactorId(existingFactor.id);setEnrolling(true)
+          }
         }else{
           const {data:enrollment,error:enrollError}=await supabase.auth.mfa.enroll({factorType:'totp',friendlyName:'Studyspace Monitor administrator'})
           if(enrollError)throw enrollError

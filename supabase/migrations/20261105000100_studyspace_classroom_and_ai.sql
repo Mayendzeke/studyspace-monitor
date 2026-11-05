@@ -277,3 +277,87 @@ end;
 $$;
 revoke all on function public.update_studyspace_learner_profile(text,text,text,text,text,text,text,text) from public;
 grant execute on function public.update_studyspace_learner_profile(text,text,text,text,text,text,text,text) to authenticated;
+
+-- Learner planner data beyond the initial task and study-session tables.
+create table if not exists public.academic_periods (
+  id uuid primary key default gen_random_uuid(),
+  learner_id uuid not null references public.profiles(id) on delete cascade,
+  period_type text not null check (period_type in ('term','exam','holiday','semester','quarter')),
+  title text not null,
+  starts_on date not null,
+  ends_on date not null,
+  created_at timestamptz not null default now(),
+  check (ends_on >= starts_on)
+);
+create table if not exists public.academic_events (
+  id uuid primary key default gen_random_uuid(),
+  learner_id uuid not null references public.profiles(id) on delete cascade,
+  subject_id uuid references public.student_subjects(id) on delete set null,
+  title text not null,
+  event_type text not null default 'event',
+  starts_at timestamptz not null,
+  ends_at timestamptz,
+  all_day boolean not null default false,
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  check (ends_at is null or ends_at >= starts_at)
+);
+create table if not exists public.student_goals (
+  learner_id uuid primary key references public.profiles(id) on delete cascade,
+  goal_text text not null default '',
+  target_mark numeric(5,2) check (target_mark is null or target_mark between 0 and 100),
+  weekly_hours numeric(5,2) not null default 8 check (weekly_hours between 0 and 168),
+  preferred_days jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.flashcards (
+  id uuid primary key default gen_random_uuid(),
+  learner_id uuid not null references public.profiles(id) on delete cascade,
+  subject_id uuid references public.student_subjects(id) on delete cascade,
+  topic text not null default '',
+  front text not null,
+  back text not null,
+  is_known boolean not null default false,
+  review_count integer not null default 0 check (review_count >= 0),
+  last_reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create table if not exists public.progress_events (
+  id uuid primary key default gen_random_uuid(),
+  learner_id uuid not null references public.profiles(id) on delete cascade,
+  subject_id uuid references public.student_subjects(id) on delete set null,
+  event_type text not null,
+  score numeric(8,2),
+  max_score numeric(8,2),
+  duration_minutes integer check (duration_minutes is null or duration_minutes between 0 and 1440),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  check (score is null or score >= 0),
+  check (max_score is null or max_score > 0)
+);
+create index if not exists academic_periods_learner_dates on public.academic_periods(learner_id,starts_on,ends_on);
+create index if not exists academic_events_learner_time on public.academic_events(learner_id,starts_at);
+create index if not exists flashcards_learner_subject on public.flashcards(learner_id,subject_id);
+create index if not exists progress_events_learner_time on public.progress_events(learner_id,created_at desc);
+
+alter table public.academic_periods enable row level security;
+alter table public.academic_events enable row level security;
+alter table public.student_goals enable row level security;
+alter table public.flashcards enable row level security;
+alter table public.progress_events enable row level security;
+
+create policy "academic_periods_owner_admin" on public.academic_periods for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+create policy "academic_events_owner_admin" on public.academic_events for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+create policy "student_goals_owner_admin" on public.student_goals for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+create policy "flashcards_owner_admin" on public.flashcards for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());
+create policy "progress_events_owner_admin" on public.progress_events for all to authenticated
+using ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin())
+with check ((learner_id = auth.uid() and public.is_active_studyspace_learner()) or public.is_studyspace_admin());

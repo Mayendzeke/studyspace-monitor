@@ -1,4 +1,5 @@
 import ContentStudio from './components/ContentStudio'
+import ClassroomStudio from './components/ClassroomStudio'
 import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -11,13 +12,14 @@ import {
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Content Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Learners', icon: Users },
   { label: 'Content Studio', icon: PenTool },
+  { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Enrolment PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
   { label: 'Settings', icon: Settings },
@@ -161,6 +163,7 @@ function App() {
           {page === 'Overview' && <Overview navigate={navigate} />}
           {page === 'Learners' && <EmptyPage icon={<Users size={25} />} title="Learner accounts" description="When learner accounts are connected, select a learner's preferred name to open their individual workspace. From there, you will be able to review their subjects and progress, assign resources, and create learning activities for them." action="Create an enrolment PIN" onAction={() => navigate('Enrolment PINs')} />}
           {page === 'Content Studio' && <ContentStudio />}
+          {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <EmptyPage icon={<Activity size={25} />} title="Academic progress" description="Once learners are connected, this area will summarise study activity, subject progress and planner engagement." />}
           {page === 'Settings' && <SettingsPage />}

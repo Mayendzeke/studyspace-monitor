@@ -161,7 +161,7 @@ function App() {
 
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} />}
-          {page === 'Learners' && <EmptyPage icon={<Users size={25} />} title="Learner accounts" description="When learner accounts are connected, select a learner's preferred name to open their individual workspace. From there, you will be able to review their subjects and progress, assign resources, and create learning activities for them." action="Create an enrolment PIN" onAction={() => navigate('Enrolment PINs')} />}
+          {page === 'Learners' && <LearnersPage />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
@@ -312,6 +312,61 @@ function PinPage() {
     <div className="panel pin-history-panel">
       <div className="panel-heading"><div><h2>Recent invitations</h2><p>{pins.length} recent record(s)</p></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button></div>
       {pins.length ? <div className="pin-history-list">{pins.map(pin=>{const status=pin.redeemed_at?'Redeemed':pin.revoked_at?'Revoked':new Date(pin.expires_at).getTime()<Date.now()?'Expired':'Unused';return <article key={pin.id}><div><strong>{pin.student_id || 'Student ID unavailable'}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={'pin-status '+status.toLowerCase()}>{status}</span>{status==='Unused'&&<button className="text-button" disabled={busy} onClick={()=>void revokePin(pin.id)}>Revoke</button>}</article>})}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No invitations yet</strong><span>Create a PIN to invite your first learner.</span></div>}
+    </div>
+  </div>
+}
+
+
+function LearnersPage() {
+  type Learner = { id: string; student_id: string | null; full_name: string; preferred_name: string; account_status: string; created_at: string; grade: string; curriculum: string }
+  const [learners, setLearners] = useState<Learner[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState('')
+  const [temporary, setTemporary] = useState<{ studentId: string; password: string } | null>(null)
+  const refresh = async () => {
+    if (!supabase) { setLoading(false); setError('Connect Supabase to load learner accounts.'); return }
+    const { data, error: queryError } = await supabase.from('profiles')
+      .select('id,student_id,full_name,preferred_name,account_status,created_at,grade,curriculum')
+      .eq('role','learner').order('created_at',{ascending:false})
+    if (queryError) setError('Learner records could not be loaded. Check the applied migrations and administrator access.')
+    else { setLearners((data ?? []) as Learner[]); setError('') }
+    setLoading(false)
+  }
+  useEffect(() => { void refresh() }, [])
+  const manage = async (learner: Learner, action: 'disable' | 'enable' | 'reset_password') => {
+    if (!supabase) return
+    const label = action === 'disable' ? 'disable this learner account' : action === 'enable' ? 're-enable this learner account' : 'generate a new temporary password'
+    if (!window.confirm('Are you sure you want to ' + label + '?')) return
+    setBusyId(learner.id); setError(''); setNotice(''); setTemporary(null)
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('manage-learner-account',{body:{learnerId:learner.id,action}})
+      if (invokeError) throw invokeError
+      if (!data?.success) throw new Error(data?.error || 'The account action failed.')
+      if (action === 'reset_password') {
+        if (!data.temporaryPassword) throw new Error('The server did not return the temporary password.')
+        setTemporary({studentId:learner.student_id || 'Student ID unavailable',password:data.temporaryPassword})
+        setNotice('Password rotated. Copy the temporary password and deliver it privately; it will not be shown again.')
+      } else { setNotice(data.message || 'Account updated.'); await refresh() }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'The account action failed.') }
+    finally { setBusyId('') }
+  }
+  const copyPassword = () => {
+    if (!temporary) return
+    if (!navigator.clipboard) { setNotice('Clipboard is unavailable. Select and copy the temporary password manually.'); return }
+    void navigator.clipboard.writeText(temporary.password).then(()=>setNotice('Temporary password copied. Deliver it privately.')).catch(()=>setNotice('Clipboard access failed. Select and copy the password manually.'))
+  }
+  const visible = learners.filter(x => [x.student_id,x.full_name,x.preferred_name,x.grade,x.curriculum].some(v => (v || '').toLowerCase().includes(search.toLowerCase())))
+  return <div className="subpage learners-page">
+    <div className="eyebrow">LEARNER MANAGEMENT</div><h1>Learner accounts</h1><p className="page-subtitle">Review enrolled learners, control account access and rotate passwords without requiring student email addresses.</p>
+    <div className="panel learners-toolbar"><div><strong>{learners.length} learner account(s)</strong><small>Account changes require administrator MFA.</small></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button><button className="primary-button" onClick={()=>{window.dispatchEvent(new CustomEvent('studyspace-navigate-pins'))}}>Create enrolment PIN</button></div>
+    <label className="learners-search"><span>Search learners</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Student ID, name, grade or curriculum"/></label>
+    {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
+    {temporary&&<div className="pin-issued-card"><strong>Temporary password · shown once</strong><div><span>Student ID</span><code>{temporary.studentId}</code></div><div><span>New password</span><code>{temporary.password}</code><button className="subtle-button" onClick={copyPassword}>Copy password</button></div><small>The previous password has been replaced. Deliver this password directly to the learner.</small></div>}
+    <div className="panel learners-list-panel">
+      {loading?<div className="classroom-empty">Loading learner accounts…</div>:visible.length?visible.map(learner=><article className="learner-row" key={learner.id}><div className="learner-avatar">{(learner.preferred_name||learner.full_name||'S').slice(0,1).toUpperCase()}</div><div className="learner-identity"><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><span>{learner.student_id||'No Student ID'} · {learner.grade||'Grade not set'} · {learner.curriculum||'Curriculum not set'}</span><small>Joined {new Date(learner.created_at).toLocaleDateString()}</small></div><span className={'pin-status '+learner.account_status}>{learner.account_status}</span><div className="learner-actions"><button className="text-button" disabled={!!busyId} onClick={()=>void manage(learner,'reset_password')}>Reset password</button>{learner.account_status==='active'?<button className="text-button danger-text" disabled={!!busyId} onClick={()=>void manage(learner,'disable')}>Disable</button>:<button className="text-button" disabled={!!busyId} onClick={()=>void manage(learner,'enable')}>Enable</button>}</div></article>):<div className="classroom-empty"><Users size={25}/><strong>{search?'No matching learners':'No learner accounts yet'}</strong><span>{search?'Try another search term.':'Generate an enrolment PIN and share the Student ID and PIN with a learner.'}</span></div>}
     </div>
   </div>
 }

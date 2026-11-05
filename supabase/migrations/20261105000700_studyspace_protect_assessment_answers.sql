@@ -60,7 +60,10 @@ with source as (
   from public.exercise_questions
   where question_type = 'matching'
     and jsonb_typeof(content->'pairs') = 'array'
-    and jsonb_array_length(content->'pairs') > 1
+    and case
+      when jsonb_typeof(content->'pairs') = 'array' then jsonb_array_length(content->'pairs') > 1
+      else false
+    end
 ),
 left_items as (
   select s.id, item.ordinality as position, item.value->>'left' as left_value

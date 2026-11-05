@@ -14,10 +14,11 @@ The migrations are versioned SQL files. Apply them once, in order:
 2. `supabase/migrations/20261104000200_studyspace_security_hardening.sql`
 3. `supabase/migrations/20261104000300_studyspace_admin_mfa_enforcement.sql`
 4. `supabase/migrations/20261105000100_studyspace_classroom_and_ai.sql`
+5. `supabase/migrations/20261105000200_studyspace_admin_bootstrap_fix.sql`
 
 For the initial setup, use the Supabase Dashboard **SQL Editor** and run one migration at a time, checking for a successful result before continuing. Do not also run `supabase db push` after manually applying these files unless the migration history has been reconciled; otherwise the CLI may try to apply them again.
 
-The migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables.
+The migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration ensures the trusted SQL Editor can promote the first administrator while ordinary client requests remain protected.
 
 ## 3. Configure Edge Function secrets
 

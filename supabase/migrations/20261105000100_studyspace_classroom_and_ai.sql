@@ -198,7 +198,15 @@ create policy "whiteboard_member_update" on public.session_whiteboards
     public.is_studyspace_admin() or (public.is_active_studyspace_learner()
       and exists (select 1 from public.class_session_members m
         where m.session_id = session_whiteboards.session_id and m.learner_id = auth.uid()))
-  ) with check (updated_by = auth.uid());
+  ) with check (
+    updated_by = auth.uid()
+    and (public.is_studyspace_admin() or (
+      public.is_active_studyspace_learner() and exists (
+        select 1 from public.class_session_members m
+        where m.session_id = session_whiteboards.session_id and m.learner_id = auth.uid()
+      )
+    ))
+  );
 
 create policy "ai_usage_admin_read" on public.ai_generation_usage
   for select to authenticated using (public.is_studyspace_admin());
@@ -216,3 +224,54 @@ begin
   alter publication supabase_realtime add table public.session_whiteboards;
 exception when duplicate_object then null;
 end $$;
+
+-- Login and enrolment throttling records are private to server-side functions.
+create table if not exists public.student_auth_attempts (
+  id bigint generated always as identity primary key,
+  identifier_hash text not null,
+  source_hash text not null,
+  action text not null check (action in ('enrol','signin')),
+  was_successful boolean not null default false,
+  attempted_at timestamptz not null default now()
+);
+create index if not exists student_auth_attempts_identifier_time
+  on public.student_auth_attempts(identifier_hash, attempted_at desc);
+create index if not exists student_auth_attempts_source_time
+  on public.student_auth_attempts(source_hash, attempted_at desc);
+alter table public.student_auth_attempts enable row level security;
+revoke all on public.student_auth_attempts from anon, authenticated;
+
+-- Learners may update only their own ordinary profile fields through this RPC.
+create or replace function public.update_studyspace_learner_profile(
+  p_full_name text,
+  p_preferred_name text,
+  p_country text,
+  p_institution text,
+  p_education_level text,
+  p_grade text,
+  p_curriculum text,
+  p_academic_year text
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_active_studyspace_learner() then
+    raise exception 'An active learner account is required';
+  end if;
+  update public.profiles set
+    full_name = left(coalesce(p_full_name,''),120),
+    preferred_name = left(coalesce(p_preferred_name,''),80),
+    country = left(coalesce(p_country,''),80),
+    institution = left(coalesce(p_institution,''),160),
+    education_level = left(coalesce(p_education_level,''),80),
+    grade = left(coalesce(p_grade,''),80),
+    curriculum = left(coalesce(p_curriculum,''),120),
+    academic_year = left(coalesce(p_academic_year,''),30),
+    updated_at = now()
+  where id = auth.uid();
+end;
+$$;
+revoke all on function public.update_studyspace_learner_profile(text,text,text,text,text,text,text,text) from public;
+grant execute on function public.update_studyspace_learner_profile(text,text,text,text,text,text,text,text) to authenticated;

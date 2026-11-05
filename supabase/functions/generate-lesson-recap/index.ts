@@ -70,11 +70,17 @@ Deno.serve(async request => {
     "TEACHER SOURCE MATERIAL: " + sourceNotes,
   ].join("\n\n");
 
+  const { data: usageRecord, error: usageError } = await admin.from("ai_generation_usage").insert({
+    actor_id: authData.user.id, provider: "gemini", purpose: "lesson_recap",
+    input_characters: prompt.length, output_characters: 0,
+  }).select("id").single();
+  if (usageError || !usageRecord) return json(503, { error: "AI usage could not be recorded. Try again later." });
+
   let response: Response;
   try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey), {
+    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
@@ -98,10 +104,8 @@ Deno.serve(async request => {
     exitQuestion: typeof recap.exitQuestion === "string" ? recap.exitQuestion.slice(0, 400) : "",
   };
 
-  await admin.from("ai_generation_usage").insert({
-    actor_id: authData.user.id, provider: "gemini", purpose: "lesson_recap",
-    input_characters: prompt.length,
+  await admin.from("ai_generation_usage").update({
     output_characters: JSON.stringify(recap).length,
-  });
+  }).eq("id", usageRecord.id);
   return json(200, { success: true, provider: "gemini", model, recap });
 });

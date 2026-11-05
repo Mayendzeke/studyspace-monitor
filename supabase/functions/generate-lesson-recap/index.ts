@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+import { getTokenAssuranceLevel } from "../_shared/jwt-assurance.ts";
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
@@ -21,6 +22,7 @@ Deno.serve(async request => {
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
 
   const authorization = request.headers.get("Authorization");
+  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
@@ -28,14 +30,13 @@ Deno.serve(async request => {
   if (!["gemini", "openai"].includes(provider)) return json(500, { error: "Unsupported AI provider configuration." });
   const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");
   const model = Deno.env.get(provider === "openai" ? "OPENAI_MODEL" : "GEMINI_MODEL") ?? (provider === "openai" ? "gpt-4.1-mini" : "gemini-3.8-flash");
-  if (!authorization || !url || !anonKey || !serviceKey) return json(500, { error: "Supabase function configuration is incomplete." });
+  if (!accessToken || !url || !anonKey || !serviceKey) return json(500, { error: "Supabase function configuration is incomplete." });
   if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
 
-  const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
-  const { data: authData, error: authError } = await caller.auth.getUser();
+  const caller = createClient(url, anonKey, { auth: { persistSession: false } });
+  const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
   if (authError || !authData.user) return json(401, { error: "Sign in is required." });
-  const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (assuranceError || assurance.currentLevel !== "aal2") return json(403, { error: "Administrator multi-factor authentication is required." });
+  if (getTokenAssuranceLevel(accessToken) !== "aal2") return json(403, { error: "Administrator multi-factor authentication is required." });
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 

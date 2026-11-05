@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
@@ -18,8 +19,8 @@ Deno.serve(async request => {
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   const origin = request.headers.get("Origin");
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
-  const url = Deno.env.get("SUPABASE_URL"), anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
+  const url = Deno.env.get("SUPABASE_URL"), anonKey = getPublishableKey();
+  const serviceKey = getSecretKey(), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
   if (!url || !anonKey || !serviceKey || !ratePepper) return json(500, { error: "Student sign-in service configuration is incomplete." });
   let body: { studentId?: string; password?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }

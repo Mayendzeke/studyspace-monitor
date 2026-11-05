@@ -4,7 +4,7 @@ import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
@@ -36,6 +36,8 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [adminName, setAdminName] = useState('Administrator')
+  const handleMfaVerified = useCallback(() => setMfaVerified(true), [])
+
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       return localStorage.getItem('studyspace-monitor-theme') === 'dark' ? 'dark' : 'light'
@@ -99,7 +101,7 @@ function App() {
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} />
   if (authLoading || adminLoading) return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner" /><p>Verifying administrator access…</p></div></div>
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
-  if (!mfaVerified) return <AdminMfaGate onVerified={() => setMfaVerified(true)} />
+  if (!mfaVerified) return <AdminMfaGate onVerified={handleMfaVerified} />
 
   return (
     <div className="app-shell" data-theme={theme}>

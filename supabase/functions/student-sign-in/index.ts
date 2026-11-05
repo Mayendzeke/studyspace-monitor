@@ -39,8 +39,8 @@ Deno.serve(async request => {
   if (byId.error || bySource.error) return json(503, { error: "Sign-in protection is temporarily unavailable." });
   if ((byId.count ?? 0) >= 8 || (bySource.count ?? 0) >= 20) return json(429, { error: "Too many sign-in attempts. Wait 15 minutes and try again." });
 
-  const { data: profile } = await admin.from("profiles").select("id,account_status").eq("student_id", studentId).maybeSingle();
-  if (!profile || profile.account_status !== "active") {
+  const { data: profile } = await admin.from("profiles").select("id,role,account_status").eq("student_id", studentId).maybeSingle();
+  if (!profile || profile.role !== "learner" || profile.account_status !== "active") {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "signin", was_successful: false });
     return json(401, { error: "Student ID or password is incorrect." });
   }

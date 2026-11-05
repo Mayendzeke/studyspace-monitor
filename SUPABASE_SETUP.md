@@ -18,6 +18,8 @@ In **Project Settings → Integrations → GitHub**, confirm:
 
 The GitHub integration watches commits to the production branch. When Deploy to production is enabled, Supabase applies pending migrations in `supabase/migrations/` and deploys the Edge Functions declared in `supabase/config.toml`. The migration files are applied in timestamp order. Do not manually run the same SQL files in the SQL Editor or run `supabase db push` as a second deployment route; that can desynchronise migration history.
 
+Migration 006 is a corrective, forward-only repair for the two production columns `student_subjects.period_ids` and `exercise_assignments.available_at`. It uses `ADD COLUMN IF NOT EXISTS`, preserving existing rows and values. It is safe to apply if those columns are already present.
+
 The current migration sequence is:
 
 1. `supabase/migrations/20261104000100_studyspace_core.sql`
@@ -28,6 +30,7 @@ The current migration sequence is:
 6. `supabase/migrations/20261105000300_studyspace_planner_sync_and_personal_files.sql`
 7. `supabase/migrations/20261105000400_studyspace_content_studio_cloud.sql`
 8. `supabase/migrations/20261105000500_studyspace_sync_deletion_ledger.sql`
+9. `supabase/migrations/20261105000600_studyspace_schema_repair_missing_sync_columns.sql`
 
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 

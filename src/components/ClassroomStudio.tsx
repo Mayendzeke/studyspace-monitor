@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users } from 'lucide-react'
 
+type LessonRecap = { summary: string; keyPoints: string[]; workedExample: string; exitQuestion: string }
 type LessonPlan = {
   id: string
   title: string
@@ -15,6 +17,7 @@ type LessonPlan = {
   checkpoints: string[]
   homework: string
   homeworkDue: string
+  aiRecap?: LessonRecap
   updatedAt: string
 }
 const KEY = 'studyspace-monitor-classroom-plans-v1'
@@ -28,9 +31,26 @@ export default function ClassroomStudio() {
   const [draft, setDraft] = useState<LessonPlan>(blank)
   const [notice, setNotice] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
+  const generateRecap = async () => {
+    if (!supabase) { setNotice('Connect Supabase before using AI lesson recaps.'); return }
+    setAiBusy(true); setNotice('Preparing a concise lesson recap…')
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
+        title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
+        curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
+      } })
+      if (error) throw error
+      if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
+      update({ aiRecap: data.recap })
+      setNotice('AI draft generated. Review it for accuracy before sharing with learners.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'The AI recap could not be generated.')
+    } finally { setAiBusy(false) }
+  }
   const save = () => {
     if (!draft.title.trim() || !draft.subject.trim()) { setNotice('Add a lesson title and subject before saving.'); return }
     const saved = { ...draft, title: draft.title.trim(), subject: draft.subject.trim(), checkpoints: completePoints }
@@ -63,7 +83,8 @@ export default function ClassroomStudio() {
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>
-        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generation will use the lesson title, objectives and source material to create a short explanation, up to five key points, one worked example where relevant, and a quick exit question. It will not invent details beyond the supplied material.</p><small>Secure AI service not connected yet · No generated content is being claimed here.</small><button type="button" className="subtle-button" disabled title="Connect the secure AI service during the Supabase phase">Generate lesson recap</button></div></div>
+        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generation will use the lesson title, objectives and source material to create a short explanation, up to five key points, one worked example where relevant, and a quick exit question. It will not invent details beyond the supplied material.</p><small>Uses the configured Gemini provider. Do not include learner names, contact details or other personal information in source material.</small><button type="button" className="subtle-button" disabled={aiBusy || !draft.title.trim() || !draft.subject.trim() || (!draft.objectives.trim() && !draft.sourceNotes.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div></div>
+        {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
         <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>

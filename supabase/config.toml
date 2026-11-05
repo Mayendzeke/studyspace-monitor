@@ -1,5 +1,8 @@
 project_id = "studyspace"
 
+[remotes.production]
+project_id = "tibcoottzstnqkfpwabk"
+
 [functions.create-enrolment-pin]
 verify_jwt = false
 

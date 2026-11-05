@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
@@ -18,8 +19,8 @@ Deno.serve(async request => {
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
   const authorization = request.headers.get("Authorization");
   const url = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = getPublishableKey();
+  const serviceKey = getSecretKey();
   if (!authorization || !url || !anonKey || !serviceKey) return json(500, { error: "Function configuration is incomplete." });
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser();

@@ -25,6 +25,33 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Settings', icon: Settings },
 ]
 
+async function describeFunctionError(reason: unknown, fallback: string): Promise<string> {
+  const context = reason && typeof reason === 'object' && 'context' in reason
+    ? (reason as { context?: unknown }).context
+    : undefined
+
+  if (context instanceof Response) {
+    const status = context.status
+    try {
+      const payload = await context.clone().json() as { error?: unknown; message?: unknown }
+      const detail = typeof payload.error === 'string'
+        ? payload.error
+        : typeof payload.message === 'string' ? payload.message : ''
+      if (detail) return `${detail} (HTTP ${status})`
+    } catch {
+      try {
+        const detail = (await context.clone().text()).trim().slice(0, 240)
+        if (detail) return `${detail} (HTTP ${status})`
+      } catch {
+        // Keep the HTTP status even when the response body cannot be read.
+      }
+    }
+    return `The server rejected the request (HTTP ${status}).`
+  }
+
+  return reason instanceof Error ? reason.message : fallback
+}
+
 function App() {
   const [page, setPage] = useState<Page>('Overview')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -286,7 +313,7 @@ function PinPage() {
       setNewPin({ pin: data.pin, studentId: data.studentId, expiresAt: data.expiresAt })
       setNotice('New learner access created. Copy both values and deliver them privately.')
       await refresh()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN creation failed.') }
+    } catch (reason) { setError(await describeFunctionError(reason, 'PIN creation failed.')) }
     finally { setBusy(false) }
   }
   const revokePin = async (id: string) => {
@@ -298,7 +325,7 @@ function PinPage() {
       if (!data?.success) throw new Error(data?.error || 'The PIN could not be revoked.')
       setNotice(data.message || 'PIN revoked.')
       await refresh()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN revocation failed.') }
+    } catch (reason) { setError(await describeFunctionError(reason, 'PIN revocation failed.')) }
     finally { setBusy(false) }
   }
   const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }

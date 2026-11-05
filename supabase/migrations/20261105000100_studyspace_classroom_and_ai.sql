@@ -216,12 +216,12 @@ revoke insert, update, delete on public.ai_generation_usage from authenticated;
 
 -- Realtime is used only for the shared session tables. Row policies still
 -- determine which authenticated users can receive each row.
-do $
+do $$
 begin
   alter publication supabase_realtime add table public.class_sessions;
 exception when duplicate_object then null;
-end $;
-do $
+end $$;
+do $$
 begin
   alter publication supabase_realtime add table public.session_messages;
 exception when duplicate_object then null;

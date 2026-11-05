@@ -58,7 +58,7 @@ jobs:
 
           console.log('Supabase project URL and public-key format validated. Key value was not printed.')
           NODE
-      - name: Verify assessment Edge Function rejects unauthenticated requests
+      - name: Verify assessment Edge Function rejects invalid session tokens
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
@@ -70,6 +70,7 @@ jobs:
             method: 'POST',
             headers: {
               apikey: key,
+              Authorization: 'Bearer invalid.invalid.invalid',
               'Content-Type': 'application/json',
               Origin: 'https://mayendzeke.github.io',
             },
@@ -80,9 +81,9 @@ jobs:
           try { payload = JSON.parse(responseBody) } catch { payload = null }
           if (response.status !== 401 || payload?.error !== 'Sign in is required.') {
             const detail = responseBody.slice(0, 180)
-            throw new Error('submit-exercise-attempt expected an unauthenticated HTTP 401 response, received HTTP ' + response.status + ': ' + detail)
+            throw new Error('submit-exercise-attempt expected HTTP 401 for an invalid learner token, received HTTP ' + response.status + ': ' + detail)
           }
-          console.log('submit-exercise-attempt is deployed and correctly rejects requests without a learner token.')
+          console.log('submit-exercise-attempt is deployed and correctly rejects requests with an invalid learner token.')
           NODE
       - name: Build
         env:

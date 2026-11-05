@@ -26,10 +26,14 @@ export default function AdminMfaGate({ onVerified }: Props) {
         const {data:factorData,error:factorError}=await supabase.auth.mfa.listFactors()
         if(factorError)throw factorError
         const verified=factorData.totp.find(f=>f.status==='verified')
-        if(verified){
-          const {data:challenge,error:challengeError}=await supabase.auth.mfa.challenge({factorId:verified.id})
+        const pending=factorData.totp.find(f=>f.status==='unverified' && f.friendly_name==='Studyspace Monitor administrator')
+        if(verified || pending){
+          // Reuse an existing factor. A page refresh during setup must not
+          // attempt to enrol a second factor with the same friendly name.
+          const factor=verified || pending
+          const {data:challenge,error:challengeError}=await supabase.auth.mfa.challenge({factorId:factor.id})
           if(challengeError)throw challengeError
-          if(alive){setFactorId(verified.id);setChallengeId(challenge.id);setEnrolling(false)}
+          if(alive){setFactorId(factor.id);setChallengeId(challenge.id);setEnrolling(false)}
         }else{
           const {data:enrollment,error:enrollError}=await supabase.auth.mfa.enroll({factorType:'totp',friendlyName:'Studyspace Monitor administrator'})
           if(enrollError)throw enrollError

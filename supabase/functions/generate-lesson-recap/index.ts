@@ -33,7 +33,7 @@ Deno.serve(async request => {
   if (!accessToken || !url || !anonKey || !serviceKey) return json(500, { error: "Supabase function configuration is incomplete." });
   if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
 
-  const caller = createClient(url, anonKey, { auth: { persistSession: false } });
+  const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
   if (authError || !authData.user) return json(401, { error: "Sign in is required." });
   if (getTokenAssuranceLevel(accessToken) !== "aal2") return json(403, { error: "Administrator multi-factor authentication is required." });

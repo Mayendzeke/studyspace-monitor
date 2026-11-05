@@ -36,6 +36,8 @@ The current migration sequence is:
 10. `supabase/migrations/20261105000700_studyspace_protect_assessment_answers.sql`
 11. `supabase/migrations/20261105000800_studyspace_resource_storage_access.sql`
 
+Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
+
 These migrations create the shared learner/admin profiles, enrolment and authentication controls, planner data, private resource storage, exercises, classroom sessions, chat, whiteboards, lesson notes, homework, and AI usage records. Row Level Security (RLS) is enabled for application tables. The final migration allows a trusted SQL Editor session to promote the first administrator while ordinary client requests remain protected.
 
 If Deploy to production is disabled, commits in GitHub will **not** apply these migrations or deploy the functions to the live project. Enable it before expecting the backend to activate.

@@ -66,7 +66,7 @@ function loadJaasScript(appId: string): Promise<void> {
       if (window.JitsiMeetExternalAPI) resolve();
       else reject(new Error("JaaS loaded without its meeting API."));
     };
-    const onError = () => reject(new Error("JaaS could not be loaded. Check your internet connection and try again."));
+    const onError = () => { script?.remove(); reject(new Error("JaaS could not be loaded. Check your internet connection and try again.")); };
     script.addEventListener("load", onLoad, { once: true });
     script.addEventListener("error", onError, { once: true });
     if (!script.isConnected) document.head.appendChild(script);
@@ -139,7 +139,13 @@ export default function LiveClassroomCall({
           credentials.provider !== "jaas" ||
           credentials.domain !== "8x8.vc" ||
           typeof credentials.appId !== "string" ||
+          !/^vpaas-magic-cookie-[a-f0-9]{32}$/i.test(credentials.appId) ||
           typeof credentials.roomName !== "string" ||
+          !new RegExp("^" + credentials.appId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\          typeof credentials.appId !== "string" ||
+          typeof credentials.roomName !== "string" ||
+          typeof credentials.token !== "string" ||
+          !credentials.token") + "/Studyspace-[a-f0-9]{32}$", "i").test(credentials.roomName) ||
+          credentials.moderator !== (audience === "teacher") ||
           typeof credentials.token !== "string" ||
           !credentials.token
         ) {
@@ -184,6 +190,7 @@ export default function LiveClassroomCall({
         callInstance.addEventListener("videoConferenceLeft", () => {
           if (alive) {
             setConnected(false);
+            setRoomReady(false);
             setParticipantCount(0);
             setLoading(false);
           }

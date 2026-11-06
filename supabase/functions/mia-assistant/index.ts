@@ -50,7 +50,7 @@ Deno.serve(async request => {
   if (authError || !auth.user) return json(401, { error: "Your session has expired. Sign in again." });
   const learnerId = auth.user.id;
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("role,account_status,full_name,preferred_name,country,institution,education_level,grade,curriculum,academic_year")
+    .select("role,account_status,education_level,grade,curriculum,academic_year")
     .eq("id", learnerId).maybeSingle();
   if (profileError || !profile || profile.role !== "learner" || profile.account_status !== "active") {
     return json(403, { error: "MIΛ is available to active student accounts only." });
@@ -103,9 +103,7 @@ Deno.serve(async request => {
 
   const studentContext = [
     "STUDENT PROFILE (trusted database fields):",
-    "Name: " + (profile.preferred_name || profile.full_name || "Student"),
-    "School: " + (profile.institution || "Not provided"),
-    "Country: " + (profile.country || "Not provided"),
+    "Student identifiers are not included in the model context.",
     "Level and grade: " + [profile.education_level, profile.grade].filter(Boolean).join(" / "),
     "Curriculum: " + (profile.curriculum || "Not provided"),
     "Academic year: " + (profile.academic_year || "Not provided"),
@@ -138,7 +136,7 @@ Deno.serve(async request => {
       "Read this photographed timetable. Extract only clearly legible recurring school timetable entries.",
       "Return JSON with reply and memory plus timetableDraft: an array of objects with day_of_week (0=Sunday, 1=Monday ... 6=Saturday), subject_name, title, starts_at (24-hour HH:MM), ends_at (HH:MM), location, notes.",
       "Do not guess illegible times or days. Leave uncertain items out and mention them in reply. Never decide whether this is a school timetable or personal study timetable; ask the student to choose. Do not create or save events.",
-      "Use a concise reply asking the student to review the extracted entries and identify timetable type.",
+      "Ask the student to review and correct entries, then choose school or personal study timetable. Optional instruction: " + String(body.message ?? "").slice(0, 300),
     ].join("\n") });
     parts.push({ inlineData: { mimeType: body.image!.mimeType, data: body.image!.data } });
   } else {
@@ -200,6 +198,14 @@ Deno.serve(async request => {
   }
   await admin.from("mia_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId).eq("learner_id", learnerId);
   await admin.from("ai_generation_usage").update({ output_characters: JSON.stringify(result).length }).eq("id", usage.data.id);
+  // Keep recent raw chat bounded; structured learning memory persists separately.
+  const { data: olderMessages } = await admin.from("mia_messages").select("id")
+    .eq("conversation_id", conversationId).eq("learner_id", learnerId)
+    .order("created_at", { ascending: false }).range(40, 500);
+  if (olderMessages?.length) {
+    await admin.from("mia_messages").delete().eq("conversation_id", conversationId)
+      .eq("learner_id", learnerId).in("id", olderMessages.map(x => x.id));
+  }
 
   const timetableDraft = action === "parse_timetable" && Array.isArray(result.timetableDraft)
     ? result.timetableDraft.slice(0, 50).filter((x: any) => Number.isInteger(x.day_of_week) && x.day_of_week >= 0 && x.day_of_week <= 6

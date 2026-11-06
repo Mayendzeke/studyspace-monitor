@@ -114,9 +114,9 @@ function findOptions(lines: string[]): { stemLines: string[]; options: string[] 
       }
       continue;
     }
-    optionsStarted = true;
     const firstIndex = matches[0].index ?? 0;
-    if (firstIndex > 0 && !optionsStarted) stemLines.push(line.slice(0, firstIndex));
+    if (!optionsStarted && firstIndex > 0) stemLines.push(line.slice(0, firstIndex));
+    optionsStarted = true;
     for (const match of matches) {
       const value = (match[3] || "").trim();
       if (value) options.push(value);

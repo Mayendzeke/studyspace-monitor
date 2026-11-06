@@ -118,46 +118,51 @@ export default function ContentStudio() {
     if(!supabase) throw new Error('Supabase is not connected.');
     const {data:authState,error:authError}=await supabase.auth.getUser();
     if(authError||!authState.user) throw new Error('Sign in again to save content to Studyspace.');
-    const {error:setError}=await supabase.from('exercise_sets').upsert({
-      id:draft.id,created_by:authState.user.id,title:draft.title,instructions:draft.instructions,
-      subject_name:draft.subject,education_level:draft.level,grade:draft.grade,curriculum:draft.curriculum,
-      question_count:draft.questions.length,review_status:status,
-      duration_minutes:draft.duration,due_date:draft.dueDate||null,
-      source_resource_id:draft.sourceResourceId||null,updated_at:new Date().toISOString()
-    },{onConflict:'id'});
-    if(setError) throw setError;
-    const {data:oldQuestions,error:oldError}=await supabase.from('exercise_questions').select('id').eq('exercise_set_id',draft.id);
-    if(oldError) throw oldError;
-    if(oldQuestions?.length){
-      const {error:deleteError}=await supabase.from('exercise_questions').delete().eq('exercise_set_id',draft.id);
-      if(deleteError) throw deleteError;
-    }
-    if(draft.questions.length){
-      const rows=draft.questions.map((q,index)=>({
-        id:q.id,exercise_set_id:draft.id,position:index+1,question_type:q.type,prompt:q.prompt,
-        // Never put accepted answers, correct matching pairs, or explanations
-        // in learner-readable question content. Matching choices are rotated so
-        // the right-hand choices are not aligned with the correct left-hand item.
-        content:{
-          options:q.options,
-          pairs:q.type==='matching'&&q.pairs.length>1
-            ? q.pairs.map((pair,index)=>({left:pair.left,right:q.pairs[(index+1)%q.pairs.length].right}))
-            : q.type==='matching'?q.pairs.map(pair=>({left:pair.left,right:pair.right})) : undefined,
-          difficulty:q.difficulty,
-          topic:q.topic,
-          clue:q.type==='word_puzzle'?q.explanation:undefined
-        },
-        explanation:'',points:q.points,topic:q.topic,difficulty:q.difficulty,
-      }));
-      const {error:questionError}=await supabase.from('exercise_questions').insert(rows);
-      if(questionError) throw questionError;
-      const keys=draft.questions.map(q=>({
-        question_id:q.id,
-        answer_key:{answer:q.answer,acceptedAnswers:q.acceptedAnswers,pairs:q.type==='matching'?q.pairs:undefined,explanation:q.type==='word_puzzle'?'':q.explanation}
-      }));
-      const {error:keyError}=await supabase.from('exercise_answer_keys').upsert(keys,{onConflict:'question_id'});
-      if(keyError) throw keyError;
-    }
+
+    const rows=draft.questions.map((q,index)=>({
+      id:q.id,
+      position:index+1,
+      question_type:q.type,
+      prompt:q.prompt,
+      // Never put accepted answers, correct matching pairs, or explanations
+      // in learner-readable question content. Matching choices are rotated so
+      // the right-hand choices are not aligned with the correct left-hand item.
+      content:{
+        options:q.options,
+        pairs:q.type==='matching'&&q.pairs.length>1
+          ? q.pairs.map((pair,index)=>({left:pair.left,right:q.pairs[(index+1)%q.pairs.length].right}))
+          : q.type==='matching'?q.pairs.map(pair=>({left:pair.left,right:pair.right})) : undefined,
+        difficulty:q.difficulty,
+        topic:q.topic,
+        clue:q.type==='word_puzzle'?q.explanation:undefined
+      },
+      explanation:'',
+      points:q.points,
+      topic:q.topic,
+      difficulty:q.difficulty,
+    }));
+    const keys=draft.questions.map(q=>({
+      question_id:q.id,
+      answer_key:{answer:q.answer,acceptedAnswers:q.acceptedAnswers,pairs:q.type==='matching'?q.pairs:undefined,explanation:q.type==='word_puzzle'?'':q.explanation}
+    }));
+    const {error:saveError}=await supabase.rpc('save_studyspace_exercise_draft',{
+      p_set:{
+        id:draft.id,
+        title:draft.title.trim(),
+        instructions:draft.instructions,
+        subject_name:draft.subject.trim(),
+        education_level:draft.level,
+        grade:draft.grade,
+        curriculum:draft.curriculum,
+        review_status:status,
+        duration_minutes:Math.max(1,Math.min(300,draft.duration)),
+        due_date:draft.dueDate||null,
+        source_resource_id:draft.sourceResourceId||null,
+      },
+      p_questions:rows,
+      p_answer_keys:keys,
+    });
+    if(saveError) throw new Error('The assessment was not changed. '+saveError.message);
     return {...draft,status,updatedAt:new Date().toISOString()};
   }
 

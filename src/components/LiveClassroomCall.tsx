@@ -4,6 +4,7 @@ import { ExternalLink, Mic, Video, X } from "lucide-react";
 type JitsiApi = {
   dispose: () => void;
   executeCommand?: (command: string) => void;
+  getNumberOfParticipants?: () => number;
   addEventListener: (event: string, callback: (payload?: unknown) => void) => void;
 };
 
@@ -68,6 +69,8 @@ export default function LiveClassroomCall({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [roomReady, setRoomReady] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -77,6 +80,8 @@ export default function LiveClassroomCall({
     setLoading(true);
     setError("");
     setConnected(false);
+    setRoomReady(false);
+    setParticipantCount(0);
 
     const start = async () => {
       try {
@@ -97,18 +102,30 @@ export default function LiveClassroomCall({
           },
         });
         apiRef.current = instance;
-        instance.addEventListener("videoConferenceJoined", () => {
-          if (alive) { setConnected(true); setLoading(false); }
+        const callInstance = instance;
+        callInstance.addEventListener("videoConferenceJoined", () => {
+          if (!alive) return;
+          setConnected(true);
+          setRoomReady(true);
+          setLoading(false);
+          setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 1);
         });
-        instance.addEventListener("videoConferenceLeft", () => {
-          if (alive) { setConnected(false); setLoading(false); }
+        callInstance.addEventListener("participantJoined", () => {
+          if (alive) setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 2);
         });
-        instance.addEventListener("readyToClose", () => {
-          if (alive) { setConnected(false); setOpen(false); setLoading(false); }
+        callInstance.addEventListener("participantLeft", () => {
+          if (alive) setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 1);
+        });
+        callInstance.addEventListener("videoConferenceLeft", () => {
+          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setLoading(false); }
+        });
+        callInstance.addEventListener("readyToClose", () => {
+          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setOpen(false); setLoading(false); }
         });
         instance.addEventListener("errorOccurred", () => {
           if (alive) { setError("The video room reported a problem. You can try again or open it in a new tab."); setLoading(false); }
         });
+        setRoomReady(true);
         setLoading(false);
       } catch (reason) {
         if (alive) {
@@ -131,6 +148,9 @@ export default function LiveClassroomCall({
   function leaveCall() {
     try { apiRef.current?.executeCommand?.("hangup"); } catch { /* Dispose still removes the embedded room. */ }
     setOpen(false);
+    setConnected(false);
+    setRoomReady(false);
+    setParticipantCount(0);
   }
 
   return (
@@ -151,6 +171,8 @@ export default function LiveClassroomCall({
       </div>
       {loading && <p className="live-classroom-call-status" role="status">Connecting to the classroom video service…</p>}
       {error && <p className="live-classroom-call-error" role="alert">{error}</p>}
+      {open && roomReady && !connected && <p className="live-classroom-call-status" role="status">The video room is ready. Complete the name and microphone check in the meeting panel, then join the call.</p>}
+      {connected && <p className="live-classroom-call-status" role="status">Connected · {participantCount} participant{participantCount===1?"":"s"} in this room. You can use the meeting controls below.</p>}
       {open && <div className="live-classroom-call-frame" ref={mountRef} aria-label="Video classroom" />}
       <p className="live-classroom-call-footnote">
         {connected ? "You are connected to the room. Use the meeting controls to mute, share your screen or leave." : "The room opens inside Studyspace. Allow microphone or camera access only when you are ready."}

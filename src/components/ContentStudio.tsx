@@ -377,23 +377,29 @@ export default function ContentStudio() {
       }
       setResources(current=>[...uploaded,...current.filter(item=>!uploaded.some(next=>next.id===item.id))])
       if(isPastPaper&&importedQuestions.length){
-        const baseTitle=selected[0].name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ').trim()
-        setActiveId(null)
-        setTitle(baseTitle||'Imported past paper')
-        setSubject(uploadSubject.trim()||subject.trim())
-        setLevel(level)
-        setGrade(grade)
-        setCurriculum(curriculum)
-        setInstructions('Answer every question. The original past paper is available in the assigned resource library for diagrams and source material.')
-        setDuration(Math.min(180,Math.max(15,Math.ceil(importedQuestions.reduce((sum,q)=>sum+q.points,0)*1.5))))
+        const baseTitle=selected[0].name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ').trim()||'Imported past paper'
+        const assessmentSubject=uploadSubject.trim()||subject.trim()
+        const estimatedDuration=Math.min(180,Math.max(15,Math.ceil(importedQuestions.reduce((sum,q)=>sum+q.points,0)*1.5)))
+        const importedDraft:ExerciseDraft={
+          id:crypto.randomUUID(),title:baseTitle,subject:assessmentSubject,level,grade,curriculum,
+          instructions:'Answer every question. The original paper is stored in the teacher resource library; assign that PDF separately when learners need diagrams or the full source.',
+          duration:estimatedDuration,dueDate:'',questions:importedQuestions,status:'draft',updatedAt:new Date().toISOString()
+        }
+        setDrafts(current=>[importedDraft,...current.filter(item=>item.id!==importedDraft.id)])
+        setActiveId(importedDraft.id)
+        setTitle(importedDraft.title)
+        setSubject(importedDraft.subject)
+        setInstructions(importedDraft.instructions)
+        setDuration(importedDraft.duration)
         setDueDate('')
         setQuestions(importedQuestions)
         setEditing(0)
         setPreview(false)
         setTab('builder')
         const mc=importedQuestions.filter(question=>question.type==='multiple_choice').length
-        const written=importedQuestions.length-mc
-        setNotice('Past paper uploaded ('+paperPages+' pages). Extracted '+importedQuestions.length+' question part(s): '+mc+' multiple choice and '+written+' written response. Review every question, add the correct answers and check marks before saving or assigning.')
+        const tf=importedQuestions.filter(question=>question.type==='true_false').length
+        const written=importedQuestions.length-mc-tf
+        setNotice('Past paper uploaded ('+paperPages+' pages). '+importedQuestions.length+' extracted question part(s) have been saved as a local draft: '+mc+' multiple choice, '+tf+' true/false and '+written+' written response. Review the wording, marks and answer keys; then save the draft to Studyspace, submit it for review and assign it to learners.')
       }else{
         setNotice(uploaded.length+' resource(s) uploaded securely and saved to the cloud library.'+(extractionWarning?' '+extractionWarning:''))
       }

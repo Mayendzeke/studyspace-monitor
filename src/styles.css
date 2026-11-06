@@ -12,6 +12,17 @@
   --muted: #8992a5;
   --purple: #7164d8;
   --purple-dark: #5d51c3;
+  --page-bg: #e9edf5;
+  --panel: #f4f6fb;
+  --panel-strong: #ffffff;
+  --border: rgba(62,84,122,.15);
+  --text: var(--ink);
+  --blue: #655bd0;
+  --mint: #26866e;
+  --danger: #b4233a;
+  --accent: var(--purple);
+  --line: var(--border);
+  --surface-2: #edf0f7;
   --raised: 7px 7px 16px #cbd0da, -7px -7px 16px #ffffff;
   --raised-small: 4px 4px 9px #cbd0da, -4px -4px 9px #ffffff;
   --inset: inset 4px 4px 8px #cbd0da, inset -4px -4px 8px #ffffff;
@@ -271,7 +282,7 @@ h1 span { color: #8278d9; }
 .assignment-preview-grid span{font-size:8px;color:var(--muted);font-weight:700;letter-spacing:.8px}
 .assignment-preview-grid strong{font-size:10px;color:var(--ink);line-height:1.45}
 .primary-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
-:root[data-theme="dark"]{--surface:#252a38;--ink:#edf0fa;--muted:#a9b1c3;--raised:7px 7px 16px #191d28,-7px -7px 16px #303748;--raised-small:4px 4px 9px #191d28,-4px -4px 9px #303748;--inset:inset 4px 4px 8px #191d28,inset -4px -4px 8px #303748}
+:root[data-theme="dark"]{--surface:#252a38;--ink:#edf0fa;--muted:#a9b1c3;--page-bg:#1c2230;--panel:#202633;--panel-strong:#2b3345;--border:rgba(220,225,245,.13);--text:var(--ink);--blue:#a79aff;--mint:#70d7b6;--danger:#ff9aa8;--accent:var(--purple);--line:var(--border);--surface-2:#30384b;--raised:7px 7px 16px #191d28,-7px -7px 16px #303748;--raised-small:4px 4px 9px #191d28,-4px -4px 9px #303748;--inset:inset 4px 4px 8px #191d28,inset -4px -4px 8px #303748}
 :root[data-theme="dark"] body,:root[data-theme="dark"] .sidebar,:root[data-theme="dark"] .icon-button,:root[data-theme="dark"] .stat-card,:root[data-theme="dark"] .panel{background-color:var(--surface);color:var(--ink)}
 :root[data-theme="dark"] .brand-copy strong,:root[data-theme="dark"] h1,:root[data-theme="dark"] .stat-value,:root[data-theme="dark"] .panel-heading h2,:root[data-theme="dark"] .setup-banner-copy strong,:root[data-theme="dark"] .studio-resource-row strong,:root[data-theme="dark"] .activity-type-row strong,:root[data-theme="dark"] .assignment-preview-grid strong{color:var(--ink)}
 :root[data-theme="dark"] .workspace-copy strong,:root[data-theme="dark"] .profile-copy strong,:root[data-theme="dark"] .breadcrumb strong{color:#dce2f2}
@@ -684,3 +695,25 @@ h1 span { color: #8278d9; }
 
 
 .classroom-chat-notice{margin-left:auto;color:#6258c5;font-size:9px;font-weight:700}
+
+
+/* Branded loading screen used during authentication and workspace checks. */
+.monitor-splash{--splash-bg:#e9edf5;--splash-panel:#f4f6fb;--splash-ink:#30384b;--splash-muted:#8992a5;--splash-accent:#7164d8;min-height:100svh;position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden;padding:28px;background:radial-gradient(ellipse at 50% 42%,rgba(113,100,216,.14),transparent 42%),var(--splash-bg);color:var(--splash-ink)}
+.monitor-splash[data-theme="dark"]{--splash-bg:#1c2230;--splash-panel:#252a38;--splash-ink:#edf0fa;--splash-muted:#a9b1c3;--splash-accent:#a79aff;background:radial-gradient(ellipse at 50% 42%,rgba(113,100,216,.2),transparent 42%),var(--splash-bg)}
+.monitor-splash-glow{position:absolute;z-index:-1;width:280px;height:280px;border-radius:50%;filter:blur(90px);opacity:.16;pointer-events:none}
+.monitor-splash-glow-one{top:7%;left:9%;background:#7468dc}
+.monitor-splash-glow-two{right:8%;bottom:2%;background:#52bfa4}
+.monitor-splash-content{display:flex;align-items:center;flex-direction:column;text-align:center;gap:15px}
+.monitor-splash-brand{display:flex;align-items:center;gap:15px;margin-bottom:12px}
+.monitor-splash-mark{width:66px;height:66px;display:grid;place-items:center;border-radius:21px;background:linear-gradient(145deg,#887be9,#6154c7);color:#fff;box-shadow:7px 7px 17px rgba(75,70,135,.2),-5px -5px 12px rgba(255,255,255,.38)}
+.monitor-splash-wordmark{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
+.monitor-splash-wordmark strong{font:800 30px Manrope,sans-serif;letter-spacing:-1.3px;color:var(--splash-ink)}
+.monitor-splash-wordmark strong span{color:var(--splash-accent)}
+.monitor-splash-wordmark small{margin-top:7px;font-size:9px;letter-spacing:2.8px;font-weight:800;color:var(--splash-muted)}
+.monitor-splash-loader{width:168px;height:4px;margin-top:12px;border-radius:20px;background:rgba(135,145,165,.2);overflow:hidden}
+.monitor-splash-loader span{display:block;width:0;height:100%;border-radius:20px;background:linear-gradient(90deg,#70d7b6,#8db9ff,var(--splash-accent));animation:monitor-splash-progress 2.2s ease-out forwards}
+.monitor-splash-content>p{margin:0;color:var(--splash-muted);font-size:12px;letter-spacing:.25px}
+.monitor-splash-caption{color:var(--splash-muted);font-size:8px;font-weight:800;letter-spacing:1.6px}
+.monitor-splash-footer{position:absolute;bottom:24px;display:flex;align-items:center;gap:8px;color:var(--splash-muted);font-size:8px;font-weight:700;letter-spacing:1.6px}
+@keyframes monitor-splash-progress{0%{width:0}40%{width:48%}75%{width:82%}100%{width:100%}}
+@media(prefers-reduced-motion:reduce){.monitor-splash-loader span{animation:none;width:100%}}

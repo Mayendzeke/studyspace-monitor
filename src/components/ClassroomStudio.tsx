@@ -67,7 +67,7 @@ export default function ClassroomStudio() {
   const [subjectOptions, setSubjectOptions] = useState<string[]>([])
   const [subjectManual, setSubjectManual] = useState(false)
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
-  const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
+  const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])\n  const [chatNotice, setChatNotice] = useState('')
   const [chatDraft, setChatDraft] = useState('')
   const [sessionStatus, setSessionStatus] = useState<'scheduled'|'live'|'ended'|'cancelled'|null>(null)
   const [boardImage, setBoardImage] = useState('')
@@ -123,7 +123,14 @@ export default function ClassroomStudio() {
       channel=supabase!.channel('monitor-session-'+draft.publishedSessionId)
         .on('postgres_changes',{event:'INSERT',schema:'public',table:'session_messages',filter:'session_id=eq.'+draft.publishedSessionId},payload=>{
           const row=payload.new as {id:string;sender_id:string;message:string;created_at:string};
-          if(alive) setTeacherMessages(current=>current.some(item=>item.id===row.id)?current:[...current,row]);
+          if(alive) {
+            setTeacherMessages(current=>current.some(item=>item.id===row.id)?current:[...current,row]);
+            if(row.sender_id!==adminId) {
+              const sender=learners.find(item=>item.id===row.sender_id);
+              setChatNotice('New message from '+(sender?.preferred_name||sender?.full_name||'a learner'));
+              if('Notification' in window && Notification.permission==='granted') new Notification('Studyspace class chat',{body:(sender?.preferred_name||sender?.full_name||'A learner')+' sent a message.'});
+            }
+          }
         })
         .on('postgres_changes',{event:'*',schema:'public',table:'session_whiteboards',filter:'session_id=eq.'+draft.publishedSessionId},payload=>{
           const image=(payload.new as {board_state?:{imageData?:string}}).board_state?.imageData;
@@ -310,7 +317,7 @@ export default function ClassroomStudio() {
         <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
         {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}
         {sessionStatus==='scheduled'&&<p className="classroom-live-waiting">Start the lesson to open the embedded video room. Learners will see the same Join button in Today's Session.</p>}
-        <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':'Learner'}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
+        <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat{chatNotice&&<small className="classroom-chat-notice" role="status">{chatNotice}</small>}</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':(learners.find(learner=>learner.id===item.sender_id)?.preferred_name||learners.find(learner=>learner.id===item.sender_id)?.full_name||'Unknown learner')}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
         {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}
       </div>}</section>
         <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>

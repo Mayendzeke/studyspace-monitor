@@ -290,11 +290,18 @@ Deno.serve(async (request) => {
     });
   }
 
-  // This nullable audit reference otherwise blocks deleting the Auth user.
+  // Preserve the one-time nature of redeemed PINs while detaching the
+  // nullable profile foreign key. The table constraint requires the redemption
+  // timestamp and redeemer to be cleared together; revoked_at keeps the PIN
+  // unavailable for reuse and visible in the administrator's PIN history.
   const { error: pinError } = await admin.from("enrolment_pins")
-    .update({ redeemed_by: null }).eq("redeemed_by", learnerId);
+    .update({
+      redeemed_by: null,
+      redeemed_at: null,
+      revoked_at: new Date().toISOString(),
+    }).eq("redeemed_by", learnerId);
   if (pinError) {
-    return json(500, { error: "The learner's redeemed enrolment records could not be detached. The learner remains suspended; no permanent account deletion was completed." });
+    return json(500, { error: "The learner's redeemed enrolment records could not be detached and revoked. The learner remains suspended; no permanent account deletion was completed." });
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(learnerId, false);

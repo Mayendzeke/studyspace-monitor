@@ -60,7 +60,7 @@ export default function SharedStudyTimetable() {
               <b>{learnerName(learner)}</b>
               <small>{time(slot.starts_at)}–{time(slot.ends_at)}</small>
               <small>{slot.subject_name || slot.title || "Study session"}{learner?.grade ? " · " + learner.grade : ""}</small>
-              <span className="pin-status active">Available</span>
+              <span className={"pin-status " + ((slot.notes || "").includes("[READY_FOR_STUDY]") ? "active" : "pending")}>{(slot.notes || "").includes("[READY_FOR_STUDY]") ? "Ready" : "Planned"}</span>
             </article>;
           })}</td>)}
         </tr>)}</tbody>

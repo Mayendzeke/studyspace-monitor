@@ -568,3 +568,11 @@ h1 span { color: #8278d9; }
 @media (max-width: 520px) {
   .notification-popover { right: -48px; }
 }
+
+
+.classroom-ai-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 10px; }
+.classroom-ai-actions .primary-button,.classroom-ai-actions .subtle-button { min-height: 34px; padding: 0 11px; font-size: 10px; }
+.classroom-ai-status { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; line-height: 1.5; }
+.classroom-ai-status svg { flex: 0 0 auto; margin-top: 1px; }
+.classroom-ai-status.is-ready { color: #26845e; }
+.classroom-ai-status.has-error { color: #b34d58; }

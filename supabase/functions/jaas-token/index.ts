@@ -136,12 +136,12 @@ async function signJaasJwt(
     typ: "JWT",
     kid: appId + "/" + apiKeyId,
   };
-  const roomName = appId + "/" + roomSlug;
   const payload = {
     aud: "jitsi",
     iss: "chat",
     sub: appId,
-    room: roomName,
+    // JaaS scopes the JWT room claim to the room slug; `sub` binds the tenant/AppID.
+    room: roomSlug,
     iat: now,
     nbf: now - 5,
     exp: now + TOKEN_TTL_SECONDS,

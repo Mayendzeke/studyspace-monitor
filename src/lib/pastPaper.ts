@@ -58,7 +58,7 @@ async function extractPdfText(file: File, onProgress: ProgressCallback): Promise
       pages.push({ page: index, text: textFromPageItems(content.items) });
     }
 
-    const scanned = pages.filter(page => page.text.replace(/\s/g, "").length < 35);
+    const scanned = pages.filter(page => page.text.replace(/\s/g, "").length < 80);
     if (scanned.length) {
       if (scanned.length > 25) {
         throw new Error("This appears to be a scanned paper with more than 25 image-only pages. Split it into smaller sections and import each section separately.");
@@ -73,7 +73,7 @@ async function extractPdfText(file: File, onProgress: ProgressCallback): Promise
       });
       try {
         for (let index = 0; index < pages.length; index += 1) {
-          if (pages[index].text.replace(/\s/g, "").length >= 35) continue;
+          if (pages[index].text.replace(/\s/g, "").length >= 80) continue;
           onProgress("Recognising scanned page " + pages[index].page + " of " + document.numPages);
           const page = await document.getPage(pages[index].page);
           const viewport = page.getViewport({ scale: 1.65 });

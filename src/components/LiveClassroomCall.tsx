@@ -15,14 +15,30 @@ declare global {
 }
 
 let jitsiScriptPromise: Promise<void> | null = null;
+let jitsiScriptDomain: string | null = null;
 
-function loadJitsiScript(): Promise<void> {
-  if (window.JitsiMeetExternalAPI) return Promise.resolve();
-  if (jitsiScriptPromise) return jitsiScriptPromise!;
+function loadJitsiScript(domain: string): Promise<void> {
+  if (window.JitsiMeetExternalAPI) {
+    if (jitsiScriptDomain && jitsiScriptDomain !== domain) {
+      return Promise.reject(new Error("A different Jitsi domain is already loaded. Refresh Studyspace before changing video providers."));
+    }
+    return Promise.resolve();
+  }
+  if (jitsiScriptPromise) {
+    if (jitsiScriptDomain !== domain) {
+      return Promise.reject(new Error("A different Jitsi domain is already loading. Refresh Studyspace before changing video providers."));
+    }
+    return jitsiScriptPromise;
+  }
 
+  jitsiScriptDomain = domain;
   jitsiScriptPromise = new Promise<void>((resolve, reject) => {
     let script = document.querySelector<HTMLScriptElement>("script[data-studyspace-jitsi]");
     const created = !script;
+    if (script && script.dataset.studyspaceJitsi && script.dataset.studyspaceJitsi !== domain) {
+      reject(new Error("A different Jitsi provider script is already on this page. Refresh Studyspace and try again."));
+      return;
+    }
     if (!script) {
       script = document.createElement("script");
       script.src = "https://" + domain + "/external_api.js";
@@ -48,7 +64,7 @@ function loadJitsiScript(): Promise<void> {
 
 function configuredMeetingDomain(): string {
   const value = (import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN || "meet.jit.si").trim().toLowerCase();
-  const domain = value.replace(/^https?:\\/\\//, "").split("/")[0].replace(/\\.$/, "");
+  const domain = value.replace("https://", "").replace("http://", "").split("/")[0].replace(/\.$/, "");
   if (!/^[a-z0-9.-]+$/.test(domain) || domain.includes("..")) {
     throw new Error("The Studyspace video domain is not configured correctly.");
   }

@@ -190,10 +190,11 @@ export function parsePastPaperQuestions(source: string): ImportedPaperQuestion[]
       const marks = marksFor(fullText);
       const detected = findOptions(bodyLines);
       const trueFalseLines = bodyLines.filter(line => /^(?:true|false)$/i.test(line));
-      const isTrueFalse = trueFalseLines.some(line => /^true$/i.test(line)) && trueFalseLines.some(line => /^false$/i.test(line));
+      const combinedTrueFalseLine = bodyLines.find(line => /^true(?:\\s*\\/\\s*|\\s+)false$/i.test(line));
+      const isTrueFalse = (trueFalseLines.some(line => /^true$/i.test(line)) && trueFalseLines.some(line => /^false$/i.test(line))) || Boolean(combinedTrueFalseLine);
       const isMultipleChoice = detected.options.length >= 3;
       const isTrueFalseQuestion = !isMultipleChoice && isTrueFalse;
-      const promptLines = isMultipleChoice ? detected.stemLines : isTrueFalseQuestion ? bodyLines.filter(line => !/^(?:true|false)$/i.test(line)) : bodyLines;
+      const promptLines = isMultipleChoice ? detected.stemLines : isTrueFalseQuestion ? bodyLines.filter(line => !/^(?:true|false)$/i.test(line) && line !== combinedTrueFalseLine) : bodyLines;
       const prompt = stripMarks(promptLines.join("\n").replace(/\n+/g, "\n")).slice(0, 5000);
       questions.push({
         id: crypto.randomUUID(),

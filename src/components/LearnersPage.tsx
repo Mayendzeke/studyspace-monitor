@@ -152,6 +152,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The account action failed.");
+      await refresh();
     } finally {
       setBusyId("");
     }
@@ -190,6 +191,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       await refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The learner profile could not be saved.");
+      await refresh();
     } finally {
       setSavingProfile(false);
     }
@@ -228,6 +230,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       await refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The learner account could not be deleted.");
+      await refresh();
     } finally {
       setDeleting(false);
       setBusyId("");
@@ -346,7 +349,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               {learner.account_status === "active" ? (
                 <button type="button" className="text-button danger-text" disabled={!!busyId} onClick={() => void manage(learner, "disable")}>Disable</button>
               ) : (
-                <button type="button" className="text-button" disabled={!!busyId || learner.account_status === "pending"} onClick={() => void manage(learner, "enable")}>Enable</button>
+                <button type="button" className="text-button" disabled={!!busyId} onClick={() => void manage(learner, "enable")}>Enable</button>
               )}
               <button type="button" className="text-button danger-text" disabled={!!busyId} onClick={() => { setDeleteTarget(learner); setDeleteConfirmation(""); setError(""); }}>
                 <Trash2 size={13}/> Delete

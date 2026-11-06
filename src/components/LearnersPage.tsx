@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2, Download, Edit3, GraduationCap, KeyRound, RefreshCw,
   Save, Search, ShieldAlert, Trash2, UserRound, X,
@@ -173,7 +173,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setNotice("");
   }
 
-  async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !editTarget || savingProfile) return;
     setSavingProfile(true);

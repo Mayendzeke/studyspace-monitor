@@ -49,7 +49,7 @@ function readRoom(meetingUrl: string): { domain: string; roomName: string } {
   if (url.protocol !== "https:" || url.hostname !== "meet.jit.si") {
     throw new Error("This meeting link is not a supported Studyspace video room.");
   }
-  const roomName = decodeURIComponent(url.pathname.replace(/^\\/+|\\/+$/g, ""));
+  const roomName = decodeURIComponent(url.pathname.replace(/^\/+|\/+$/g, ""));
   if (!roomName || roomName.includes("/")) throw new Error("The meeting room name is invalid.");
   return { domain: url.hostname, roomName };
 }

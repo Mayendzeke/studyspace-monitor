@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Building2, Download, Edit3, KeyRound, RefreshCw,
+  Building2, Download, Edit3, Eye, KeyRound, RefreshCw,
   Save, Search, ShieldAlert, Trash2, UserRound, X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import TimetableManager from "./TimetableManager";
 
 type Learner = {
   id: string;
@@ -80,6 +81,28 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [deleteTarget, setDeleteTarget] = useState<Learner | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [adminId, setAdminId] = useState("");
+  const [viewTarget, setViewTarget] = useState<Learner | null>(null);
+  const [viewSubjects, setViewSubjects] = useState<string[]>([]);
+  const [viewSubjectsLoading, setViewSubjectsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? ""));
+  }, []);
+
+  async function openView(learner: Learner) {
+    if (!supabase) return;
+    setViewTarget(learner);
+    setViewSubjects([]);
+    setViewSubjectsLoading(true);
+    setError("");
+    const { data, error: subjectError } = await supabase.from("student_subjects")
+      .select("name").eq("learner_id", learner.id).order("name");
+    if (subjectError) setError("Student details opened, but subjects could not be loaded: " + subjectError.message);
+    else setViewSubjects(Array.from(new Set((data ?? []).map(row => String(row.name ?? "").trim()).filter(Boolean))));
+    setViewSubjectsLoading(false);
+  }
 
   async function refresh() {
     if (!supabase) {
@@ -344,6 +367,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
             </div>
             <span className={"pin-status " + learner.account_status}>{learner.account_status}</span>
             <div className="learner-actions learner-admin-actions">
+              <button type="button" className="text-button" disabled={!!busyId} onClick={() => void openView(learner)}><Eye size={13}/> View student</button>
               <button type="button" className="text-button" disabled={!!busyId} onClick={() => openEdit(learner)}><Edit3 size={13}/> Edit details</button>
               <button type="button" className="text-button" disabled={!!busyId || learner.account_status !== "active"} onClick={() => void manage(learner, "reset_password")}><KeyRound size={13}/> Reset password</button>
               {learner.account_status === "active" ? (
@@ -364,6 +388,34 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
           </div>
         )}
       </section>
+
+      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable"/>}
+
+      {viewTarget && (
+        <div className="learner-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setViewTarget(null); }}>
+          <section className="learner-admin-modal learner-view-modal" role="dialog" aria-modal="true" aria-labelledby="learner-view-title">
+            <div className="learner-modal-heading">
+              <div><span className="eyebrow">STUDENT WORKSPACE</span><h2 id="learner-view-title">{learnerName(viewTarget)}</h2><p>{viewTarget.student_id || "Student ID unavailable"} · {viewTarget.institution || "School not set"}</p></div>
+              <button type="button" className="icon-button" aria-label="Close student details" onClick={() => setViewTarget(null)}><X size={18}/></button>
+            </div>
+            <div className="learner-view-profile-grid">
+              <div><span>Grade / form</span><strong>{viewTarget.grade || "Not set"}</strong></div>
+              <div><span>Curriculum</span><strong>{viewTarget.curriculum || "Not set"}</strong></div>
+              <div><span>Academic year</span><strong>{viewTarget.academic_year || "Not set"}</strong></div>
+              <div><span>Education level</span><strong>{viewTarget.education_level || "Not set"}</strong></div>
+            </div>
+            <section className="learner-view-subjects">
+              <strong>Registered subjects</strong>
+              {viewSubjectsLoading ? <small>Loading subjects…</small> : viewSubjects.length ? <div>{viewSubjects.map(subject => <span key={subject}>{subject}</span>)}</div> : <small>No registered subjects were found.</small>}
+            </section>
+            <div className="learner-view-timetables">
+              <TimetableManager learnerId={viewTarget.id} kind="school" title="School timetable" subjects={viewSubjects}/>
+              <TimetableManager learnerId={viewTarget.id} kind="personal" title="Personal study timetable" subjects={viewSubjects}/>
+            </div>
+            <div className="learner-modal-actions"><button type="button" className="subtle-button" onClick={() => setViewTarget(null)}>Close student view</button><button type="button" className="primary-button" onClick={() => { setViewTarget(null); openEdit(viewTarget); }}><Edit3 size={14}/> Edit profile</button></div>
+          </section>
+        </div>
+      )}
 
       {editTarget && (
         <div className="learner-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !savingProfile) setEditTarget(null); }}>

@@ -128,7 +128,7 @@ export default function TimetableManager({
       <div className="teacher-week-grid-wrap">
         {!rows.length && <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No timetable entries saved yet. The learner can add or import lessons from the student app.</span></div>}
         <div className="teacher-week-grid-scroll"><table className="teacher-week-grid">
-          <thead><tr><th className="teacher-week-day-heading">DAY</th>{Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><th key={start}>{start}</th>)}</tr></thead>
+          <thead><tr><th className="teacher-week-day-heading">DAY</th>{Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><th key={start}><span>{start}</span><small>SUBJECT / ACTIVITY</small></th>)}</tr></thead>
           <tbody>{[1,2,3,4,5,6,0].map(day=><tr key={day}><th className="teacher-week-day-cell">{days[day]}</th>
             {Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><td key={start}>{rows.filter(row=>row.day_of_week===day&&shortTime(row.starts_at)===start).map(row=><article className={"teacher-week-lesson "+(/break/i.test(row.title)?"is-break":/lunch/i.test(row.title)?"is-lunch":"")} key={row.id}>
               <b>{row.subject_name||row.title}</b><small>{shortTime(row.starts_at)}–{shortTime(row.ends_at)}</small>{row.location&&<small>{row.location}</small>}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import AssessmentReviewQueue from './AssessmentReviewQueue'
+import { extractPastPaperQuestions, type ImportedPaperQuestion } from '../lib/pastPaper'
 import { Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'true_false' | 'matching' | 'word_puzzle' | 'short_answer'
@@ -323,10 +324,31 @@ export default function ContentStudio() {
     const allowed=/\.(pdf|doc|docx|ppt|pptx|txt|rtf|jpg|jpeg|png|webp|csv|xlsx)$/i
     const selected=Array.from(files)
     const invalid=selected.find(file=>!allowed.test(file.name))
-    if(invalid){setNotice(`Unsupported file type: ${invalid.name}`);return}
+    if(invalid){setNotice('Unsupported file type: '+invalid.name);return}
     const oversized=selected.find(file=>file.size>25*1024*1024)
-    if(oversized){setNotice(`${oversized.name} exceeds the 25 MB per-file limit.`);return}
+    if(oversized){setNotice(oversized.name+' exceeds the 25 MB per-file limit.');return}
+    const isPastPaper=uploadCategory==='Past paper'
+    if(isPastPaper&&(selected.length!==1||!/\.pdf$/i.test(selected[0].name))){
+      setNotice('For automatic question extraction, choose one PDF past paper at a time. Other materials can be uploaded together.')
+      return
+    }
     if(!supabase){setNotice('Connect the Studyspace cloud before uploading shared teaching resources.');return}
+
+    setPaperBusy(isPastPaper)
+    setPaperProgress('')
+    let importedQuestions:ImportedPaperQuestion[]=[]
+    let paperPages=0
+    let extractionWarning=''
+    if(isPastPaper){
+      try{
+        const extracted=await extractPastPaperQuestions(selected[0],message=>setPaperProgress(message))
+        importedQuestions=extracted.questions
+        paperPages=extracted.pageCount
+        if(!importedQuestions.length) extractionWarning='The PDF was saved, but automatic extraction could not identify numbered questions. You can still build the assessment manually from the uploaded paper.'
+      }catch(reason){
+        extractionWarning=reason instanceof Error?reason.message:'Question extraction could not be completed.'
+      }
+    }
     try{
       const {data:authState,error:authError}=await supabase.auth.getUser()
       if(authError||!authState.user) throw new Error('Sign in again before uploading teaching resources.')
@@ -349,11 +371,36 @@ export default function ContentStudio() {
         uploaded.push(localRecord)
         const tx=db.transaction(RESOURCE_STORE,'readwrite')
         tx.objectStore(RESOURCE_STORE).put(localRecord)
-        await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})
+        await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('The local resource cache could not be updated.'))})
       }
       setResources(current=>[...uploaded,...current.filter(item=>!uploaded.some(next=>next.id===item.id))])
-      setNotice(uploaded.length+' resource(s) uploaded securely and saved to the cloud library.')
-    }catch(reason){setNotice(reason instanceof Error?reason.message:'Cloud upload failed.')}
+      if(isPastPaper&&importedQuestions.length){
+        const baseTitle=selected[0].name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ').trim()
+        setActiveId(null)
+        setTitle(baseTitle||'Imported past paper')
+        setSubject(uploadSubject.trim()||subject.trim())
+        setLevel(level)
+        setGrade(grade)
+        setCurriculum(curriculum)
+        setInstructions('Answer every question. The original past paper is available in the assigned resource library for diagrams and source material.')
+        setDuration(Math.min(180,Math.max(15,Math.ceil(importedQuestions.reduce((sum,q)=>sum+q.points,0)*1.5))))
+        setDueDate('')
+        setQuestions(importedQuestions)
+        setEditing(0)
+        setPreview(false)
+        setTab('builder')
+        const mc=importedQuestions.filter(question=>question.type==='multiple_choice').length
+        const written=importedQuestions.length-mc
+        setNotice('Past paper uploaded ('+paperPages+' pages). Extracted '+importedQuestions.length+' question part(s): '+mc+' multiple choice and '+written+' written response. Review every question, add the correct answers and check marks before saving or assigning.')
+      }else{
+        setNotice(uploaded.length+' resource(s) uploaded securely and saved to the cloud library.'+(extractionWarning?' '+extractionWarning:''))
+      }
+    }catch(reason){
+      setNotice(reason instanceof Error?reason.message:'Cloud upload failed.')
+    }finally{
+      setPaperBusy(false)
+      setPaperProgress('')
+    }
   }
   const updateResource=async(id:string,patch:Partial<ResourceRecord>)=>{
     const resource=resources.find(item=>item.id===id)
@@ -499,7 +546,9 @@ export default function ContentStudio() {
     {tab==='library'&&<section className="panel studio-library-panel"><div className="panel-heading"><div><h2>Resource library</h2><p>Organise teaching materials by subject, topic and resource type</p></div><FileText size={19}/></div>
       <div className="resource-upload-zone"><Upload size={25}/><strong>Add learning materials</strong><p>PDF, Word, PowerPoint, text, CSV, Excel and image files · 25 MB maximum per file. Files are uploaded to the private Studyspace library and remain accessible only to you and the learners you assign them to.</p>
         <div className="resource-upload-fields"><label className="studio-field">Subject<input value={uploadSubject} onChange={e=>setUploadSubject(e.target.value)} placeholder="e.g. Mathematics"/></label><label className="studio-field">Topic / unit<input value={uploadTopic} onChange={e=>setUploadTopic(e.target.value)} placeholder="e.g. Algebra"/></label><label className="studio-field">Resource type<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value as ResourceCategory)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label className="studio-field">Description<input value={uploadDescription} onChange={e=>setUploadDescription(e.target.value)} placeholder="Optional note about this file"/></label></div>
-        <label className="primary-button"><Plus size={16}/> Choose files<input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx" onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} hidden/></label>
+        {uploadCategory==='Past paper'&&<div className="builder-hint">Past-paper PDFs are read in your browser. Selectable text is extracted automatically; image-only pages use English OCR. The extracted questions become an editable draft. Check every question, mark value and answer before you publish or assign it. The original PDF remains in your private resource library.</div>}
+        <label className="primary-button"><Plus size={16}/> {paperBusy?'Reading paper…':'Choose files'}<input type="file" multiple={!isPastPaper} accept={uploadCategory==='Past paper'?'.pdf,application/pdf':'.pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx'} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} disabled={paperBusy} hidden/></label>
+        {paperBusy&&<p className="inline-message" role="status">{paperProgress||'Preparing your past paper…'}</p>}
       </div>
       <div className="resource-toolbar"><div className="resource-search"><Search size={16}/><input value={resourceSearch} onChange={e=>setResourceSearch(e.target.value)} placeholder="Search file, subject or topic..."/></div><select aria-label="Filter by subject" value={resourceSubjectFilter} onChange={e=>setResourceSubjectFilter(e.target.value)}><option>All</option>{subjects.map(s=><option key={s}>{s}</option>)}</select><select aria-label="Filter by resource type" value={resourceCategoryFilter} onChange={e=>setResourceCategoryFilter(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select><select aria-label="Sort resources" value={resourceSort} onChange={e=>setResourceSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select></div>
       <div className="resource-assignment-controls">

@@ -717,3 +717,5 @@ h1 span { color: #8278d9; }
 .monitor-splash-footer{position:absolute;bottom:24px;display:flex;align-items:center;gap:8px;color:var(--splash-muted);font-size:8px;font-weight:700;letter-spacing:1.6px}
 @keyframes monitor-splash-progress{0%{width:0}40%{width:48%}75%{width:82%}100%{width:100%}}
 @media(prefers-reduced-motion:reduce){.monitor-splash-loader span{animation:none;width:100%}}
+
+.teacher-week-grid thead th small{display:block;margin-top:3px;font-size:8px;font-weight:600;letter-spacing:.04em;color:var(--muted)}

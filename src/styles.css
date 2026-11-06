@@ -682,3 +682,5 @@ h1 span { color: #8278d9; }
 .teacher-week-grid thead th:not(:first-child){position:sticky;top:0;z-index:2;background:var(--panel);text-align:center;white-space:nowrap}
 .teacher-week-grid td{min-width:125px;height:88px}
 
+
+.classroom-chat-notice{margin-left:auto;color:#6258c5;font-size:9px;font-weight:700}

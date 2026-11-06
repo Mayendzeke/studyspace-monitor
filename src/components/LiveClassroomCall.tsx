@@ -134,17 +134,18 @@ export default function LiveClassroomCall({
         if (tokenError) throw new Error(await getFunctionError(tokenError));
         const credentials = data as JaasTokenResponse | null;
 
+        const roomSegments = typeof credentials?.roomName === "string" ? credentials.roomName.split("/") : [];
+        const validRoomName = typeof credentials?.appId === "string" &&
+          roomSegments.length === 2 &&
+          roomSegments[0] === credentials.appId &&
+          /^Studyspace-[a-f0-9]{32}$/i.test(roomSegments[1]);
         if (
           !credentials?.success ||
           credentials.provider !== "jaas" ||
           credentials.domain !== "8x8.vc" ||
           typeof credentials.appId !== "string" ||
           !/^vpaas-magic-cookie-[a-f0-9]{32}$/i.test(credentials.appId) ||
-          typeof credentials.roomName !== "string" ||
-          !new RegExp("^" + credentials.appId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\          typeof credentials.appId !== "string" ||
-          typeof credentials.roomName !== "string" ||
-          typeof credentials.token !== "string" ||
-          !credentials.token") + "/Studyspace-[a-f0-9]{32}$", "i").test(credentials.roomName) ||
+          !validRoomName ||
           credentials.moderator !== (audience === "teacher") ||
           typeof credentials.token !== "string" ||
           !credentials.token

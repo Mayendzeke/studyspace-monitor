@@ -169,7 +169,7 @@ export function parsePastPaperQuestions(source: string): ImportedPaperQuestion[]
     .filter(line => line.length > 1)
     .filter(line => !/^(?:page\s+\d+(?:\s+of\s+\d+)?|turn over|turn the page|continued|copyright|©|www\.)/i.test(line));
 
-  const startPattern = /^(?:question\s+)?(\d{1,2}(?:\.\d{1,2}){0,2})[.)]\s*(.*)$/i;
+  const startPattern = /^(?:question\s+)?(\d{1,2}(?:\.\d{1,2}){0,2})(?:[.)]\s*|\s*(?=\([a-z]\))|\s+(?=[A-Z])|$)(.*)$/i;
   const blocks: PaperBlock[] = [];
   for (const line of lines) {
     const match = line.match(startPattern);

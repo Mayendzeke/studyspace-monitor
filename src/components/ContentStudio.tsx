@@ -86,6 +86,8 @@ export default function ContentStudio() {
   const [uploadCategory,setUploadCategory] = useState<ResourceCategory>('Notes'); const [uploadDescription,setUploadDescription] = useState('')
   const [assignmentExercise,setAssignmentExercise] = useState(''); const [assignmentTarget,setAssignmentTarget] = useState('One learner')
   const [assignmentDue,setAssignmentDue] = useState(''); const [assignmentAvailability,setAssignmentAvailability] = useState('Immediately after publishing')
+  const [paperBusy,setPaperBusy] = useState(false)
+  const [paperProgress,setPaperProgress] = useState('')
 
   useEffect(()=>{ localStorage.setItem(DRAFTS_KEY,JSON.stringify(drafts)) },[drafts])
   useEffect(()=>{ localStorage.setItem(ASSIGNMENTS_KEY,JSON.stringify(assignments)) },[assignments])

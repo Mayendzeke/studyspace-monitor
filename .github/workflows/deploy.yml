@@ -99,6 +99,43 @@ jobs:
 
           console.log('Assessment endpoint is deployed; missing and invalid learner credentials are rejected with HTTP 401.')
           NODE
+      - name: Verify learner account management requires authentication
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          const url = process.env.VITE_SUPABASE_URL?.trim()
+          const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
+          const endpoint = url + '/functions/v1/manage-learner-account'
+          const headers = {
+            apikey: key,
+            'Content-Type': 'application/json',
+            Origin: 'https://mayendzeke.github.io',
+          }
+
+          const missingToken = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ learnerId: '00000000-0000-4000-8000-000000000000', action: 'delete' }),
+          })
+          if (missingToken.status !== 401) {
+            const detail = (await missingToken.text()).slice(0, 180)
+            throw new Error('Learner management must reject missing credentials with HTTP 401, received HTTP ' + missingToken.status + ': ' + detail)
+          }
+
+          const invalidToken = await fetch(endpoint, {
+            method: 'POST',
+            headers: { ...headers, Authorization: 'Bearer invalid.invalid.invalid' },
+            body: JSON.stringify({ learnerId: '00000000-0000-4000-8000-000000000000', action: 'delete' }),
+          })
+          if (invalidToken.status !== 401) {
+            const detail = (await invalidToken.text()).slice(0, 180)
+            throw new Error('Learner management must reject invalid credentials with HTTP 401, received HTTP ' + invalidToken.status + ': ' + detail)
+          }
+
+          console.log('Learner account management rejects both missing and invalid authentication tokens.')
+          NODE
       - name: Build
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}

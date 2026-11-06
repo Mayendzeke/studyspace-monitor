@@ -67,7 +67,9 @@ export default function ContentStudio() {
   const [drafts,setDrafts] = useState<ExerciseDraft[]>(readDrafts)
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
-  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string}[]>([])
+  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string;education_level:string;course:string}[]>([])
+  const [registeredSubjectRows,setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
+  const [courseFilter,setCourseFilter] = useState('')
   const [subjectOptions,setSubjectOptions] = useState<string[]>([])
   const [subjectCustom,setSubjectCustom] = useState(false)
   const [uploadSubjectCustom,setUploadSubjectCustom] = useState(false)
@@ -78,7 +80,7 @@ export default function ContentStudio() {
   const [resourceAssignLearner,setResourceAssignLearner] = useState('')
   const [activeId,setActiveId] = useState<string|null>(null)
   const [title,setTitle] = useState(''); const [subject,setSubject] = useState('')
-  const [level,setLevel] = useState('Secondary'); const [grade,setGrade] = useState('')
+  const [level,setLevel] = useState(''); const [grade,setGrade] = useState('')
   const [curriculum,setCurriculum] = useState(''); const [instructions,setInstructions] = useState('Read each question carefully and answer all questions.')
   const [duration,setDuration] = useState(30); const [dueDate,setDueDate] = useState('')
   const [questions,setQuestions] = useState<Question[]>([newQuestion()]); const [editing,setEditing] = useState(0)
@@ -177,10 +179,10 @@ export default function ContentStudio() {
       const adminId=authState.user.id;
       const [setsResult,learnersResult,resourcesResult,assignmentsResult,subjectsResult,localResourceRecords]=await Promise.all([
         supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
-        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum').eq('role','learner').eq('account_status','active').order('preferred_name'),
+        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,course').eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
         supabase.from('exercise_assignments').select('id,exercise_set_id,learner_id,due_at,available_at,assigned_at').order('assigned_at',{ascending:false}),
-        supabase.from('student_subjects').select('name').order('name'),
+        supabase.from('student_subjects').select('learner_id,name').order('name'),
         openResourceDb().then(db=>new Promise<any[]>((resolve,reject)=>{const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})),
       ]);
       if(setsResult.error) throw setsResult.error;
@@ -210,7 +212,9 @@ export default function ContentStudio() {
       if(loaded.length||!readDrafts().length) setDrafts(loaded);
       const activeLearners=(learnersResult.data||[]) as typeof learners;
       setLearners(activeLearners);
-      const registeredSubjects=Array.from(new Set((subjectsResult.data||[]).map((row:any)=>String(row.name||'').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+      const subjectRows=(subjectsResult.data||[]).map((row:any)=>({learner_id:String(row.learner_id),name:String(row.name||'').trim()})).filter((row:any)=>row.name);
+      setRegisteredSubjectRows(subjectRows);
+      const registeredSubjects=Array.from(new Set(subjectRows.map((row:any)=>row.name))).sort((a,b)=>a.localeCompare(b));
       setSubjectOptions(registeredSubjects);
       if(registeredSubjects.length){
         setSubject(current=>current||registeredSubjects[0]);
@@ -262,18 +266,26 @@ export default function ContentStudio() {
   const activeQuestion=questions[editing] || newQuestion()
   const labelFor=(type:QuestionType)=>questionTypes.find(t=>t.value===type)?.label || type
   const subjects=Array.from(new Set(resources.map(r=>r.subject).filter(Boolean))).sort()
+  const learnerLevels=Array.from(new Set(learners.map(item=>item.education_level).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const levelLearners=learners.filter(item=>!level||item.education_level===level);
+  const learnerCourses=Array.from(new Set(levelLearners.map(item=>item.course).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const gradeLearners=levelLearners.filter(item=>!courseFilter||item.course===courseFilter);
+  const learnerGrades=Array.from(new Set(gradeLearners.map(item=>item.grade).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const scopedLearners=gradeLearners.filter(item=>!grade||item.grade===grade);
+  const scopedLearnerIds=new Set(scopedLearners.map(item=>item.id));
+  const builderSubjectOptions=Array.from(new Set(registeredSubjectRows.filter(row=>scopedLearnerIds.has(row.learner_id)).map(row=>row.name))).sort((a,b)=>a.localeCompare(b));
   const filteredResources=resources.filter(r=>{
     const match=`${r.name} ${r.subject} ${r.topic} ${r.description}`.toLowerCase().includes(resourceSearch.toLowerCase())
     return match && (resourceSubjectFilter==='All'||r.subject===resourceSubjectFilter) && (resourceCategoryFilter==='All'||r.category===resourceCategoryFilter)
   }).sort((a,b)=>resourceSort==='name'?a.name.localeCompare(b.name):resourceSort==='oldest'?a.savedAt.localeCompare(b.savedAt):b.savedAt.localeCompare(a.savedAt))
 
   const resetBuilder=()=>{
-    setActiveId(null);setTitle('');setSubject('');setLevel('Secondary');setGrade('');setCurriculum('')
+    setActiveId(null);setTitle('');setSubject('');setLevel('');setGrade('');setCourseFilter('');setCurriculum('')
     setInstructions('Read each question carefully and answer all questions.');setDuration(30);setDueDate('')
     setQuestions([newQuestion()]);setEditing(0);setPreview(false)
   }
   const loadDraft=(d:ExerciseDraft)=>{
-    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setSubjectCustom(!!d.subject&&!subjectOptions.includes(d.subject));setLevel(d.level);setGrade(d.grade);setCurriculum(d.curriculum)
+    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setSubjectCustom(!!d.subject&&!subjectOptions.includes(d.subject));setLevel(d.level);setGrade(d.grade);setCourseFilter('');setCurriculum(d.curriculum)
     setInstructions(d.instructions);setDuration(d.duration);setDueDate(d.dueDate);setQuestions(d.questions);setEditing(0)
     setPreview(false);setTab('builder');setNotice('Assessment loaded.')
   }
@@ -543,17 +555,16 @@ export default function ContentStudio() {
         <div className="panel-heading"><div><h2>Assessment details</h2><p>Define the class and assessment settings</p></div><span className="studio-draft-count">{drafts.length} assessments</span></div>
         <div className="studio-form-grid">
           <label className="studio-field studio-field-wide">Assessment title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Algebra: Linear equations test"/></label>
-          <label className="studio-field">Subject / module
-            <select value={subjectCustom|| (subject&&!subjectOptions.includes(subject))?'__other__':subject}
-              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}}>
-              <option value="">Choose a registered subject</option>
-              {subjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
+          <label className="studio-field">1. Education level<select value={level} onChange={e=>{setLevel(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false)}}><option value="">Choose level from registered learners</option>{learnerLevels.map(item=><option key={item}>{item}</option>)}</select></label>
+          {(level==='University'||level==='College')&&<label className="studio-field">2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setGrade('');setSubject('')}}><option value="">All courses / programmes</option>{learnerCourses.map(item=><option key={item}>{item}</option>)}</select></label>}
+          <label className="studio-field">2. Grade / year<select value={grade} onChange={e=>{setGrade(e.target.value);setSubject('');setSubjectCustom(false)}} disabled={!level}><option value="">Choose grade / year</option>{learnerGrades.map(item=><option key={item}>{item}</option>)}</select></label>
+          <label className="studio-field">3. Subject / module<select value={subjectCustom|| (subject&&!builderSubjectOptions.includes(subject))?'__other__':subject}
+              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}} disabled={!level||!grade}>
+              <option value="">Choose from this level and grade</option>
+              {builderSubjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
               <option value="__other__">Other / enter manually</option>
-            </select>
-          </label>
-          {(subjectCustom|| (subject&&!subjectOptions.includes(subject)))&&<label className="studio-field">Enter subject<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Type the subject or module"/></label>}
-          <label className="studio-field">Education level<select value={level} onChange={e=>setLevel(e.target.value)}><option>Primary</option><option>Secondary</option><option>High school</option><option>College</option><option>University</option></select></label>
-          <label className="studio-field">Grade / year<input value={grade} onChange={e=>setGrade(e.target.value)} placeholder="e.g. Form 3 / Year 1"/></label>
+            </select></label>
+          {(subjectCustom|| (subject&&!builderSubjectOptions.includes(subject)))&&<label className="studio-field">Enter subject / module<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Type the subject or module"/></label>}
           <label className="studio-field">Curriculum<input value={curriculum} onChange={e=>setCurriculum(e.target.value)} placeholder="e.g. Cambridge IGCSE"/></label>
           <label className="studio-field">Duration (minutes)<input type="number" min="1" max="300" value={duration} onChange={e=>setDuration(Number(e.target.value))}/></label>
           <label className="studio-field">Due date (optional)<input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></label>

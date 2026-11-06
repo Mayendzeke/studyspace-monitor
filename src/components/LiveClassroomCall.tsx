@@ -262,7 +262,7 @@ export default function LiveClassroomCall({
           {!open ? (
             <button type="button" className="primary-button" onClick={() => setOpen(true)}>Join in Studyspace</button>
           ) : (
-            <button type="button" className="secondary-button" onClick={leaveCall}><X size={14} /> Leave call</button>
+            <button type="button" className="subtle-button" onClick={leaveCall}><X size={14} /> Leave call</button>
           )}
         </div>
       </div>

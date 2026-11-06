@@ -108,10 +108,12 @@ Deno.serve(async (request) => {
 
   const authorization = request.headers.get("Authorization");
   const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!accessToken) return json(401, { error: "Sign in is required." });
+
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
-  if (!accessToken || !url || !anonKey || !serviceKey) return json(500, { error: "Function configuration is incomplete." });
+  if (!url || !anonKey || !serviceKey) return json(500, { error: "Function configuration is incomplete." });
 
   const caller = createClient(url, anonKey, {
     global: { headers: { Authorization: authorization! } },

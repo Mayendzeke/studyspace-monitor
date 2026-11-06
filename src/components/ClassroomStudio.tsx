@@ -50,7 +50,7 @@ async function describeEdgeFunctionError(reason: unknown, fallback: string): Pro
   return reason instanceof Error ? reason.message : fallback;
 }
 
-const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: 'Secondary', grade: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
+const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
   const [plans, setPlans] = useState<LessonPlan[]>(readPlans)
@@ -63,8 +63,10 @@ export default function ClassroomStudio() {
   const [jaasConnection, setJaasConnection] = useState<'unchecked'|'checking'|'ready'|'error'>('unchecked')
   const [jaasConnectionMessage, setJaasConnectionMessage] = useState('')
   const [publishing, setPublishing] = useState(false)
-  const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
+  const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string;education_level:string;grade:string;curriculum:string;course:string}[]>([])
   const [subjectOptions, setSubjectOptions] = useState<string[]>([])
+  const [registeredSubjectRows, setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
+  const [courseFilter, setCourseFilter] = useState('')
   const [subjectManual, setSubjectManual] = useState(false)
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
   const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
@@ -78,9 +80,9 @@ export default function ClassroomStudio() {
     let alive = true;
     const loadClassOptions = async () => {
       const [learnerResult, subjectResult] = await Promise.all([
-        supabase!.from('profiles').select('id,student_id,full_name,preferred_name,account_status')
+        supabase!.from('profiles').select('id,student_id,full_name,preferred_name,account_status,education_level,grade,curriculum,course')
           .eq('role','learner').eq('account_status','active').order('preferred_name'),
-        supabase!.from('student_subjects').select('name').order('name')
+        supabase!.from('student_subjects').select('learner_id,name').order('name')
       ]);
       if (!alive) return;
       if (learnerResult.error) setNotice('Learner list could not be loaded: ' + learnerResult.error.message);
@@ -88,16 +90,10 @@ export default function ClassroomStudio() {
       if (subjectResult.error) {
         setNotice('Registered subjects could not be loaded. You can still enter a subject manually.');
       } else {
-        const names = Array.from(new Set((subjectResult.data ?? []).map(row => String(row.name ?? '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-        setSubjectOptions(names);
-        setDraft(current => {
-          if (current.subject.trim()) {
-            if (!names.includes(current.subject)) setSubjectManual(true);
-            return current;
-          }
-          if (names.length) return { ...current, subject: names[0] };
-          return current;
-        });
+        const rows = (subjectResult.data ?? []).map(row => ({ learner_id: String(row.learner_id), name: String(row.name ?? '').trim() })).filter(row => row.name);
+        setRegisteredSubjectRows(rows);
+        setSubjectOptions(Array.from(new Set(rows.map(row => row.name))).sort((a,b)=>a.localeCompare(b)));
+        setDraft(current => current.level ? current : { ...current, level: (learnerResult.data || [])[0]?.education_level || '' });
       }
     };
     void loadClassOptions();
@@ -155,6 +151,14 @@ export default function ClassroomStudio() {
     else {setSessionStatus(status);setNotice(status==='live'?'Class is live. The teacher and assigned learners can now join the secured video room.':'Class has been ended.')}
   };
 
+  const levelOptions = Array.from(new Set(learners.map(item => item.education_level).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const levelLearners = learners.filter(item => !draft.level || item.education_level === draft.level);
+  const courseOptions = Array.from(new Set(levelLearners.map(item => item.course).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const courseLearners = levelLearners.filter(item => !courseFilter || item.course === courseFilter);
+  const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const scopedLearners = courseLearners.filter(item => !draft.grade || item.grade === draft.grade);
+  const scopedIds = new Set(scopedLearners.map(item => item.id));
+  const scopedSubjectOptions = Array.from(new Set(registeredSubjectRows.filter(row => scopedIds.has(row.learner_id)).map(row => row.name))).sort((a,b)=>a.localeCompare(b));
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
   const checkAiConnection = async () => {
@@ -202,6 +206,29 @@ export default function ClassroomStudio() {
       setNotice(message);
     } finally { setAiBusy(false) }
   }
+  const generateLessonStructure = async () => {
+    if (!supabase) { setNotice('Connect Supabase before generating lesson objectives.'); return; }
+    if (!draft.sourceNotes.trim()) { setNotice('Add source notes or learning material first so generated objectives are grounded.'); return; }
+    setAiBusy(true); setNotice('Generating editable lesson objectives and checkpoints…');
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
+        title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
+        curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
+      }});
+      if (error) throw error;
+      if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return lesson structure.');
+      const recap = data.recap as LessonRecap & { learningObjectives?: string[] };
+      const points = Array.isArray(recap.keyPoints) ? recap.keyPoints.slice(0,5) : [];
+      const objectives = Array.isArray(recap.learningObjectives) && recap.learningObjectives.length
+        ? recap.learningObjectives
+        : points.map(point => 'By the end of the lesson, learners will be able to explain or apply: ' + point);
+      update({ objectives: objectives.join('\n'), checkpoints: [...points, '', '', '', ''].slice(0,5), aiRecap: recap });
+      setNotice('Objectives and checkpoints generated. Review and edit them before publishing.');
+    } catch (reason) {
+      setNotice(await describeEdgeFunctionError(reason, 'Lesson objectives could not be generated.'));
+    } finally { setAiBusy(false); }
+  };
+
   const checkJaasConnection = async () => {
     if (!supabase) {
       setJaasConnection('error');
@@ -291,22 +318,22 @@ export default function ClassroomStudio() {
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>
         <div className="classroom-form-grid">
           <label>Lesson title<input value={draft.title} onChange={e=>update({title:e.target.value})} placeholder="e.g. Linear equations"/></label>
-          <label>Subject / module
-            <select value={subjectManual || (draft.subject && !subjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
-              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}}>
-              <option value="">Choose a registered subject</option>
-              {subjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
+          <label>1. Education level<select value={draft.level} onChange={e=>{setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);update({level:e.target.value,grade:'',subject:'',curriculum:''})}}><option value="">Choose a level from registered learners</option>{levelOptions.map(item=><option key={item}>{item}</option>)}</select></label>
+          {(draft.level==='University'||draft.level==='College')&&<label>2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setSelectedLearners([]);setSubjectManual(false);update({grade:'',subject:''})}}><option value="">Choose a course / programme</option>{courseOptions.map(item=><option key={item}>{item}</option>)}</select></label>}
+          <label>2. Grade / year<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level||((draft.level==='University'||draft.level==='College')&&!courseFilter)}><option value="">Choose grade / year</option>{gradeOptions.map(item=><option key={item}>{item}</option>)}</select></label>
+          <label>3. Subject / module<select value={subjectManual || (draft.subject && !scopedSubjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
+              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}} disabled={!draft.level||!draft.grade}>
+              <option value="">Choose from this level and year</option>
+              {scopedSubjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
               <option value="__other__">Other / enter manually</option>
-            </select>
-          </label>
-          {(subjectManual || (!!draft.subject && !subjectOptions.includes(draft.subject))) && <label>Enter subject<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Type the subject or module"/></label>}
-          <label>Level<select value={draft.level} onChange={e=>update({level:e.target.value})}><option>Primary</option><option>Secondary</option><option>College</option><option>University</option></select></label>
-          <label>Grade / year<input value={draft.grade} onChange={e=>update({grade:e.target.value})} placeholder="Form 3"/></label>
+            </select></label>
+          {(subjectManual || (!!draft.subject && !scopedSubjectOptions.includes(draft.subject))) && <label>Enter subject / module<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Type the subject or module"/></label>}
           <label>Curriculum<input value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="IGCSE, CAPS, etc."/></label>
           <label>Date<input type="date" value={draft.date} onChange={e=>update({date:e.target.value})}/></label>
           <label>Lesson length (minutes)<input type="number" min="10" max="240" value={draft.duration} onChange={e=>update({duration:Math.max(10,Math.min(240,Number(e.target.value)||45))})}/></label>
         </div>
-        <label className="classroom-wide-field">Learning objectives<textarea rows={2} value={draft.objectives} onChange={e=>update({objectives:e.target.value})} placeholder="What should learners be able to explain or do by the end?"/></label>
+        <label className="classroom-wide-field">Learning objectives<textarea rows={3} value={draft.objectives} onChange={e=>update({objectives:e.target.value})} placeholder="What should learners be able to explain or do by the end?"/></label>
+        <div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiBusy||!draft.subject||!draft.grade||!draft.sourceNotes.trim()} onClick={()=>void generateLessonStructure()}><Sparkles size={14}/>{aiBusy?'Generating…':'Auto-generate objectives & checkpoints'}</button><small>You can edit every generated objective and checkpoint before saving or publishing.</small></div>
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>
@@ -314,7 +341,7 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
-        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
+        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{scopedLearners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
         <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
         {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}
         {sessionStatus==='scheduled'&&<p className="classroom-live-waiting">Start the lesson to open the embedded video room. Learners will see the same Join button in Today's Session.</p>}

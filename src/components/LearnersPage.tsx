@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
+import SharedStudyTimetable from "./SharedStudyTimetable";
 
 type Learner = {
   id: string;
@@ -304,6 +305,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       <p className="page-subtitle">Manage learner records, school placement, academic details, sign-in access and account deletion from one secure workspace.</p>
 
       {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable"/>}
+      <SharedStudyTimetable/>
 
 
       <div className="learners-summary">

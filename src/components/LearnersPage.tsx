@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Building2, Download, Edit3, GraduationCap, KeyRound, RefreshCw,
+  Building2, Download, Edit3, KeyRound, RefreshCw,
   Save, Search, ShieldAlert, Trash2, UserRound, X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";

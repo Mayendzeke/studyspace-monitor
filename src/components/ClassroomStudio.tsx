@@ -64,13 +64,44 @@ export default function ClassroomStudio() {
   const [jaasConnectionMessage, setJaasConnectionMessage] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
+  const [subjectOptions, setSubjectOptions] = useState<string[]>([])
+  const [subjectManual, setSubjectManual] = useState(false)
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
   const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
   const [chatDraft, setChatDraft] = useState('')
   const [sessionStatus, setSessionStatus] = useState<'scheduled'|'live'|'ended'|'cancelled'|null>(null)
   const [boardImage, setBoardImage] = useState('')
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
-  useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
+  useEffect(() => {
+    if (!supabase) return;
+    let alive = true;
+    const loadClassOptions = async () => {
+      const [learnerResult, subjectResult] = await Promise.all([
+        supabase!.from('profiles').select('id,student_id,full_name,preferred_name,account_status')
+          .eq('role','learner').eq('account_status','active').order('preferred_name'),
+        supabase!.from('student_subjects').select('name').order('name')
+      ]);
+      if (!alive) return;
+      if (learnerResult.error) setNotice('Learner list could not be loaded: ' + learnerResult.error.message);
+      else setLearners((learnerResult.data ?? []) as typeof learners);
+      if (subjectResult.error) {
+        setNotice('Registered subjects could not be loaded. You can still enter a subject manually.');
+      } else {
+        const names = Array.from(new Set((subjectResult.data ?? []).map(row => String(row.name ?? '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+        setSubjectOptions(names);
+        setDraft(current => {
+          if (current.subject.trim()) {
+            if (!names.includes(current.subject)) setSubjectManual(true);
+            return current;
+          }
+          if (names.length) return { ...current, subject: names[0] };
+          return current;
+        });
+      }
+    };
+    void loadClassOptions();
+    return () => { alive = false };
+  }, [])
   useEffect(() => {
     if (!supabase || !draft.publishedSessionId) return;
     let alive = true;
@@ -148,7 +179,11 @@ export default function ClassroomStudio() {
       } })
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
-      update({ aiRecap: data.recap })
+      update({
+        title: draft.title.trim() || (draft.subject.trim() ? draft.subject.trim() + ' lesson' : 'Lesson recap'),
+        subject: draft.subject.trim() || subjectOptions[0] || 'General learning',
+        aiRecap: data.recap
+      })
       setAiConnection('ready');
       setAiConnectionMessage('Last generation succeeded · ' + String(data.provider || 'AI provider') + ' · ' + String(data.model || 'configured model'));
       setNotice('AI draft generated. Review it for accuracy before sharing with learners.')
@@ -228,7 +263,12 @@ export default function ClassroomStudio() {
     setPlans(current => [saved, ...current.filter(x => x.id !== saved.id)])
     setSelected(saved.id); setDraft(saved); setNotice('Lesson plan saved in this browser. It is not yet synced to learners.')
   }
-  const load = (plan: LessonPlan) => { setDraft(plan); setSelected(plan.id); setNotice('Lesson plan loaded.') }
+  const load = (plan: LessonPlan) => {
+    setDraft(plan);
+    setSubjectManual(!!plan.subject && !subjectOptions.includes(plan.subject));
+    setSelected(plan.id);
+    setNotice('Lesson plan loaded.');
+  }
   const remove = (id: string) => { if (!window.confirm('Delete this local lesson plan?')) return; setPlans(current => current.filter(x => x.id !== id)); if (selected === id) { setSelected(null); setDraft(blank()) } }
   const exportPlan = () => {
     const blob = new Blob([JSON.stringify({ format: 'Studyspace classroom plans', version: 1, plans }, null, 2)], { type: 'application/json' })
@@ -243,7 +283,15 @@ export default function ClassroomStudio() {
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>
         <div className="classroom-form-grid">
           <label>Lesson title<input value={draft.title} onChange={e=>update({title:e.target.value})} placeholder="e.g. Linear equations"/></label>
-          <label>Subject<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Mathematics"/></label>
+          <label>Subject / module
+            <select value={subjectManual || (draft.subject && !subjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
+              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}}>
+              <option value="">Choose a registered subject</option>
+              {subjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
+              <option value="__other__">Other / enter manually</option>
+            </select>
+          </label>
+          {(subjectManual || (!!draft.subject && !subjectOptions.includes(draft.subject))) && <label>Enter subject<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Type the subject or module"/></label>}
           <label>Level<select value={draft.level} onChange={e=>update({level:e.target.value})}><option>Primary</option><option>Secondary</option><option>College</option><option>University</option></select></label>
           <label>Grade / year<input value={draft.grade} onChange={e=>update({grade:e.target.value})} placeholder="Form 3"/></label>
           <label>Curriculum<input value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="IGCSE, CAPS, etc."/></label>
@@ -254,7 +302,7 @@ export default function ClassroomStudio() {
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>
-        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generate a concise explanation, up to five key points, a worked example where relevant, and an understanding-check question from the teacher's material. Review all generated content before sharing it with learners.</p><small>Use anonymised lesson material only. Do not submit learner names, IDs, contact details or other personal information to an external AI provider.</small><div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiConnection==='checking'} onClick={() => void checkAiConnection()}><ShieldCheck size={14}/>{aiConnection==='checking'?'Checking AI…':'Test AI connection'}</button><button type="button" className="primary-button" disabled={aiBusy || !draft.title.trim() || !draft.subject.trim() || (!draft.objectives.trim() && !draft.sourceNotes.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div>{aiConnectionMessage&&<small className={'classroom-ai-status '+(aiConnection==='ready'?'is-ready':aiConnection==='error'?'has-error':'')} role="status">{aiConnection==='ready'?<CheckCircle2 size={13}/>:aiConnection==='error'?<FileText size={13}/>:<ShieldCheck size={13}/>} {aiConnectionMessage}</small>}</div></div>
+        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generate a concise explanation, up to five key points, a worked example where relevant, and an understanding-check question from the teacher's material. Review all generated content before sharing it with learners.</p><small>Use anonymised lesson material only. Do not submit learner names, IDs, contact details or other personal information to an external AI provider.</small><div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiConnection==='checking'} onClick={() => void checkAiConnection()}><ShieldCheck size={14}/>{aiConnection==='checking'?'Checking AI…':'Test AI connection'}</button><button type="button" className="primary-button" disabled={aiBusy || ![draft.title,draft.subject,draft.grade,draft.curriculum,draft.objectives,draft.sourceNotes].some(value=>value.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div>{aiConnectionMessage&&<small className={'classroom-ai-status '+(aiConnection==='ready'?'is-ready':aiConnection==='error'?'has-error':'')} role="status">{aiConnection==='ready'?<CheckCircle2 size={13}/>:aiConnection==='error'?<FileText size={13}/>:<ShieldCheck size={13}/>} {aiConnectionMessage}</small>}</div></div>
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>

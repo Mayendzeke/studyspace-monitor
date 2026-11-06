@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
-import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send } from 'lucide-react'
+import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send, ShieldCheck } from 'lucide-react'
 
 type LessonRecap = { summary: string; keyPoints: string[]; workedExample: string; exitQuestion: string }
 type LessonPlan = {
@@ -33,6 +33,29 @@ const configuredMeetingDomain = () => {
   if(!/^[a-z0-9.-]+$/.test(domain)||domain.includes('..')) throw new Error('The Studyspace video domain is not configured correctly.')
   return domain
 }
+async function describeEdgeFunctionError(reason: unknown, fallback: string): Promise<string> {
+  const context = reason && typeof reason === "object" && "context" in reason
+    ? (reason as { context?: unknown }).context
+    : undefined;
+  if (context instanceof Response) {
+    const status = context.status;
+    try {
+      const payload = await context.clone().json() as { error?: unknown; message?: unknown };
+      const detail = typeof payload.error === "string"
+        ? payload.error
+        : typeof payload.message === "string" ? payload.message : "";
+      if (detail) return detail + " (HTTP " + status + ")";
+    } catch {
+      try {
+        const detail = (await context.clone().text()).trim().slice(0, 240);
+        if (detail) return detail + " (HTTP " + status + ")";
+      } catch { /* Preserve the status if the response body is unavailable. */ }
+    }
+    return "The AI service rejected the request (HTTP " + status + ").";
+  }
+  return reason instanceof Error ? reason.message : fallback;
+}
+
 const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: 'Secondary', grade: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
@@ -41,6 +64,8 @@ export default function ClassroomStudio() {
   const [notice, setNotice] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiConnection, setAiConnection] = useState<'unchecked'|'checking'|'ready'|'error'>('unchecked')
+  const [aiConnectionMessage, setAiConnectionMessage] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
@@ -111,6 +136,26 @@ export default function ClassroomStudio() {
 
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
+  const checkAiConnection = async () => {
+    if (!supabase) {
+      setAiConnection('error');
+      setAiConnectionMessage('Studyspace is not connected to the AI service.');
+      return;
+    }
+    setAiConnection('checking');
+    setAiConnectionMessage('Checking provider credentials and model availability…');
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } });
+      if (error) throw error;
+      if (!data?.success || data?.verified !== true) throw new Error(data?.error || 'The AI connection could not be verified.');
+      setAiConnection('ready');
+      setAiConnectionMessage('AI is ready · ' + String(data.provider || 'Provider') + ' · ' + String(data.model || 'Configured model'));
+    } catch (reason) {
+      setAiConnection('error');
+      setAiConnectionMessage(await describeEdgeFunctionError(reason, 'The AI connection could not be verified.'));
+    }
+  };
+
   const generateRecap = async () => {
     if (!supabase) { setNotice('Connect Supabase before using AI lesson recaps.'); return }
     setAiBusy(true); setNotice('Preparing a concise lesson recap…')
@@ -122,9 +167,14 @@ export default function ClassroomStudio() {
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
       update({ aiRecap: data.recap })
+      setAiConnection('ready');
+      setAiConnectionMessage('Last generation succeeded · ' + String(data.provider || 'AI provider') + ' · ' + String(data.model || 'configured model'));
       setNotice('AI draft generated. Review it for accuracy before sharing with learners.')
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'The AI recap could not be generated.')
+    } catch (reason) {
+      const message = await describeEdgeFunctionError(reason, 'The AI recap could not be generated.');
+      setAiConnection('error');
+      setAiConnectionMessage(message);
+      setNotice(message);
     } finally { setAiBusy(false) }
   }
   const publishSession = async () => {
@@ -205,7 +255,7 @@ export default function ClassroomStudio() {
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>
-        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generation will use the lesson title, objectives and source material to create a short explanation, up to five key points, one worked example where relevant, and a quick exit question. It will not invent details beyond the supplied material.</p><small>The free Gemini tier may use submitted content to improve its models. Use anonymised lesson material only; never include learner names, IDs or personal details.</small><button type="button" className="subtle-button" disabled={aiBusy || !draft.title.trim() || !draft.subject.trim() || (!draft.objectives.trim() && !draft.sourceNotes.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div></div>
+        <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generate a concise explanation, up to five key points, a worked example where relevant, and an understanding-check question from the teacher's material. Review all generated content before sharing it with learners.</p><small>Use anonymised lesson material only. Do not submit learner names, IDs, contact details or other personal information to an external AI provider.</small><div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiConnection==='checking'} onClick={() => void checkAiConnection()}><ShieldCheck size={14}/>{aiConnection==='checking'?'Checking AI…':'Test AI connection'}</button><button type="button" className="primary-button" disabled={aiBusy || !draft.title.trim() || !draft.subject.trim() || (!draft.objectives.trim() && !draft.sourceNotes.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div>{aiConnectionMessage&&<small className={'classroom-ai-status '+(aiConnection==='ready'?'is-ready':aiConnection==='error'?'has-error':'')} role="status">{aiConnection==='ready'?<CheckCircle2 size={13}/>:aiConnection==='error'?<FileText size={13}/>:<ShieldCheck size={13}/>} {aiConnectionMessage}</small>}</div></div>
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>

@@ -540,3 +540,39 @@ h1 span { color: #8278d9; }
 
 .classroom-live-waiting,.classroom-room-ready{display:flex;align-items:flex-start;gap:9px;margin:12px 0;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--muted);font-size:11px;line-height:1.55}
 .classroom-room-ready{color:var(--text)}
+
+
+/* Functional notification centre */
+.workspace-switcher { width: 100%; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.workspace-switcher:hover { filter: brightness(.99); }
+.notification-wrap { position: relative; display: inline-flex; }
+.notification-button[aria-expanded="true"] { color: var(--purple); }
+.notification-popover { position: absolute; z-index: 30; top: calc(100% + 12px); right: -8px; width: min(360px, calc(100vw - 28px)); padding: 15px; border: 1px solid rgba(130,140,165,.22); border-radius: 15px; background: var(--surface); box-shadow: 8px 10px 25px rgba(40,48,70,.16); color: var(--ink); }
+.notification-popover-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(130,140,165,.18); }
+.notification-popover-head>div:first-child { display: grid; gap: 4px; }
+.notification-popover-head strong { font-size: 12px; }
+.notification-popover-head small { color: var(--muted); font-size: 10px; }
+.notification-popover-head>div:last-child { display: flex; align-items: center; gap: 9px; }
+.notification-refresh,.notification-close { border: 0; padding: 4px; color: var(--purple); background: transparent; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.notification-close { display: grid; place-items: center; color: var(--muted); }
+.notification-refresh:disabled { opacity: .55; cursor: wait; }
+.notification-list { display: grid; gap: 0; max-height: 330px; overflow-y: auto; margin: 0; padding: 4px 0 0; list-style: none; }
+.notification-list li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 2px; border-bottom: 1px solid rgba(130,140,165,.13); }
+.notification-list li:last-child { border-bottom: 0; }
+.notification-event-dot { width: 7px; height: 7px; flex: 0 0 auto; margin-top: 4px; border-radius: 50%; background: var(--purple); }
+.notification-list li div { display: grid; gap: 4px; min-width: 0; }
+.notification-list li strong { color: var(--ink); font-size: 10px; font-weight: 700; text-transform: capitalize; }
+.notification-list li time { color: var(--muted); font-size: 9px; }
+.notification-empty,.notification-error { margin: 14px 2px 3px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.notification-error { color: #b34d58; }
+@media (max-width: 520px) {
+  .notification-popover { right: -48px; }
+}
+
+
+.classroom-ai-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 10px; }
+.classroom-ai-actions .primary-button,.classroom-ai-actions .subtle-button { min-height: 34px; padding: 0 11px; font-size: 10px; }
+.classroom-ai-status { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; line-height: 1.5; }
+.classroom-ai-status svg { flex: 0 0 auto; margin-top: 1px; }
+.classroom-ai-status.is-ready { color: #26845e; }
+.classroom-ai-status.has-error { color: #b34d58; }

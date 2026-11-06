@@ -1,5 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+function getNamedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const value = parsed?.default;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function getPublishableKey(): string {
+  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+function getSecretKey(): string {
+  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
@@ -30,7 +46,6 @@ Deno.serve(async request => {
   const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");
   const model = Deno.env.get(provider === "openai" ? "OPENAI_MODEL" : "GEMINI_MODEL") ?? (provider === "openai" ? "gpt-4.1-mini" : "gemini-3.8-flash");
   if (!accessToken || !url || !anonKey || !serviceKey) return json(500, { error: "Supabase function configuration is incomplete." });
-  if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
 
   const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
@@ -40,8 +55,36 @@ Deno.serve(async request => {
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 
-  let body: { title?: string; subject?: string; level?: string; grade?: string; curriculum?: string; objectives?: string; sourceNotes?: string };
+  let body: { action?: string; title?: string; subject?: string; level?: string; grade?: string; curriculum?: string; objectives?: string; sourceNotes?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
+
+  // A low-cost preflight validates that the configured provider key and model
+  // are accepted without generating lesson content or consuming generation quota.
+  if (body.action === "healthcheck") {
+    if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
+    const modelUrl = provider === "openai"
+      ? "https://api.openai.com/v1/models/" + encodeURIComponent(model)
+      : "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model);
+    let modelResponse: Response;
+    try {
+      modelResponse = await fetch(modelUrl, {
+        method: "GET",
+        headers: provider === "openai"
+          ? { Authorization: "Bearer " + apiKey }
+          : { "x-goog-api-key": apiKey },
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch {
+      return json(502, { error: "The AI provider could not be reached during the connection test." });
+    }
+    if (!modelResponse.ok) {
+      return json(503, { error: "The AI provider rejected the configured API key or model (HTTP " + modelResponse.status + "). Check the provider secret and model setting." });
+    }
+    return json(200, { success: true, verified: true, provider, model });
+  }
+  if (body.action) return json(400, { error: "Unsupported AI action." });
+  if (!apiKey) return json(503, { error: "The selected AI provider is not configured. Add its API key to Supabase Edge Function secrets." });
+
   const title = String(body.title ?? "").trim().slice(0, 160);
   const subject = String(body.subject ?? "").trim().slice(0, 100);
   const level = String(body.level ?? "").trim().slice(0, 60);

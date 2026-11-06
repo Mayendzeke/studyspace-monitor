@@ -215,9 +215,7 @@ export default function LiveClassroomCall({
         {connected ? "You are connected to the room. Use the meeting controls to mute, share your screen or leave." : "The room opens inside Studyspace. Allow microphone or camera access only when you are ready."}
         {" "}{passwordProtected ? "A session password is in use. The public Jitsi service is not tied to the learner's Studyspace identity." : meetingPassword && audience === "teacher" ? "Waiting for Jitsi moderator access so the teacher can set the room password. Learner access stays locked until Studyspace confirms readiness." : "This older or unprotected room has no Studyspace sign-in enforcement. Do not use it for sensitive lessons."}
       </p>
-      {securityError && <p className="live-classroom-call-error" role="alert">{securityError}</p>
-      <p className="live-classroom-call-footnote">
-      </p>
+      {securityError && <p className="live-classroom-call-error" role="alert">{securityError}</p>}
     </section>
   );
 }

@@ -16,7 +16,7 @@ type Status = 'draft' | 'review' | 'approved'
 type ExerciseDraft = {
   id: string; title: string; subject: string; level: string; grade: string; curriculum: string
   instructions: string; duration: number; dueDate: string; questions: Question[]
-  status: Status; updatedAt: string
+  status: Status; updatedAt: string; sourceResourceId?: string
 }
 type ResourceCategory = 'Notes' | 'Revision' | 'Worksheet' | 'Past paper' | 'Reference' | 'Other'
 type ResourceRecord = {
@@ -100,6 +100,7 @@ export default function ContentStudio() {
       curriculum: String(set.curriculum||''), instructions: String(set.instructions||''),
       duration: Number(set.duration_minutes||30), dueDate: set.due_date||'',
       status: (set.review_status||'draft') as Status, updatedAt: String(set.updated_at||set.created_at),
+      sourceResourceId: set.source_resource_id ? String(set.source_resource_id) : undefined,
       questions: questions.map((q:any)=>({
         id:String(q.id), type:q.question_type as QuestionType, prompt:String(q.prompt||''),
         options:Array.isArray(q.content?.options)?q.content.options:['','','',''],
@@ -121,7 +122,8 @@ export default function ContentStudio() {
       id:draft.id,created_by:authState.user.id,title:draft.title,instructions:draft.instructions,
       subject_name:draft.subject,education_level:draft.level,grade:draft.grade,curriculum:draft.curriculum,
       question_count:draft.questions.length,review_status:status,
-      duration_minutes:draft.duration,due_date:draft.dueDate||null,updated_at:new Date().toISOString()
+      duration_minutes:draft.duration,due_date:draft.dueDate||null,
+      source_resource_id:draft.sourceResourceId||null,updated_at:new Date().toISOString()
     },{onConflict:'id'});
     if(setError) throw setError;
     const {data:oldQuestions,error:oldError}=await supabase.from('exercise_questions').select('id').eq('exercise_set_id',draft.id);
@@ -383,7 +385,8 @@ export default function ContentStudio() {
         const importedDraft:ExerciseDraft={
           id:crypto.randomUUID(),title:baseTitle,subject:assessmentSubject,level,grade,curriculum,
           instructions:'Answer every question. The original paper is stored in the teacher resource library; assign that PDF separately when learners need diagrams or the full source.',
-          duration:estimatedDuration,dueDate:'',questions:importedQuestions,status:'draft',updatedAt:new Date().toISOString()
+          duration:estimatedDuration,dueDate:'',questions:importedQuestions,status:'draft',updatedAt:new Date().toISOString(),
+          sourceResourceId:uploaded[0]?.cloudId
         }
         setDrafts(current=>[importedDraft,...current.filter(item=>item.id!==importedDraft.id)])
         setActiveId(importedDraft.id)
@@ -484,9 +487,15 @@ export default function ContentStudio() {
       const rows=targets.map(student=>({exercise_set_id:selected.id,learner_id:student.id,assigned_by:authState.user.id,due_at:dueAt,available_at:releaseAt}))
       const {data:created,error:assignmentError}=await supabase.from('exercise_assignments').upsert(rows,{onConflict:'exercise_set_id,learner_id'}).select('*')
       if(assignmentError) throw assignmentError
+      let sourceResourceWarning=''
+      if(selected.sourceResourceId){
+        const resourceRows=targets.map(student=>({resource_id:selected.sourceResourceId,learner_id:student.id,assigned_by:authState.user.id}))
+        const {error:resourceAssignmentError}=await supabase.from('resource_assignments').upsert(resourceRows,{onConflict:'resource_id,learner_id'})
+        if(resourceAssignmentError) sourceResourceWarning=' The assessment is assigned, but the original PDF could not be linked to the learner library. Assign it separately from the resource library: '+resourceAssignmentError.message
+      }
       const a:AssignmentDraft={id:crypto.randomUUID(),exerciseId:selected.id,target:assignmentTarget==='All learners'?'All learners':(targets[0].preferred_name||targets[0].full_name||targets[0].student_id||'One learner'),dueDate:assignmentDue,availability:assignmentAvailability,updatedAt:new Date().toISOString(),assignedCount:created?.length||targets.length}
       setAssignments(current=>[a,...current])
-      setNotice('Assessment published and assigned to '+targets.length+' learner(s). It will appear in their Study & Exams workspace.')
+      setNotice('Assessment published and assigned to '+targets.length+' learner(s). It will appear in their Study & Exams workspace.'+(sourceResourceWarning?' '+sourceResourceWarning:selected.sourceResourceId?' The original past-paper PDF was also added to their Student Library.':''))
     }catch(reason){setNotice('Assignment could not be published: '+(reason instanceof Error?reason.message:'Unknown error.'))}
   }
   const assignResourceToLearner=async()=>{

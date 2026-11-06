@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
 import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send, ShieldCheck } from 'lucide-react'
@@ -26,12 +26,6 @@ type LessonPlan = {
 const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
   try { const value = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(value) ? value : [] } catch { return [] }
-}
-const configuredMeetingDomain = () => {
-  const value=(import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN||'meet.jit.si').trim().toLowerCase()
-  const domain=value.replace('https://','').replace('http://','').split('/')[0].replace(/\.$/,'')
-  if(!/^[a-z0-9.-]+$/.test(domain)||domain.includes('..')) throw new Error('The Studyspace video domain is not configured correctly.')
-  return domain
 }
 async function describeEdgeFunctionError(reason: unknown, fallback: string): Promise<string> {
   const context = reason && typeof reason === "object" && "context" in reason
@@ -66,16 +60,15 @@ export default function ClassroomStudio() {
   const [aiBusy, setAiBusy] = useState(false)
   const [aiConnection, setAiConnection] = useState<'unchecked'|'checking'|'ready'|'error'>('unchecked')
   const [aiConnectionMessage, setAiConnectionMessage] = useState('')
+  const [jaasConnection, setJaasConnection] = useState<'unchecked'|'checking'|'ready'|'error'>('unchecked')
+  const [jaasConnectionMessage, setJaasConnectionMessage] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string}[]>([])
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
   const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
   const [chatDraft, setChatDraft] = useState('')
   const [sessionStatus, setSessionStatus] = useState<'scheduled'|'live'|'ended'|'cancelled'|null>(null)
-  const [meetingPassword, setMeetingPassword] = useState<string|null>(null)
-  const [meetingReadyAt, setMeetingReadyAt] = useState<string|null>(null)
   const [boardImage, setBoardImage] = useState('')
-  const publicMeetingProvider = (import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN||'meet.jit.si').replace('https://','').replace('http://','').split('/')[0] === 'meet.jit.si'
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
   useEffect(() => {
@@ -86,7 +79,7 @@ export default function ClassroomStudio() {
       const [{data: auth},{data: messages},{data: session},{data: board}] = await Promise.all([
         supabase!.auth.getUser(),
         supabase!.from('session_messages').select('id,sender_id,message,created_at').eq('session_id',draft.publishedSessionId).order('created_at'),
-        supabase!.from('class_sessions').select('status,meeting_url,meeting_password,meeting_ready_at').eq('id',draft.publishedSessionId).single(),
+        supabase!.from('class_sessions').select('status,meeting_url').eq('id',draft.publishedSessionId).single(),
         supabase!.from('session_whiteboards').select('board_state').eq('session_id',draft.publishedSessionId).maybeSingle()
       ]);
       if (!alive) return;
@@ -94,8 +87,6 @@ export default function ClassroomStudio() {
       if (messages) setTeacherMessages(messages);
       if (session?.status) setSessionStatus(session.status);
       if (session?.meeting_url) setDraft(current=>({...current,meetingUrl:session.meeting_url}));
-      setMeetingPassword(session?.meeting_password||null);
-      setMeetingReadyAt(session?.meeting_ready_at||null);
       const imageData=(board?.board_state as {imageData?:string}|null)?.imageData;
       if (imageData) setBoardImage(imageData);
       channel=supabase!.channel('monitor-session-'+draft.publishedSessionId)
@@ -122,17 +113,8 @@ export default function ClassroomStudio() {
     if(!supabase||!draft.publishedSessionId)return;
     const {error}=await supabase.from('class_sessions').update({status,meeting_ready_at:null,updated_at:new Date().toISOString()}).eq('id',draft.publishedSessionId);
     if(error)setNotice('Session status could not be changed: '+error.message);
-    else {setSessionStatus(status);setMeetingReadyAt(null);setNotice(status==='live'?'Class is live. Join the video room first; assigned learners will be admitted after the room password is configured.':'Class has been ended.')}
+    else {setSessionStatus(status);setNotice(status==='live'?'Class is live. The teacher and assigned learners can now join the secured video room.':'Class has been ended.')}
   };
-
-  const secureTeacherRoom = useCallback(async () => {
-    if(!supabase||!draft.publishedSessionId) throw new Error('The Studyspace session is not available.');
-    const readyAt=new Date().toISOString();
-    const {error}=await supabase.from('class_sessions').update({meeting_ready_at:readyAt,updated_at:readyAt}).eq('id',draft.publishedSessionId);
-    if(error) throw error;
-    setMeetingReadyAt(readyAt);
-    setNotice('Password-protected classroom ready. Assigned learners can now join.');
-  },[draft.publishedSessionId]);
 
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
@@ -177,6 +159,26 @@ export default function ClassroomStudio() {
       setNotice(message);
     } finally { setAiBusy(false) }
   }
+  const checkJaasConnection = async () => {
+    if (!supabase) {
+      setJaasConnection('error');
+      setJaasConnectionMessage('Studyspace is not connected to the secure video service.');
+      return;
+    }
+    setJaasConnection('checking');
+    setJaasConnectionMessage('Checking JaaS credentials and testing server-side signing…');
+    try {
+      const { data, error } = await supabase.functions.invoke('jaas-token', { body: { action: 'healthcheck' } });
+      if (error) throw new Error(await describeEdgeFunctionError(error, 'The JaaS connection test failed.'));
+      if (!data?.success || !data?.verified) throw new Error('The JaaS server did not confirm successful token signing.');
+      setJaasConnection('ready');
+      setJaasConnectionMessage('JaaS is configured and Studyspace successfully signed a test token.');
+    } catch (reason) {
+      setJaasConnection('error');
+      setJaasConnectionMessage(reason instanceof Error ? reason.message : 'The JaaS connection test failed.');
+    }
+  };
+
   const publishSession = async () => {
     if (!supabase) { setNotice('Connect Supabase before publishing a class session.'); return }
     if (!draft.title.trim() || !draft.subject.trim() || selectedLearners.length === 0) { setNotice('Add a lesson title and subject, then select at least one active learner.'); return }
@@ -186,13 +188,12 @@ export default function ClassroomStudio() {
       const adminId = authState.session?.user.id
       if (!adminId) throw new Error('Administrator sign-in is required.')
       const startsAt = new Date(draft.date + 'T09:00:00').toISOString()
-      const meetingUrl = 'https://' + configuredMeetingDomain() + '/Studyspace-' + crypto.randomUUID().replace(/-/g,'')
-      const newMeetingPassword = crypto.randomUUID().replace(/-/g,'')
+      const meetingUrl = 'https://8x8.vc/Studyspace-' + crypto.randomUUID().replace(/-/g,'')
       const { data: session, error: sessionError } = await supabase.from('class_sessions').insert({
         created_by: adminId, title: draft.title.trim(), subject_name: draft.subject.trim(),
         education_level: draft.level, grade: draft.grade, curriculum: draft.curriculum,
         objectives: draft.objectives, starts_at: startsAt, duration_minutes: draft.duration, status: 'scheduled', meeting_url: meetingUrl,
-        meeting_password: newMeetingPassword, meeting_ready_at: null
+        meeting_ready_at: null
       }).select('id').single()
       if (sessionError || !session) throw sessionError || new Error('The class session could not be created.')
       const memberRows = selectedLearners.map(learner_id => ({session_id:session.id,learner_id}))
@@ -215,8 +216,6 @@ export default function ClassroomStudio() {
       const { error: boardError } = await supabase.from('session_whiteboards').insert({session_id:session.id,updated_by:adminId})
       if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
       update({publishedSessionId:session.id,meetingUrl})
-      setMeetingPassword(newMeetingPassword)
-      setMeetingReadyAt(null)
       setSessionStatus('scheduled')
       setPlans(current => [{...draft,publishedSessionId:session.id,meetingUrl,updatedAt:new Date().toISOString()},...current.filter(plan=>plan.id!==draft.id)])
       setNotice("Session published to " + selectedLearners.length + " learner(s). Their Today’s Session workspace can now load the shared lesson, notes and homework.")
@@ -238,7 +237,7 @@ export default function ClassroomStudio() {
   return <div className="subpage classroom-studio">
     <div className="eyebrow">TEACHING WORKSPACE</div><h1>Classroom Studio</h1>
     <p className="page-subtitle">Prepare short, focused lessons, student-friendly recaps and follow-up work for Today's Session.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>Classroom delivery uses the Supabase backend</strong><p>Published lessons, learner assignments, teacher notes, homework and class chat are shared through Studyspace. Lesson-plan drafts remain in this browser until you publish them. {publicMeetingProvider ? 'Video currently uses the public Jitsi test service with a unique room password shared only with assigned learners. This improves access control, but the public service is not intended as a production application backend. Configure a self-hosted Jitsi domain before a full production launch.' : 'Video uses your configured Jitsi domain with session-specific room passwords. Confirm that the server is managed, monitored, secured and sized for your expected classes before launch.'}</p></div></div>
+    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>Classroom delivery uses the Supabase backend</strong><p>Published lessons, learner assignments, teacher notes, homework and class chat are shared through Studyspace. Lesson-plan drafts remain in this browser until you publish them. Video uses authenticated JaaS on 8x8.vc. Studyspace issues a short-lived room token only after checking the signed-in account, class assignment and teacher permissions. Only the class creator receives moderator access.</p></div></div>
     <div className="classroom-layout">
       <section className="panel classroom-editor">
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>
@@ -260,10 +259,8 @@ export default function ClassroomStudio() {
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
         <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{learners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
-        <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
-        {sessionStatus==='live'&&draft.meetingUrl&&<LiveClassroomCall meetingUrl={draft.meetingUrl} displayName="Studyspace Teacher" audience="teacher" meetingPassword={meetingPassword||undefined} onRoomSecured={secureTeacherRoom}/>}
-        {sessionStatus==='live'&&meetingPassword&&!meetingReadyAt&&<p className="classroom-live-waiting">The room is being secured. Assigned learners cannot join until you enter the video room and Studyspace confirms the room password setup.</p>}
-        {sessionStatus==='live'&&meetingReadyAt&&<p className="classroom-room-ready"><CheckCircle2 size={15}/> Password-protected room ready for assigned learners.</p>}
+        <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div><button type="button" className="subtle-button" onClick={()=>void checkJaasConnection()} disabled={jaasConnection==='checking'}><ShieldCheck size={14}/>{jaasConnection==='checking'?'Testing video…':'Test video connection'}</button> {sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>{jaasConnectionMessage&&<p className={'classroom-ai-status '+(jaasConnection==='ready'?'is-ready':jaasConnection==='error'?'has-error':'')} role="status">{jaasConnectionMessage}</p>}
+        {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}
         {sessionStatus==='scheduled'&&<p className="classroom-live-waiting">Start the lesson to open the embedded video room. Learners will see the same Join button in Today's Session.</p>}
         <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':'Learner'}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
         {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}

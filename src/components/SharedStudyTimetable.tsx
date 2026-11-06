@@ -14,9 +14,9 @@ export default function SharedStudyTimetable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function refresh() {
+  async function refresh(quiet = false) {
     if (!supabase) { setError("Studyspace is not connected."); setLoading(false); return; }
-    setLoading(true); setError("");
+    if (!quiet) setLoading(true); setError("");
     try {
       const { data: profiles, error: profileError } = await supabase.from("profiles")
         .select("id,full_name,preferred_name,grade,education_level")
@@ -34,10 +34,16 @@ export default function SharedStudyTimetable() {
       setSlots((data || []) as Slot[]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Shared study availability could not be loaded.");
-    } finally { setLoading(false); }
+    } finally { if (!quiet) setLoading(false); }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(() => void refresh(true), 30000);
+    const onFocus = () => void refresh(true);
+    window.addEventListener("focus", onFocus);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  }, []);
   const times = useMemo(() => Array.from(new Set(slots.map(slot => time(slot.starts_at)))).sort(), [slots]);
   const byId = useMemo(() => new Map(learners.map(item => [item.id, item])), [learners]);
 

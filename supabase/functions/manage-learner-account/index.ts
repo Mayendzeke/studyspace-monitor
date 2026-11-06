@@ -10,9 +10,80 @@ const headers = {
   "Cache-Control": "no-store",
   "Content-Type": "application/json",
 };
+
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers });
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_STORAGE_PAGE = 1000;
+const MAX_STORAGE_DEPTH = 8;
+
+async function listPersonalStorageFiles(admin: ReturnType<typeof createClient>, learnerId: string): Promise<string[]> {
+  const bucket = admin.storage.from("studyspace-resources");
+  const prefix = learnerId + "/personal";
+  const paths = new Set<string>();
+  const visitedFolders = new Set<string>();
+
+  async function visit(folder: string, depth: number): Promise<void> {
+    if (depth > MAX_STORAGE_DEPTH) {
+      throw new Error("The learner's personal storage contains an unexpectedly deep folder structure.");
+    }
+    if (visitedFolders.has(folder)) return;
+    visitedFolders.add(folder);
+
+    let offset = 0;
+    while (true) {
+      const { data, error } = await bucket.list(folder, {
+        limit: MAX_STORAGE_PAGE,
+        offset,
+        sortBy: { column: "name", order: "asc" },
+      });
+      if (error) throw new Error("Could not inspect a learner's personal storage: " + error.message);
+      const entries = data ?? [];
+      for (const entry of entries) {
+        if (!entry.name || entry.name === "." || entry.name === "..") continue;
+        const path = folder + "/" + entry.name;
+        if (entry.id === null) {
+          await visit(path, depth + 1);
+        } else {
+          paths.add(path);
+        }
+      }
+      if (entries.length < MAX_STORAGE_PAGE) break;
+      offset += MAX_STORAGE_PAGE;
+    }
+  }
+
+  await visit(prefix, 0);
+
+  // Include database-registered paths even if Storage listing pagination or
+  // a just-created folder makes them absent from the current list response.
+  const { data: resources, error: resourceError } = await admin
+    .from("learner_personal_resources")
+    .select("storage_path")
+    .eq("learner_id", learnerId);
+  if (resourceError) throw new Error("Could not load the learner's personal-file records: " + resourceError.message);
+  for (const row of resources ?? []) {
+    const path = typeof row.storage_path === "string" ? row.storage_path : "";
+    if (path.startsWith(prefix + "/")) paths.add(path);
+  }
+
+  return [...paths];
+}
+
+async function removePersonalStorageFiles(admin: ReturnType<typeof createClient>, paths: string[]): Promise<number> {
+  const bucket = admin.storage.from("studyspace-resources");
+  let removed = 0;
+  for (let offset = 0; offset < paths.length; offset += 100) {
+    const batch = paths.slice(offset, offset + 100);
+    const { error } = await bucket.remove(batch);
+    if (error) throw new Error("Could not remove the learner's private files: " + error.message);
+    removed += batch.length;
+  }
+  return removed;
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
@@ -26,31 +97,108 @@ Deno.serve(async (request) => {
   const serviceKey = getSecretKey();
   if (!accessToken || !url || !anonKey || !serviceKey) return json(500, { error: "Function configuration is incomplete." });
 
-  const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
+  const caller = createClient(url, anonKey, {
+    global: { headers: { Authorization: authorization! } },
+    auth: { persistSession: false },
+  });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
   if (authError || !authData.user) return json(401, { error: "Sign in is required." });
+
   const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel(accessToken);
   if (assuranceError || assurance.currentLevel !== "aal2") return json(403, { error: "Administrator multi-factor authentication is required." });
-  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
-  if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 
-  let body: { learnerId?: string; action?: string };
-  try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
+  const { data: profile, error: profileError } = await caller
+    .from("profiles").select("role,account_status").eq("id", authData.user.id).single();
+  if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") {
+    return json(403, { error: "Active administrator access is required." });
+  }
+
+  let body: {
+    learnerId?: string;
+    action?: string;
+    profile?: Record<string, unknown>;
+    confirmation?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { error: "Invalid request body." });
+  }
+
   const learnerId = String(body.learnerId ?? "");
   const action = String(body.action ?? "");
-  if (!/^[0-9a-f-]{36}$/i.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
-  if (!["disable", "enable", "reset_password"].includes(action)) return json(400, { error: "Unsupported account action." });
+  if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
+  if (learnerId === authData.user.id) return json(400, { error: "An administrator cannot manage or delete their own account as a learner." });
+  if (!["disable", "enable", "reset_password", "update_profile", "delete"].includes(action)) {
+    return json(400, { error: "Unsupported account action." });
+  }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-  const { data: learner, error: learnerError } = await admin.from("profiles").select("id,role,account_status").eq("id", learnerId).single();
-  if (learnerError || !learner || learner.role !== "learner") return json(404, { error: "Learner account not found." });
+  const { data: learner, error: learnerError } = await admin
+    .from("profiles")
+    .select("id,role,account_status,student_id,full_name,preferred_name")
+    .eq("id", learnerId)
+    .single();
+  if (learnerError || !learner || learner.role !== "learner") {
+    return json(404, { error: "Learner account not found." });
+  }
+
+  if (action === "update_profile") {
+    if (!body.profile || typeof body.profile !== "object" || Array.isArray(body.profile)) {
+      return json(400, { error: "Learner profile details are required." });
+    }
+    const allowedFields: Record<string, number> = {
+      full_name: 120,
+      preferred_name: 80,
+      country: 80,
+      institution: 160,
+      education_level: 80,
+      grade: 80,
+      curriculum: 120,
+      academic_year: 30,
+    };
+    const updates: Record<string, string | null> = {};
+    for (const [key, value] of Object.entries(body.profile)) {
+      if (!(key in allowedFields)) return json(400, { error: "Unsupported learner profile field: " + key + "." });
+      if (typeof value !== "string") return json(400, { error: "Learner profile fields must be text." });
+      const cleaned = value.replace(/\s+/g, " ").trim();
+      if (cleaned.length > allowedFields[key]) {
+        return json(400, { error: key.replaceAll("_", " ") + " is too long." });
+      }
+      updates[key] = cleaned;
+    }
+    if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
+    const resultingFullName = updates.full_name ?? learner.full_name ?? "";
+    if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
+    updates.updated_at = new Date().toISOString();
+
+    const { data: updated, error } = await admin.from("profiles")
+      .update(updates)
+      .eq("id", learnerId)
+      .eq("role", "learner")
+      .select("id,student_id,full_name,preferred_name,country,institution,education_level,grade,curriculum,academic_year,account_status,updated_at")
+      .single();
+    if (error || !updated) return json(500, { error: "Learner profile could not be saved." });
+
+    await admin.from("audit_events").insert({
+      actor_id: authData.user.id,
+      event_type: "learner_profile_updated",
+      target_type: "profile",
+      target_id: learnerId,
+    });
+    return json(200, { success: true, learner: updated, message: "Learner profile updated." });
+  }
 
   if (action === "disable") {
     const { error } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "876000h" });
     if (error) return json(500, { error: "Supabase could not revoke this account's sessions." });
-    const { error: updateError } = await admin.from("profiles").update({ account_status: "disabled", updated_at: new Date().toISOString() }).eq("id", learnerId);
+    const { error: updateError } = await admin.from("profiles")
+      .update({ account_status: "disabled", updated_at: new Date().toISOString() }).eq("id", learnerId);
     if (updateError) return json(500, { error: "The account was blocked in Auth, but its profile status needs reconciliation." });
-    await admin.from("audit_events").insert({ actor_id: authData.user.id, event_type: "learner_account_disabled", target_type: "profile", target_id: learnerId });
+    await admin.from("audit_events").insert({
+      actor_id: authData.user.id, event_type: "learner_account_disabled",
+      target_type: "profile", target_id: learnerId,
+    });
     return json(200, { success: true, message: "Learner sign-in has been blocked and existing sessions revoked." });
   }
 
@@ -58,15 +206,105 @@ Deno.serve(async (request) => {
     if (learner.account_status !== "disabled") return json(409, { error: "Only a disabled learner account can be re-enabled." });
     const { error } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "none" });
     if (error) return json(500, { error: "Supabase could not re-enable this account." });
-    const { error: updateError } = await admin.from("profiles").update({ account_status: "active", updated_at: new Date().toISOString() }).eq("id", learnerId);
+    const { error: updateError } = await admin.from("profiles")
+      .update({ account_status: "active", updated_at: new Date().toISOString() }).eq("id", learnerId);
     if (updateError) return json(500, { error: "Auth was re-enabled, but the profile status needs reconciliation." });
-    await admin.from("audit_events").insert({ actor_id: authData.user.id, event_type: "learner_account_enabled", target_type: "profile", target_id: learnerId });
+    await admin.from("audit_events").insert({
+      actor_id: authData.user.id, event_type: "learner_account_enabled",
+      target_type: "profile", target_id: learnerId,
+    });
     return json(200, { success: true, message: "Learner account re-enabled. A new sign-in is required." });
   }
 
-  const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, "0")).join("");
-  const { error: passwordError } = await admin.auth.admin.updateUserById(learnerId, { password: temporaryPassword });
-  if (passwordError) return json(500, { error: "Supabase could not rotate the learner password." });
-  await admin.from("audit_events").insert({ actor_id: authData.user.id, event_type: "learner_password_reset_by_admin", target_type: "profile", target_id: learnerId });
-  return json(200, { success: true, temporaryPassword, message: "A new temporary password was generated. Deliver it privately; it is shown only once." });
+  if (action === "reset_password") {
+    if (learner.account_status !== "active") {
+      return json(409, { error: "Enable this learner account before resetting its password." });
+    }
+    const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte =>
+      byte.toString(16).padStart(2, "0")
+    ).join("");
+    const { error: passwordError } = await admin.auth.admin.updateUserById(learnerId, { password: temporaryPassword });
+    if (passwordError) return json(500, { error: "Supabase could not rotate the learner password." });
+    await admin.from("audit_events").insert({
+      actor_id: authData.user.id, event_type: "learner_password_reset_by_admin",
+      target_type: "profile", target_id: learnerId,
+    });
+    return json(200, {
+      success: true,
+      temporaryPassword,
+      message: "A new temporary password was generated. Deliver it privately; it is shown only once.",
+    });
+  }
+
+  // Permanent deletion is deliberately stricter than disable: the UI must
+  // send the learner's exact Student ID in a second confirmation step.
+  const requiredConfirmation = "DELETE " + (learner.student_id || learner.id);
+  if (body.confirmation !== requiredConfirmation) {
+    return json(400, { error: "Deletion confirmation did not match. Re-enter the exact confirmation phrase shown in Monitor." });
+  }
+
+  const { error: startAuditError } = await admin.from("audit_events").insert({
+    actor_id: authData.user.id,
+    event_type: "learner_account_deletion_started",
+    target_type: "profile",
+    target_id: learnerId,
+  });
+  if (startAuditError) return json(500, { error: "The deletion could not be recorded, so the account was not changed." });
+
+  let storageFilesRemoved = 0;
+  try {
+    const storagePaths = await listPersonalStorageFiles(admin, learnerId);
+    storageFilesRemoved = await removePersonalStorageFiles(admin, storagePaths);
+  } catch (error) {
+    return json(500, {
+      error: error instanceof Error
+        ? error.message
+        : "Learner files could not be removed. The account was not deleted.",
+    });
+  }
+
+  // This nullable audit reference otherwise blocks deleting the Auth user.
+  const { error: pinError } = await admin.from("enrolment_pins")
+    .update({ redeemed_by: null }).eq("redeemed_by", learnerId);
+  if (pinError) {
+    return json(500, { error: "The learner's redeemed enrolment records could not be detached. The account was not deleted." });
+  }
+
+  // Block refresh/sign-in before attempting the irreversible delete. If the
+  // delete fails, the account stays disabled and cannot continue syncing.
+  const { error: banError } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "876000h" });
+  if (banError) return json(500, { error: "The learner could not be suspended before deletion." });
+  const { error: statusError } = await admin.from("profiles")
+    .update({ account_status: "disabled", updated_at: new Date().toISOString() }).eq("id", learnerId);
+  if (statusError) {
+    return json(500, { error: "The learner was blocked in Auth but profile status could not be updated. The account remains suspended." });
+  }
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(learnerId, false);
+  if (deleteError) {
+    await admin.from("audit_events").insert({
+      actor_id: authData.user.id,
+      event_type: "learner_account_deletion_failed",
+      target_type: "profile",
+      target_id: learnerId,
+    });
+    return json(500, {
+      error: "The learner's private files were removed and the account is suspended, but Supabase could not complete account deletion. The learner remains disabled; retry after resolving the Auth deletion issue.",
+    });
+  }
+
+  const { error: completedAuditError } = await admin.from("audit_events").insert({
+    actor_id: authData.user.id,
+    event_type: "learner_account_deleted",
+    target_type: "profile",
+    target_id: learnerId,
+  });
+
+  return json(200, {
+    success: true,
+    deleted: true,
+    storageFilesRemoved,
+    auditLogged: !completedAuditError,
+    message: "Learner Auth account and cloud profile were permanently deleted. Associated learner records were removed by database cascade.",
+  });
 });

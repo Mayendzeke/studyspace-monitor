@@ -50,6 +50,7 @@ The current migration sequence is:
 18. `supabase/migrations/20261105224728_studyspace_remove_identical_duplicate_policies.sql`
 19. `supabase/migrations/20261105224839_studyspace_harden_security_definer_search_paths.sql`
 20. `supabase/migrations/20261105225421_studyspace_remove_duplicate_storage_read_policy.sql`
+21. `supabase/migrations/20261106051354_studyspace_realtime_classroom_membership.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 

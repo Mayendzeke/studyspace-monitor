@@ -25,9 +25,9 @@ function loadJitsiScript(): Promise<void> {
     const created = !script;
     if (!script) {
       script = document.createElement("script");
-      script.src = "https://meet.jit.si/external_api.js";
+      script.src = "https://" + domain + "/external_api.js";
       script.async = true;
-      script.dataset.studyspaceJitsi = "true";
+      script.dataset.studyspaceJitsi = domain;
     }
     const onLoad = () => {
       if (window.JitsiMeetExternalAPI) resolve();
@@ -40,15 +40,25 @@ function loadJitsiScript(): Promise<void> {
     else if (window.JitsiMeetExternalAPI) resolve();
   }).catch(error => {
     jitsiScriptPromise = null;
+    jitsiScriptDomain = null;
     throw error;
   });
   return jitsiScriptPromise;
 }
 
+function configuredMeetingDomain(): string {
+  const value = (import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN || "meet.jit.si").trim().toLowerCase();
+  const domain = value.replace(/^https?:\\/\\//, "").split("/")[0].replace(/\\.$/, "");
+  if (!/^[a-z0-9.-]+$/.test(domain) || domain.includes("..")) {
+    throw new Error("The Studyspace video domain is not configured correctly.");
+  }
+  return domain;
+}
+
 function readRoom(meetingUrl: string): { domain: string; roomName: string } {
   const url = new URL(meetingUrl);
-  if (url.protocol !== "https:" || url.hostname !== "meet.jit.si") {
-    throw new Error("This meeting link is not a supported Studyspace video room.");
+  if (url.protocol !== "https:" || url.hostname !== configuredMeetingDomain()) {
+    throw new Error("This meeting link does not match the configured Studyspace video provider.");
   }
   const roomName = decodeURIComponent(url.pathname.replace(/^\/+|\/+$/g, ""));
   if (!roomName || roomName.includes("/")) throw new Error("The meeting room name is invalid.");
@@ -98,7 +108,7 @@ export default function LiveClassroomCall({
     const start = async () => {
       try {
         const room = readRoom(meetingUrl);
-        await loadJitsiScript();
+        await loadJitsiScript(room.domain);
         if (!alive || !mountRef.current || !window.JitsiMeetExternalAPI) return;
         instance = new window.JitsiMeetExternalAPI(room.domain, {
           roomName: room.roomName,
@@ -179,7 +189,7 @@ export default function LiveClassroomCall({
       }
       if (apiRef.current === instance) apiRef.current = null;
     };
-  }, [open, meetingUrl, displayName, audience]);
+  }, [open, meetingUrl, displayName, audience, meetingPassword]);
 
   function leaveCall() {
     try { apiRef.current?.executeCommand?.("hangup"); } catch { /* Dispose still removes the embedded room. */ }

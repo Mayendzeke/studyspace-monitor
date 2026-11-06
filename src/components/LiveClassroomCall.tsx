@@ -146,6 +146,7 @@ export default function LiveClassroomCall({
           if (audience !== "teacher" || role !== "moderator" || !meetingPassword || roomSecurityReported) return;
           roomSecurityReported = true;
           callInstance.executeCommand?.("password", meetingPassword);
+          callInstance.executeCommand?.("toggleLobby", true);
           const secure = onRoomSecuredRef.current;
           if (!secure) {
             if (alive) setSecurityError("Jitsi granted moderator access, but Studyspace could not confirm classroom readiness.");

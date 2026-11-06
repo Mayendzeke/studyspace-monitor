@@ -17,9 +17,9 @@ let jitsiScriptPromise: Promise<void> | null = null;
 
 function loadJitsiScript(): Promise<void> {
   if (window.JitsiMeetExternalAPI) return Promise.resolve();
-  if (jitsiScriptPromise) return jitsiScriptPromise;
+  if (jitsiScriptPromise) return jitsiScriptPromise!;
 
-  jitsiScriptPromise = new Promise((resolve, reject) => {
+  jitsiScriptPromise = new Promise<void>((resolve, reject) => {
     let script = document.querySelector<HTMLScriptElement>("script[data-studyspace-jitsi]");
     const created = !script;
     if (!script) {

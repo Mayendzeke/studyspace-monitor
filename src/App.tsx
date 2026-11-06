@@ -1,6 +1,7 @@
 import ContentStudio from './components/ContentStudio'
 import ClassroomStudio from './components/ClassroomStudio'
 import LearnersPage from './components/LearnersPage'
+import SplashScreen from './components/SplashScreen'
 import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -128,7 +129,7 @@ function App() {
 
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} />
-  if (authLoading || adminLoading) return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner" /><p>Verifying administrator access…</p></div></div>
+  if (authLoading || adminLoading) return <SplashScreen theme={theme} />
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
   if (!mfaVerified) return <AdminMfaGate onVerified={handleMfaVerified} />
 

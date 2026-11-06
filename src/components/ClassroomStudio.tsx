@@ -94,14 +94,6 @@ export default function ClassroomStudio() {
         setRegisteredSubjectRows(rows);
         setSubjectOptions(Array.from(new Set(rows.map(row => row.name))).sort((a,b)=>a.localeCompare(b)));
         setDraft(current => current.level ? current : { ...current, level: (learnerResult.data || [])[0]?.education_level || '' });
-        setDraft(current => {
-          if (current.subject.trim()) {
-            if (!names.includes(current.subject)) setSubjectManual(true);
-            return current;
-          }
-          if (names.length) return { ...current, subject: names[0] };
-          return current;
-        });
       }
     };
     void loadClassOptions();

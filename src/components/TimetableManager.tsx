@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock3, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Kind = "school" | "personal";
@@ -124,19 +124,18 @@ export default function TimetableManager({
       </div>
       <div className="timetable-manager-form-actions"><button type="button" className="subtle-button" onClick={() => setEditorOpen(false)} disabled={saving}>Cancel</button><button type="submit" className="primary-button" disabled={saving}><Save size={14}/>{saving ? "Saving…" : "Save entry"}</button></div>
     </form>}
-    {loading ? <div className="classroom-empty">Loading timetable…</div> : rows.length === 0 ? <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No entries saved yet.</span></div> :
-      <div className="timetable-manager-days">{days.map((day,index) => {
-        const items = rows.filter(row => row.day_of_week === index);
-        return items.length ? <div className="timetable-manager-day" key={day}>
-          <strong>{day}</strong>
-          {items.map(row => <article key={row.id}>
-            <span className="timetable-manager-time"><Clock3 size={12}/>{shortTime(row.starts_at)}–{shortTime(row.ends_at)}</span>
-            <span className="timetable-manager-name"><b>{row.title}</b><small>{row.subject_name}{row.location ? " · " + row.location : ""}</small>{row.notes && <small>{row.notes}</small>}</span>
-            <button type="button" className="icon-button" onClick={() => openEdit(row)} aria-label={"Edit " + row.title}><Pencil size={13}/></button>
-            <button type="button" className="icon-button danger-text" onClick={() => void remove(row)} aria-label={"Remove " + row.title}><Trash2 size={13}/></button>
-          </article>)}
-          <button type="button" className="timetable-manager-add-day" onClick={() => openNew(index)}><Plus size={12}/> Add to {day}</button>
-        </div> : null;
-      })}</div>}
+    {loading ? <div className="classroom-empty">Loading timetable…</div> :
+      <div className="teacher-week-grid-wrap">
+        {!rows.length && <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No timetable entries saved yet. The learner can add or import lessons from the student app.</span></div>}
+        <div className="teacher-week-grid-scroll"><table className="teacher-week-grid">
+          <thead><tr><th className="teacher-week-day-heading">DAY</th>{Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><th key={start}>{start}</th>)}</tr></thead>
+          <tbody>{[1,2,3,4,5,6,0].map(day=><tr key={day}><th className="teacher-week-day-cell">{days[day]}</th>
+            {Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><td key={start}>{rows.filter(row=>row.day_of_week===day&&shortTime(row.starts_at)===start).map(row=><article className={"teacher-week-lesson "+(/break/i.test(row.title)?"is-break":/lunch/i.test(row.title)?"is-lunch":"")} key={row.id}>
+              <b>{row.subject_name||row.title}</b><small>{shortTime(row.starts_at)}–{shortTime(row.ends_at)}</small>{row.location&&<small>{row.location}</small>}
+              <div><button type="button" className="icon-button" onClick={()=>openEdit(row)} aria-label={"Edit "+row.title}><Pencil size={12}/></button><button type="button" className="icon-button danger-text" onClick={()=>void remove(row)} aria-label={"Remove "+row.title}><Trash2 size={12}/></button></div>
+            </article>)}</td>)}
+          </tr>)}</tbody>
+        </table></div>
+      </div>}
   </section>;
 }

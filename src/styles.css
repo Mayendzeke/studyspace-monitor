@@ -672,3 +672,13 @@ h1 span { color: #8278d9; }
 .teacher-week-lesson b{font-size:10px}.teacher-week-lesson small{font-size:9px;color:var(--muted)}
 .teacher-week-lesson>div{display:flex;justify-content:flex-end;gap:3px}.teacher-week-lesson .icon-button{width:23px;height:23px}
 .teacher-week-lesson.is-break{border-left-color:#65c6a5}.teacher-week-lesson.is-lunch{border-left-color:#e7ad61}
+
+
+/* Teacher timetable matches the student layout: days at left, time slots across top. */
+.teacher-week-grid{min-width:760px}
+.teacher-week-grid th.teacher-week-day-heading,.teacher-week-grid th.teacher-week-day-cell{position:sticky;left:0;width:92px;min-width:92px;background:var(--panel);text-align:left;z-index:3}
+.teacher-week-grid th.teacher-week-day-heading{top:0;z-index:5;text-align:center}
+.teacher-week-grid th.teacher-week-day-cell{font-weight:750;color:var(--text);vertical-align:middle}
+.teacher-week-grid thead th:not(:first-child){position:sticky;top:0;z-index:2;background:var(--panel);text-align:center;white-space:nowrap}
+.teacher-week-grid td{min-width:125px;height:88px}
+

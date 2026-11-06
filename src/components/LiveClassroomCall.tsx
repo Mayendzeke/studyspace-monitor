@@ -59,19 +59,28 @@ export default function LiveClassroomCall({
   meetingUrl,
   displayName,
   audience,
+  meetingPassword,
+  onRoomSecured,
 }: {
   meetingUrl: string;
   displayName: string;
   audience: "student" | "teacher";
+  meetingPassword?: string;
+  onRoomSecured?: () => Promise<void>;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiApi | null>(null);
+  const onRoomSecuredRef = useRef(onRoomSecured);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [roomReady, setRoomReady] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
+  const [passwordProtected, setPasswordProtected] = useState(false);
+  const [securityError, setSecurityError] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => { onRoomSecuredRef.current = onRoomSecured; }, [onRoomSecured]);
 
   useEffect(() => {
     if (!open || !mountRef.current) return;
@@ -82,6 +91,9 @@ export default function LiveClassroomCall({
     setConnected(false);
     setRoomReady(false);
     setParticipantCount(0);
+    setPasswordProtected(false);
+    setSecurityError("");
+    let roomSecurityReported = false;
 
     const start = async () => {
       try {
@@ -103,12 +115,36 @@ export default function LiveClassroomCall({
         });
         apiRef.current = instance;
         const callInstance = instance;
+        callInstance.addEventListener("participantRoleChanged", event => {
+          const role = (event as { role?: string } | undefined)?.role;
+          if (audience !== "teacher" || role !== "moderator" || !meetingPassword || roomSecurityReported) return;
+          roomSecurityReported = true;
+          callInstance.executeCommand?.("password", meetingPassword);
+          const secure = onRoomSecuredRef.current;
+          if (!secure) {
+            if (alive) setSecurityError("Jitsi granted moderator access, but Studyspace could not confirm classroom readiness.");
+            return;
+          }
+          void secure().then(() => {
+            if (alive) setPasswordProtected(true);
+          }).catch(reason => {
+            if (alive) setSecurityError(reason instanceof Error ? "The room password was sent, but Studyspace could not unlock student access: " + reason.message : "The secure room could not be registered in Studyspace.");
+          });
+        });
+        callInstance.addEventListener("passwordRequired", () => {
+          if (audience === "student" && meetingPassword) {
+            callInstance.executeCommand?.("password", meetingPassword);
+          } else if (alive) {
+            setSecurityError("This room requires a password that is not available to this account.");
+          }
+        });
         callInstance.addEventListener("videoConferenceJoined", () => {
           if (!alive) return;
           setConnected(true);
           setRoomReady(true);
           setLoading(false);
           setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 1);
+          if (audience === "student" && meetingPassword) setPasswordProtected(true);
         });
         callInstance.addEventListener("participantJoined", () => {
           if (alive) setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 2);
@@ -117,10 +153,10 @@ export default function LiveClassroomCall({
           if (alive) setParticipantCount(callInstance.getNumberOfParticipants?.() ?? 1);
         });
         callInstance.addEventListener("videoConferenceLeft", () => {
-          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setLoading(false); }
+          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setPasswordProtected(false); setLoading(false); }
         });
         callInstance.addEventListener("readyToClose", () => {
-          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setOpen(false); setLoading(false); }
+          if (alive) { setConnected(false); setRoomReady(false); setParticipantCount(0); setPasswordProtected(false); setOpen(false); setLoading(false); }
         });
         instance.addEventListener("errorOccurred", () => {
           if (alive) { setError("The video room reported a problem. You can try again or open it in a new tab."); setLoading(false); }
@@ -151,6 +187,7 @@ export default function LiveClassroomCall({
     setConnected(false);
     setRoomReady(false);
     setParticipantCount(0);
+    setPasswordProtected(false);
   }
 
   return (
@@ -176,7 +213,10 @@ export default function LiveClassroomCall({
       {open && <div className="live-classroom-call-frame" ref={mountRef} aria-label="Video classroom" />}
       <p className="live-classroom-call-footnote">
         {connected ? "You are connected to the room. Use the meeting controls to mute, share your screen or leave." : "The room opens inside Studyspace. Allow microphone or camera access only when you are ready."}
-        {" "}This preview uses the public Jitsi service; room links are not protected by Studyspace sign-in.
+        {" "}{passwordProtected ? "A session password is in use. The public Jitsi service is not tied to the learner's Studyspace identity." : meetingPassword && audience === "teacher" ? "Waiting for Jitsi moderator access so the teacher can set the room password. Learner access stays locked until Studyspace confirms readiness." : "This older or unprotected room has no Studyspace sign-in enforcement. Do not use it for sensitive lessons."}
+      </p>
+      {securityError && <p className="live-classroom-call-error" role="alert">{securityError}</p>
+      <p className="live-classroom-call-footnote">
       </p>
     </section>
   );

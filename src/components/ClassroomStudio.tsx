@@ -208,7 +208,8 @@ export default function ClassroomStudio() {
   }
   const generateLessonStructure = async () => {
     if (!supabase) { setNotice('Connect Supabase before generating lesson objectives.'); return; }
-    if (!draft.sourceNotes.trim()) { setNotice('Add source notes or learning material first so generated objectives are grounded.'); return; }
+    const hasLessonContext = [draft.title, draft.subject, draft.grade, draft.curriculum, draft.objectives, draft.sourceNotes].some(value => value.trim());
+    if (!hasLessonContext) { setNotice('Add at least a lesson title, subject, grade, curriculum, objective or source note. MIΛ can create a short introductory draft from limited context.'); return; }
     setAiBusy(true); setNotice('Generating editable lesson objectives and checkpoints…');
     try {
       const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {

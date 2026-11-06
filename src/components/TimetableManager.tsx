@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock3, Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
+import { CalendarDays, Clock3, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Kind = "school" | "personal";

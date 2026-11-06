@@ -50,7 +50,7 @@ export default function ClassroomStudio() {
   const [meetingPassword, setMeetingPassword] = useState<string|null>(null)
   const [meetingReadyAt, setMeetingReadyAt] = useState<string|null>(null)
   const [boardImage, setBoardImage] = useState('')
-  const publicMeetingProvider = configuredMeetingDomain() === 'meet.jit.si'
+  const publicMeetingProvider = (import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN||'meet.jit.si').replace('https://','').replace('http://','').split('/')[0] === 'meet.jit.si'
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
   useEffect(() => {

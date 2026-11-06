@@ -68,6 +68,9 @@ export default function ContentStudio() {
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
   const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string}[]>([])
+  const [subjectOptions,setSubjectOptions] = useState<string[]>([])
+  const [subjectCustom,setSubjectCustom] = useState(false)
+  const [uploadSubjectCustom,setUploadSubjectCustom] = useState(false)
   const [selectedLearner,setSelectedLearner] = useState('')
   const [cloudLoading,setCloudLoading] = useState(true)
   const [cloudError,setCloudError] = useState('')
@@ -172,11 +175,12 @@ export default function ContentStudio() {
       const {data:authState,error:authError}=await supabase.auth.getUser();
       if(authError||!authState.user) throw new Error('Sign in again to access the cloud content workspace.');
       const adminId=authState.user.id;
-      const [setsResult,learnersResult,resourcesResult,assignmentsResult,localResourceRecords]=await Promise.all([
+      const [setsResult,learnersResult,resourcesResult,assignmentsResult,subjectsResult,localResourceRecords]=await Promise.all([
         supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
         supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum').eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
         supabase.from('exercise_assignments').select('id,exercise_set_id,learner_id,due_at,available_at,assigned_at').order('assigned_at',{ascending:false}),
+        supabase.from('student_subjects').select('name').order('name'),
         openResourceDb().then(db=>new Promise<any[]>((resolve,reject)=>{const req=db.transaction(RESOURCE_STORE,'readonly').objectStore(RESOURCE_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})),
       ]);
       if(setsResult.error) throw setsResult.error;
@@ -206,6 +210,12 @@ export default function ContentStudio() {
       if(loaded.length||!readDrafts().length) setDrafts(loaded);
       const activeLearners=(learnersResult.data||[]) as typeof learners;
       setLearners(activeLearners);
+      const registeredSubjects=Array.from(new Set((subjectsResult.data||[]).map((row:any)=>String(row.name||'').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+      setSubjectOptions(registeredSubjects);
+      if(registeredSubjects.length){
+        setSubject(current=>current||registeredSubjects[0]);
+        setUploadSubject(current=>current||registeredSubjects[0]);
+      }
       const groupedAssignments=new Map<string,any[]>();
       for(const row of assignmentsResult.data||[]){
         const key=String(row.exercise_set_id)+'|'+String(row.due_at||'');
@@ -263,7 +273,7 @@ export default function ContentStudio() {
     setQuestions([newQuestion()]);setEditing(0);setPreview(false)
   }
   const loadDraft=(d:ExerciseDraft)=>{
-    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setLevel(d.level);setGrade(d.grade);setCurriculum(d.curriculum)
+    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setSubjectCustom(!!d.subject&&!subjectOptions.includes(d.subject));setLevel(d.level);setGrade(d.grade);setCurriculum(d.curriculum)
     setInstructions(d.instructions);setDuration(d.duration);setDueDate(d.dueDate);setQuestions(d.questions);setEditing(0)
     setPreview(false);setTab('builder');setNotice('Assessment loaded.')
   }
@@ -533,7 +543,15 @@ export default function ContentStudio() {
         <div className="panel-heading"><div><h2>Assessment details</h2><p>Define the class and assessment settings</p></div><span className="studio-draft-count">{drafts.length} assessments</span></div>
         <div className="studio-form-grid">
           <label className="studio-field studio-field-wide">Assessment title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Algebra: Linear equations test"/></label>
-          <label className="studio-field">Subject / module<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Mathematics"/></label>
+          <label className="studio-field">Subject / module
+            <select value={subjectCustom|| (subject&&!subjectOptions.includes(subject))?'__other__':subject}
+              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}}>
+              <option value="">Choose a registered subject</option>
+              {subjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
+              <option value="__other__">Other / enter manually</option>
+            </select>
+          </label>
+          {(subjectCustom|| (subject&&!subjectOptions.includes(subject)))&&<label className="studio-field">Enter subject<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Type the subject or module"/></label>}
           <label className="studio-field">Education level<select value={level} onChange={e=>setLevel(e.target.value)}><option>Primary</option><option>Secondary</option><option>High school</option><option>College</option><option>University</option></select></label>
           <label className="studio-field">Grade / year<input value={grade} onChange={e=>setGrade(e.target.value)} placeholder="e.g. Form 3 / Year 1"/></label>
           <label className="studio-field">Curriculum<input value={curriculum} onChange={e=>setCurriculum(e.target.value)} placeholder="e.g. Cambridge IGCSE"/></label>
@@ -567,7 +585,14 @@ export default function ContentStudio() {
 
     {tab==='library'&&<section className="panel studio-library-panel"><div className="panel-heading"><div><h2>Resource library</h2><p>Organise teaching materials by subject, topic and resource type</p></div><FileText size={19}/></div>
       <div className="resource-upload-zone"><Upload size={25}/><strong>Add learning materials</strong><p>PDF, Word, PowerPoint, text, CSV, Excel and image files · 25 MB maximum per file. Files are uploaded to the private Studyspace library and remain accessible only to you and the learners you assign them to.</p>
-        <div className="resource-upload-fields"><label className="studio-field">Subject<input value={uploadSubject} onChange={e=>setUploadSubject(e.target.value)} placeholder="e.g. Mathematics"/></label><label className="studio-field">Topic / unit<input value={uploadTopic} onChange={e=>setUploadTopic(e.target.value)} placeholder="e.g. Algebra"/></label><label className="studio-field">Resource type<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value as ResourceCategory)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label className="studio-field">Description<input value={uploadDescription} onChange={e=>setUploadDescription(e.target.value)} placeholder="Optional note about this file"/></label></div>
+        <div className="resource-upload-fields"><label className="studio-field">Subject
+          <select value={uploadSubjectCustom||(uploadSubject&&!subjectOptions.includes(uploadSubject))?'__other__':uploadSubject}
+            onChange={e=>{const value=e.target.value;if(value==='__other__'){setUploadSubjectCustom(true);setUploadSubject('')}else{setUploadSubjectCustom(false);setUploadSubject(value)}}}>
+            <option value="">Choose a registered subject</option>
+            {subjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
+            <option value="__other__">Other / enter manually</option>
+          </select>
+        </label>{(uploadSubjectCustom||(uploadSubject&&!subjectOptions.includes(uploadSubject)))&&<label className="studio-field">Enter subject<input value={uploadSubject} onChange={e=>setUploadSubject(e.target.value)} placeholder="Type the subject or module"/></label>}<label className="studio-field">Topic / unit<input value={uploadTopic} onChange={e=>setUploadTopic(e.target.value)} placeholder="e.g. Algebra"/></label><label className="studio-field">Resource type<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value as ResourceCategory)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label className="studio-field">Description<input value={uploadDescription} onChange={e=>setUploadDescription(e.target.value)} placeholder="Optional note about this file"/></label></div>
         {uploadCategory==='Past paper'&&<div className="builder-hint">Past-paper PDFs are read in your browser. Selectable text is extracted automatically; image-only pages use English OCR. The extracted questions become an editable draft. Check every question, mark value and answer before you publish or assign it. The original PDF remains in your private resource library.</div>}
         <label className="primary-button"><Plus size={16}/> {paperBusy?'Reading paper…':'Choose files'}<input type="file" multiple={uploadCategory!=='Past paper'} accept={uploadCategory==='Past paper'?'.pdf,application/pdf':'.pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx'} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} disabled={paperBusy} hidden/></label>
         {paperBusy&&<p className="inline-message" role="status">{paperProgress||'Preparing your past paper…'}</p>}

@@ -625,3 +625,36 @@ h1 span { color: #8278d9; }
 .learner-confirm-label code{font-family:ui-monospace,monospace;color:var(--ink);font-size:11px;font-weight:800;overflow-wrap:anywhere}
 @media(max-width:850px){.learner-admin-row{flex-wrap:wrap}.learner-admin-actions{width:100%;max-width:none;padding-left:50px;justify-content:flex-start}}
 @media(max-width:650px){.learners-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.learners-filter-row{grid-template-columns:1fr;gap:0}.learner-form-grid{grid-template-columns:1fr}.learner-admin-modal{padding:17px}.learner-modal-actions{flex-wrap:wrap}.learner-modal-actions button{flex:1}.learner-admin-actions{gap:6px}.learner-admin-actions .text-button{font-size:9px;padding:5px 2px}}
+
+
+/* Teacher timetable and learner overview */
+.timetable-manager{padding:16px;min-width:0}
+.timetable-manager-actions{display:flex;align-items:center;gap:8px}
+.timetable-manager-editor{padding:13px;border:1px solid var(--border);border-radius:13px;background:var(--panel);display:grid;gap:12px;margin:12px 0}
+.timetable-manager-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.timetable-manager-grid label{display:grid;gap:5px;color:var(--muted);font-size:11px}
+.timetable-manager-grid input,.timetable-manager-grid select{width:100%;min-width:0}
+.timetable-manager-wide{grid-column:1/-1}
+.timetable-manager-form-actions{display:flex;justify-content:flex-end;gap:8px}
+.timetable-manager-empty{min-height:72px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:12px}
+.timetable-manager-days{display:grid;gap:12px}
+.timetable-manager-day{display:grid;gap:7px}
+.timetable-manager-day>strong{font-size:12px;color:var(--text)}
+.timetable-manager-day article{display:grid;grid-template-columns:110px minmax(0,1fr) 30px 30px;gap:9px;align-items:center;border-top:1px solid var(--border);padding:8px 0}
+.timetable-manager-time{display:flex;align-items:center;gap:5px;color:var(--blue);font-size:11px;white-space:nowrap}
+.timetable-manager-name{display:grid;gap:3px;min-width:0}
+.timetable-manager-name b{font-size:12px;overflow-wrap:anywhere}
+.timetable-manager-name small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.timetable-manager-add-day{display:flex;gap:4px;align-items:center;border:0;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;padding:3px 0}
+.learner-view-modal{max-width:1000px;max-height:90vh;overflow-y:auto}
+.learner-view-profile-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:16px 0}
+.learner-view-profile-grid>div{display:grid;gap:5px;padding:12px;border-radius:12px;background:var(--panel);min-width:0}
+.learner-view-profile-grid span{font-size:10px;color:var(--muted)}
+.learner-view-profile-grid strong{font-size:12px;overflow-wrap:anywhere}
+.learner-view-subjects{display:grid;gap:8px;margin:14px 0}
+.learner-view-subjects>strong{font-size:13px}
+.learner-view-subjects>div{display:flex;gap:7px;flex-wrap:wrap}
+.learner-view-subjects>div span{padding:6px 10px;border:1px solid var(--border);border-radius:20px;font-size:11px}
+.learner-view-subjects>small{color:var(--muted);font-size:11px}
+.learner-view-timetables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+@media(max-width:760px){.timetable-manager-grid{grid-template-columns:1fr}.timetable-manager-wide{grid-column:auto}.timetable-manager-day article{grid-template-columns:1fr auto auto}.timetable-manager-time{grid-column:1/-1}.learner-view-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.learner-view-timetables{grid-template-columns:1fr}}

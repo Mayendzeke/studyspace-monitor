@@ -10,6 +10,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
+  Clock3, FileText, RefreshCw, Search, TrendingUp,
 } from 'lucide-react'
 
 type Page = 'Overview' | 'Learners' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
@@ -194,12 +195,160 @@ function App() {
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}
-          {page === 'Academic progress' && <EmptyPage icon={<Activity size={25} />} title="Academic progress" description="Once learners are connected, this area will summarise study activity, subject progress and planner engagement." />}
+          {page === 'Academic progress' && <AcademicProgressPage />}
           {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} />}
         </div>
       </main>
     </div>
   )
+}
+
+
+function AcademicProgressPage() {
+  type Learner = {
+    id: string;
+    student_id: string | null;
+    full_name: string;
+    preferred_name: string;
+    grade: string;
+    curriculum: string;
+    account_status: string;
+  };
+  type StudyRow = { learner_id: string; duration_minutes: number; started_at: string };
+  type AttemptRow = { learner_id: string; score: number; total_points: number; submitted_at: string; marked_at: string | null };
+  type PracticeRow = { learner_id: string; score: number | null; max_score: number | null; created_at: string };
+  type AssignmentRow = { learner_id: string; id: string };
+  type SubjectRow = { learner_id: string; name: string };
+  type LearnerProgress = {
+    learner: Learner;
+    subjects: Set<string>;
+    studyMinutes: number;
+    assignments: number;
+    submissions: number;
+    score: number;
+    possible: number;
+    lastActivity: string;
+  };
+
+  const [learners, setLearners] = useState<LearnerProgress[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+  const refresh = async () => {
+    if (!supabase) {
+      setError('The Studyspace database is not configured.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    const [profileResult, studyResult, assignmentResult, attemptResult, practiceResult, subjectResult] = await Promise.all([
+      supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,account_status').eq('role','learner').order('preferred_name'),
+      supabase.from('study_sessions').select('learner_id,duration_minutes,started_at').order('started_at',{ascending:false}),
+      supabase.from('exercise_assignments').select('id,learner_id'),
+      supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at').order('submitted_at',{ascending:false}),
+      supabase.from('progress_events').select('learner_id,score,max_score,created_at').eq('event_type','weekly_test_attempt').order('created_at',{ascending:false}),
+      supabase.from('student_subjects').select('learner_id,name'),
+    ]);
+    const failed = [profileResult.error,studyResult.error,assignmentResult.error,attemptResult.error,practiceResult.error,subjectResult.error].find(Boolean);
+    if (failed) {
+      setError('Academic progress could not be loaded. Check administrator permissions and the latest database migrations, then refresh.');
+      setLearners([]);
+      setLoading(false);
+      return;
+    }
+
+    const progress = new Map<string,LearnerProgress>();
+    for (const learner of (profileResult.data || []) as Learner[]) {
+      progress.set(learner.id,{
+        learner,
+        subjects:new Set<string>(),
+        studyMinutes:0,
+        assignments:0,
+        submissions:0,
+        score:0,
+        possible:0,
+        lastActivity:learner.account_status ? '' : '',
+      });
+    }
+    for (const row of (subjectResult.data || []) as SubjectRow[]) {
+      const item=progress.get(row.learner_id);
+      if(item && row.name) item.subjects.add(row.name);
+    }
+    for (const row of (studyResult.data || []) as StudyRow[]) {
+      const item=progress.get(row.learner_id);
+      if(!item) continue;
+      item.studyMinutes+=Math.max(0,Number(row.duration_minutes)||0);
+      if(row.started_at && row.started_at>item.lastActivity) item.lastActivity=row.started_at;
+    }
+    for (const row of (assignmentResult.data || []) as AssignmentRow[]) {
+      const item=progress.get(row.learner_id);
+      if(item) item.assignments+=1;
+    }
+    for (const row of (attemptResult.data || []) as AttemptRow[]) {
+      const item=progress.get(row.learner_id);
+      if(!item) continue;
+      item.submissions+=1;
+      item.score+=Math.max(0,Number(row.score)||0);
+      item.possible+=Math.max(0,Number(row.total_points)||0);
+      const activity=row.marked_at||row.submitted_at;
+      if(activity && activity>item.lastActivity) item.lastActivity=activity;
+    }
+    for (const row of (practiceResult.data || []) as PracticeRow[]) {
+      const item=progress.get(row.learner_id);
+      if(!item) continue;
+      item.submissions+=1;
+      item.score+=Math.max(0,Number(row.score)||0);
+      item.possible+=Math.max(0,Number(row.max_score)||0);
+      if(row.created_at && row.created_at>item.lastActivity) item.lastActivity=row.created_at;
+    }
+    setLearners([...progress.values()].sort((a,b)=>b.lastActivity.localeCompare(a.lastActivity)||a.learner.preferred_name.localeCompare(b.learner.preferred_name)));
+    setUpdatedAt(new Date().toISOString());
+    setLoading(false);
+  };
+
+  useEffect(()=>{void refresh();},[]);
+
+  const visible=learners.filter(item=>{
+    const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.grade,item.learner.curriculum].join(' ').toLocaleLowerCase();
+    return value.includes(search.trim().toLocaleLowerCase());
+  });
+  const active=learners.filter(item=>item.learner.account_status==='active').length;
+  const minutes=learners.reduce((sum,item)=>sum+item.studyMinutes,0);
+  const attempts=learners.reduce((sum,item)=>sum+item.submissions,0);
+  const scored=learners.reduce((sum,item)=>sum+item.possible,0);
+  const earned=learners.reduce((sum,item)=>sum+item.score,0);
+  const average=scored>0?Math.round(earned/scored*100):null;
+
+  return <div className="subpage">
+    <div className="welcome-row">
+      <div><div className="eyebrow"><TrendingUp size={14}/> LEARNER OUTCOMES</div><h1>Academic <span>progress.</span></h1><p className="page-subtitle">Review study activity, assigned work and assessment performance across your learners.</p></div>
+      <button className="primary-button" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={16}/>{loading?'Refreshing…':'Refresh data'}</button>
+    </div>
+    <section className="stats-grid" aria-label="Academic progress summary">
+      <StatCard label="LEARNERS" value={String(learners.length)} detail={active+' active accounts'} icon={<Users size={19}/>}/>
+      <StatCard label="STUDY TIME" value={(minutes/60).toFixed(1)+'h'} detail="Recorded study sessions" icon={<Clock3 size={19}/>}/>
+      <StatCard label="SUBMISSIONS" value={String(attempts)} detail="Completed assessments and practice tests" icon={<FileText size={19}/>}/>
+      <StatCard label="AVERAGE SCORE" value={average===null?'—':average+'%'} detail={scored?'Across automatically scored work':'No scored work yet'} icon={<Activity size={19}/>}/>
+    </section>
+    <label className="learners-search"><span>Find a learner</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search by Student ID, name, grade or curriculum"/></label>
+    {updatedAt&&<p className="subtle-note">Last refreshed {new Date(updatedAt).toLocaleString()} · Study time and submitted work are read from the shared Studyspace database.</p>}
+    {error&&<p className="inline-message error-message" role="alert">{error}</p>}
+    <section className="panel learners-list-panel">
+      {loading?<div className="classroom-empty">Loading learner progress…</div>:visible.length?visible.map(item=>{
+        const percent=item.possible>0?Math.round(item.score/item.possible*100):null;
+        return <article className="learner-row" key={item.learner.id}>
+          <div className="learner-avatar">{(item.learner.preferred_name||item.learner.full_name||'S').slice(0,1).toUpperCase()}</div>
+          <div className="learner-identity"><strong>{item.learner.preferred_name||item.learner.full_name||'Learner'}</strong><span>{item.learner.student_id||'No Student ID'} · {item.learner.grade||'Grade not set'} · {item.learner.curriculum||'Curriculum not set'}</span><small>{item.subjects.size} subjects · {item.assignments} assigned · {item.submissions} submitted</small></div>
+          <span className="pin-status">{percent===null?'No score yet':percent+'% average'}</span>
+          <div className="learner-actions"><span className="subtle-note">{Math.floor(item.studyMinutes/60)}h {item.studyMinutes%60}m study</span><small>{item.lastActivity?new Date(item.lastActivity).toLocaleDateString():'No activity yet'}</small></div>
+        </article>;
+      }):<div className="classroom-empty"><Activity size={25}/><strong>{search?'No matching learners':'No learner activity yet'}</strong><span>{search?'Try another search term.':'Learner study sessions and completed assessments will appear here as they use Studyspace.'}</span></div>}
+    </section>
+    <p className="subtle-note">Scores include submitted teacher assignments and self-practice tests. Written responses awaiting teacher marking may not yet have a final score.</p>
+  </div>;
 }
 
 function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => void; supabaseConfigured: boolean }) {
@@ -449,7 +598,7 @@ function SettingsPage({ supabaseConfigured }: { supabaseConfigured: boolean }) {
     <div className="panel settings-card">
       <div className="settings-row"><div className="settings-symbol"><ShieldCheck size={19} /></div><div><strong>Authentication and database</strong><p>The current deployment is connected to the Studyspace Supabase project. The latest automated smoke check confirmed that the public learner enrolment and sign-in Edge Functions respond from the student app origin; it does not certify every table or feature.</p></div><span className="connection-pill"><i /> {supabaseConfigured ? 'Auth functions checked' : 'Not configured'}</span></div>
       <div className="settings-divider" />
-      <div className="settings-row"><div className="settings-symbol"><BookOpen size={19} /></div><div><strong>Studyspace Planner integration</strong><p>Student ID enrolment, sign-in and profile onboarding use the shared Supabase project. General planner tasks, study history, calendar records and personal library files still use device storage; full sync remains unfinished. Live classroom sessions use the shared backend.</p></div><span className="connection-pill"><i /> Auth connected · sync pending</span></div>
+      <div className="settings-row"><div className="settings-symbol"><BookOpen size={19} /></div><div><strong>Studyspace Planner integration</strong><p>Student ID enrolment, sign-in and profile onboarding use the shared Supabase project. The student Planner synchronises its profile, subjects, tasks, study history, academic periods, calendar events and personal files when online, while retaining an account-separated offline copy. Assignments, submissions and live classroom sessions use the shared backend.</p></div><span className="connection-pill"><i /> Shared workspace</span></div>
       <div className="settings-divider" />
       <div className="settings-row"><div className="settings-symbol"><LockKeyhole size={19} /></div><div><strong>Security controls</strong><p>Administrator access is gated by verified MFA (AAL2). Server-side functions check active administrator permissions; learner sign-in and enrolment are rate-limited. Protected database operations also depend on the production RLS migrations.</p></div><span className="connection-pill"><i /> MFA-gated</span></div>
     </div>

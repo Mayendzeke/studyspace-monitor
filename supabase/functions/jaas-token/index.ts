@@ -282,7 +282,7 @@ Deno.serve(async (request: Request) => {
     } catch {
       return json(503, { error: "JaaS signing could not be completed. Verify that the API key matches the uploaded public key." }, origin);
     }
-    return json(200, { success: true, verified: true, provider: "jaas", tokenLifetimeSeconds: TOKEN_TTL_SECONDS }, origin);
+    return json(200, { success: true, signed: true, provider: "jaas", tokenLifetimeSeconds: TOKEN_TTL_SECONDS }, origin);
   }
 
   if (body.action !== undefined) return json(400, { error: "Unsupported action." }, origin);

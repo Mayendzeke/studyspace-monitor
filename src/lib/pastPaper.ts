@@ -5,7 +5,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.m
 
 export type ImportedPaperQuestion = {
   id: string;
-  type: "multiple_choice" | "short_answer";
+  type: "multiple_choice" | "true_false" | "short_answer";
   prompt: string;
   options: string[];
   answer: string;
@@ -189,14 +189,17 @@ export function parsePastPaperQuestions(source: string): ImportedPaperQuestion[]
       if (fullText.replace(/\W/g, "").length < 8) continue;
       const marks = marksFor(fullText);
       const detected = findOptions(bodyLines);
+      const trueFalseLines = bodyLines.filter(line => /^(?:true|false)$/i.test(line));
+      const isTrueFalse = trueFalseLines.some(line => /^true$/i.test(line)) && trueFalseLines.some(line => /^false$/i.test(line));
       const isMultipleChoice = detected.options.length >= 3;
-      const promptLines = isMultipleChoice ? detected.stemLines : bodyLines;
+      const isTrueFalseQuestion = !isMultipleChoice && isTrueFalse;
+      const promptLines = isMultipleChoice ? detected.stemLines : isTrueFalseQuestion ? bodyLines.filter(line => !/^(?:true|false)$/i.test(line)) : bodyLines;
       const prompt = stripMarks(promptLines.join("\n").replace(/\n+/g, "\n")).slice(0, 5000);
       questions.push({
         id: crypto.randomUUID(),
-        type: isMultipleChoice ? "multiple_choice" : "short_answer",
+        type: isMultipleChoice ? "multiple_choice" : isTrueFalseQuestion ? "true_false" : "short_answer",
         prompt: (unit.number + ". " + (prompt || "Review the source paper for the full question wording.")).slice(0, 5000),
-        options: isMultipleChoice ? detected.options : ["", "", "", ""],
+        options: isMultipleChoice ? detected.options : isTrueFalseQuestion ? ["True", "False"] : ["", "", "", ""],
         answer: "",
         acceptedAnswers: [],
         pairs: [{ left: "", right: "" }, { left: "", right: "" }],

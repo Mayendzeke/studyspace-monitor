@@ -230,7 +230,7 @@ export default function ClassroomStudio() {
       const objectives = Array.isArray(recap.learningObjectives) && recap.learningObjectives.length
         ? recap.learningObjectives
         : points.map(point => 'By the end of the lesson, learners will be able to explain or apply: ' + point);
-      update({ objectives: objectives.join('\\n'), checkpoints: [...points, '', '', '', ''].slice(0,5), aiRecap: recap });
+      update({ objectives: objectives.join('\n'), checkpoints: [...points, '', '', '', ''].slice(0,5), aiRecap: recap });
       setNotice('Objectives and checkpoints generated. Review and edit them before publishing.');
     } catch (reason) {
       setNotice(await describeEdgeFunctionError(reason, 'Lesson objectives could not be generated.'));

@@ -219,7 +219,9 @@ Deno.serve(async (request) => {
   }
 
   if (action === "enable") {
-    if (learner.account_status !== "disabled") return json(409, { error: "Only a disabled learner account can be re-enabled." });
+    if (learner.account_status !== "disabled" && learner.account_status !== "pending") {
+      return json(409, { error: "Only a disabled or pending learner account can be activated." });
+    }
     const { error } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "none" });
     if (error) return json(500, { error: "Supabase could not re-enable this account." });
     const { error: updateError } = await admin.from("profiles")
@@ -267,15 +269,24 @@ Deno.serve(async (request) => {
   });
   if (startAuditError) return json(500, { error: "The deletion could not be recorded, so the account was not changed." });
 
+  // Suspend before file cleanup so the learner cannot keep syncing or
+  // uploading while the irreversible deletion workflow is in progress.
+  const { error: banError } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "876000h" });
+  if (banError) return json(500, { error: "The learner could not be suspended before deletion." });
+  const { error: statusError } = await admin.from("profiles")
+    .update({ account_status: "disabled", updated_at: new Date().toISOString() }).eq("id", learnerId);
+  if (statusError) {
+    return json(500, { error: "The learner was blocked in Auth but profile status could not be updated. The account remains suspended." });
+  }
+
   let storageFilesRemoved = 0;
   try {
     const storagePaths = await listPersonalStorageFiles(admin, learnerId);
     storageFilesRemoved = await removePersonalStorageFiles(admin, storagePaths);
   } catch (error) {
     return json(500, {
-      error: error instanceof Error
-        ? error.message
-        : "Learner files could not be removed. The account was not deleted.",
+      error: (error instanceof Error ? error.message : "Learner files could not be removed.") +
+        " The learner account remains suspended; no permanent account deletion was completed.",
     });
   }
 
@@ -283,17 +294,7 @@ Deno.serve(async (request) => {
   const { error: pinError } = await admin.from("enrolment_pins")
     .update({ redeemed_by: null }).eq("redeemed_by", learnerId);
   if (pinError) {
-    return json(500, { error: "The learner's redeemed enrolment records could not be detached. The account was not deleted." });
-  }
-
-  // Block refresh/sign-in before attempting the irreversible delete. If the
-  // delete fails, the account stays disabled and cannot continue syncing.
-  const { error: banError } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "876000h" });
-  if (banError) return json(500, { error: "The learner could not be suspended before deletion." });
-  const { error: statusError } = await admin.from("profiles")
-    .update({ account_status: "disabled", updated_at: new Date().toISOString() }).eq("id", learnerId);
-  if (statusError) {
-    return json(500, { error: "The learner was blocked in Auth but profile status could not be updated. The account remains suspended." });
+    return json(500, { error: "The learner's redeemed enrolment records could not be detached. The learner remains suspended; no permanent account deletion was completed." });
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(learnerId, false);

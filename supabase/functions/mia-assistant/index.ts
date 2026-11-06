@@ -74,6 +74,11 @@ Deno.serve(async request => {
     .select("id", { count: "exact", head: true }).eq("actor_id", learnerId).gte("created_at", since);
   if (countError) return json(503, { error: "MIΛ could not check today's free usage allowance. Try again later." });
   if ((count ?? 0) >= 20) return json(429, { error: "You've reached today's MIΛ allowance. Try again tomorrow." });
+  const { count: projectCount, error: projectCountError } = await admin.from("ai_generation_usage")
+    .select("id", { count: "exact", head: true })
+    .in("purpose", ["mia_chat", "mia_timetable_image"]).gte("created_at", since);
+  if (projectCountError) return json(503, { error: "MIΛ could not check the shared free-use allowance. Try again later." });
+  if ((projectCount ?? 0) >= 100) return json(429, { error: "StudySpace has reached its shared daily MIΛ allowance. Please try again tomorrow." });
 
   const [subjectsResult, goalResult, memoryResult] = await Promise.all([
     admin.from("student_subjects").select("name,target_mark").eq("learner_id", learnerId).order("name").limit(30),

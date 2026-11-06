@@ -3,7 +3,7 @@ import { ExternalLink, Mic, Video, X } from "lucide-react";
 
 type JitsiApi = {
   dispose: () => void;
-  executeCommand?: (command: string) => void;
+  executeCommand?: (command: string, ...args: unknown[]) => void;
   getNumberOfParticipants?: () => number;
   addEventListener: (event: string, callback: (payload?: unknown) => void) => void;
 };

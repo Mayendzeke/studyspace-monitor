@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
-  LockKeyhole, Menu, MoreHorizontal, Plus, Settings, ShieldCheck,
+  LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
   Clock3, FileText, RefreshCw, TrendingUp,
 } from 'lucide-react'
@@ -141,11 +141,11 @@ function App() {
           <button className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={18} /></button>
         </div>
 
-        <div className="workspace-switcher">
-          <div className="workspace-avatar">SZ</div>
-          <div className="workspace-copy"><strong>{adminName}</strong><small>Administrator workspace</small></div>
+        <button type="button" className="workspace-switcher" onClick={() => navigate('Settings')} aria-label="Open workspace settings">
+          <span className="workspace-avatar">SZ</span>
+          <span className="workspace-copy"><strong>{adminName}</strong><small>Administrator workspace</small></span>
           <ChevronDown size={16} className="muted-icon" />
-        </div>
+        </button>
 
         <div className="nav-label">WORKSPACE</div>
         <nav className="main-nav" aria-label="Main navigation">
@@ -168,7 +168,7 @@ function App() {
           <div className="sidebar-profile">
             <div className="profile-avatar">A</div>
             <div className="profile-copy"><strong>{adminName}</strong><small>Authenticated administrator</small></div>
-            <MoreHorizontal size={19} className="muted-icon" />
+
           </div>
         </div>
       </aside>
@@ -184,7 +184,7 @@ function App() {
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
-            <button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button>
+            <NotificationCenter />
             <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LockKeyhole size={16} /></button>
           </div>
         </header>
@@ -201,6 +201,85 @@ function App() {
       </main>
     </div>
   )
+}
+
+
+function NotificationCenter() {
+  type ActivityItem = { id: number; event_type: string; created_at: string };
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+
+  const refresh = async () => {
+    if (!supabase) {
+      setError("Notifications are unavailable because Studyspace is not connected.");
+      setLoaded(true);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const { data, error: queryError } = await supabase
+        .from("audit_events")
+        .select("id,event_type,created_at")
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (queryError) throw queryError;
+      setItems((data ?? []) as ActivityItem[]);
+      setLoaded(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Recent activity could not be loaded.");
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !loaded) void refresh();
+  };
+
+  return (
+    <div className="notification-wrap">
+      <button
+        type="button"
+        className="icon-button notification-button"
+        aria-label="Notifications and recent activity"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={toggle}
+      >
+        <Bell size={18} />
+        {items.length > 0 && <i />}
+      </button>
+      {open && (
+        <section className="notification-popover" role="dialog" aria-label="Recent Studyspace activity">
+          <div className="notification-popover-head">
+            <div><strong>Recent activity</strong><small>Latest events recorded by Studyspace</small></div>
+            <div>
+              <button type="button" className="notification-refresh" onClick={() => void refresh()} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+              <button type="button" className="notification-close" onClick={() => setOpen(false)} aria-label="Close notifications"><X size={16}/></button>
+            </div>
+          </div>
+          {error && <p className="notification-error" role="alert">{error}</p>}
+          {loading && !loaded ? <p className="notification-empty">Loading activity…</p>
+            : items.length ? <ul className="notification-list">
+              {items.map(item => (
+                <li key={item.id}>
+                  <span className="notification-event-dot"/>
+                  <div><strong>{item.event_type.replaceAll("_", " ")}</strong><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></div>
+                </li>
+              ))}
+            </ul>
+            : !error && <p className="notification-empty">No recent activity has been recorded yet.</p>}
+        </section>
+      )}
+    </div>
+  );
 }
 
 

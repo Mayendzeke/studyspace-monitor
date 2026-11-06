@@ -65,11 +65,14 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 
 - `PIN_PEPPER` — a randomly generated secret containing at least 32 random bytes.
 - `AUTH_RATE_LIMIT_PEPPER` — a different randomly generated secret containing at least 32 random bytes.
+- `JAAS_APP_ID` — the JaaS App ID from the 8x8 JaaS console.
+- `JAAS_API_KEY_ID` — the key ID paired with the uploaded JaaS public key.
+- `JAAS_PRIVATE_KEY` — the complete private PEM file downloaded when creating that JaaS key pair. Keep it in Supabase secrets only; never commit it, paste it into chat, or put it in a browser variable.
 - `APP_ORIGIN` — `https://mayendzeke.github.io`
 
 Keep both peppers private. Do not put them in GitHub, browser environment variables, frontend bundles, or chat.
 
-AI lesson recaps are optional. Leave AI unconfigured until a provider and current supported model have been selected. If enabling it later, add `AI_PROVIDER`, the matching provider API key, and the matching model name as Edge Function secrets only.
+AI lesson recaps use server-side provider secrets. The active setup also uses `AI_PROVIDER`, the matching provider API key, and the matching model name as Edge Function secrets only. Never expose provider keys in the browser.
 
 ## 4. Deploy Edge Functions
 
@@ -82,10 +85,11 @@ Deploy these functions to the same Supabase project:
 - `manage-learner-account`
 - `generate-lesson-recap`
 - `submit-exercise-attempt`
+- `jaas-token`
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 
-Gateway JWT verification is enabled for the protected administrator functions (`create-enrolment-pin`, `manage-enrolment-pin`, `manage-learner-account`, `generate-lesson-recap`, and the legacy `redeem-enrolment-pin`) and disabled only for the public enrolment and student sign-in endpoints (`enrol-learner` and `student-sign-in`). Protected functions also validate the user's access token; administrator operations require AAL2 MFA and an active administrator profile. The public enrolment and sign-in functions apply server-side throttling.
+Gateway JWT verification is enabled for protected functions, including `jaas-token`. The JaaS endpoint validates the signed-in user's active Studyspace profile, requires AAL2 MFA for the class-creating administrator, and only issues a room-scoped 15-minute JWT to the administrator who created a live session or a learner assigned to that session. The private key is loaded and used only inside the Edge Function. The JaaS endpoint includes an administrator-only signing health check; a successful signing check does not replace an actual meeting join test. Gateway JWT verification is disabled only for the public enrolment and student sign-in endpoints (`enrol-learner` and `student-sign-in`). The public enrolment and sign-in functions apply server-side throttling.
 
 ## 5. Create the first administrator
 
@@ -126,7 +130,7 @@ Before configuring the Student Planner, confirm its current Supabase client code
 - Keep the `studyspace-resources` Storage bucket private.
 - Admin functions require MFA; student enrolment and sign-in have server-side attempt throttling.
 - AI lesson recaps are teacher drafts. Review every recap before publishing and submit anonymised lesson material only.
-- Jitsi video/audio links are hosted by a third party and are not private database content. Do not share a class link outside the assigned class.
+- Live video and audio are served by 8x8 JaaS (`8x8.vc`). Meeting tokens are signed server-side and restricted to the individual Studyspace class; the client never receives the JaaS private key. Meeting room identifiers are not secrets, but do not share class details outside the assigned class.
 - The planner sync migrations add updated timestamps, account-owned personal file records, private Storage policies, and a server-side deletion ledger. The student client synchronises tasks, subjects, sessions, calendar entries, study preferences, test attempts, flashcard progress and personal files while signed in; the browser database remains the offline cache. The Content Studio migration stores assessments, answer keys, review state, resources and assignment records in the shared project. Apply all migrations to the production Supabase project before enabling these newer cloud-sync and assessment workflows.
 
 

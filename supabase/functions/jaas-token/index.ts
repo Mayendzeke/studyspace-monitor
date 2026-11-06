@@ -180,9 +180,14 @@ function getRoomSlug(meetingUrl: string | null): string | null {
   if (!meetingUrl) return null;
   try {
     const url = new URL(meetingUrl);
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return null;
+    if (
+      url.protocol !== "https:" ||
+      !["8x8.vc", "meet.jit.si"].includes(url.hostname) ||
+      url.username || url.password || url.search || url.hash
+    ) return null;
     const segments = url.pathname.split("/").filter(Boolean);
-    const slug = segments[segments.length - 1] ?? "";
+    if (segments.length !== 1) return null;
+    const slug = segments[0];
     return ROOM_PATTERN.test(slug) ? slug : null;
   } catch {
     return null;

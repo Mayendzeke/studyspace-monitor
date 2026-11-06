@@ -303,6 +303,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       <h1>Learner accounts</h1>
       <p className="page-subtitle">Manage learner records, school placement, academic details, sign-in access and account deletion from one secure workspace.</p>
 
+      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable"/>}
+
+
       <div className="learners-summary">
         <button type="button" className={statusFilter === "all" ? "learner-summary-card selected" : "learner-summary-card"} onClick={() => setStatusFilter("all")}>
           <span>Total learner accounts</span><strong>{counts.all}</strong><small>All enrolled profiles</small>
@@ -388,8 +391,6 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
           </div>
         )}
       </section>
-
-      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable"/>}
 
       {viewTarget && (
         <div className="learner-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setViewTarget(null); }}>

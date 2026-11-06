@@ -537,3 +537,6 @@ h1 span { color: #8278d9; }
  .live-classroom-call-actions>* { flex:1;justify-content:center; }
  .live-classroom-call-frame { min-height:340px;height:62vh; }
 }
+
+.classroom-live-waiting,.classroom-room-ready{display:flex;align-items:flex-start;gap:9px;margin:12px 0;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--muted);font-size:11px;line-height:1.55}
+.classroom-room-ready{color:var(--text)}

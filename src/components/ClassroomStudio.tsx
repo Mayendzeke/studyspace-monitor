@@ -27,6 +27,12 @@ const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
   try { const value = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(value) ? value : [] } catch { return [] }
 }
+const configuredMeetingDomain = () => {
+  const value=(import.meta.env.VITE_STUDYSPACE_MEET_DOMAIN||'meet.jit.si').trim().toLowerCase()
+  const domain=value.replace('https://','').replace('http://','').split('/')[0].replace(/\.$/,'')
+  if(!/^[a-z0-9.-]+$/.test(domain)||domain.includes('..')) throw new Error('The Studyspace video domain is not configured correctly.')
+  return domain
+}
 const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: 'Secondary', grade: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
@@ -44,6 +50,7 @@ export default function ClassroomStudio() {
   const [meetingPassword, setMeetingPassword] = useState<string|null>(null)
   const [meetingReadyAt, setMeetingReadyAt] = useState<string|null>(null)
   const [boardImage, setBoardImage] = useState('')
+  const publicMeetingProvider = configuredMeetingDomain() === 'meet.jit.si'
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   useEffect(() => { if (!supabase) return; void supabase.from('profiles').select('id,student_id,full_name,preferred_name,account_status').eq('role','learner').eq('account_status','active').order('preferred_name').then(({data}) => setLearners((data ?? []) as typeof learners)) }, [])
   useEffect(() => {
@@ -129,7 +136,7 @@ export default function ClassroomStudio() {
       const adminId = authState.session?.user.id
       if (!adminId) throw new Error('Administrator sign-in is required.')
       const startsAt = new Date(draft.date + 'T09:00:00').toISOString()
-      const meetingUrl = 'https://meet.jit.si/Studyspace-' + crypto.randomUUID().replace(/-/g,'')
+      const meetingUrl = 'https://' + configuredMeetingDomain() + '/Studyspace-' + crypto.randomUUID().replace(/-/g,'')
       const newMeetingPassword = crypto.randomUUID().replace(/-/g,'')
       const { data: session, error: sessionError } = await supabase.from('class_sessions').insert({
         created_by: adminId, title: draft.title.trim(), subject_name: draft.subject.trim(),
@@ -181,7 +188,7 @@ export default function ClassroomStudio() {
   return <div className="subpage classroom-studio">
     <div className="eyebrow">TEACHING WORKSPACE</div><h1>Classroom Studio</h1>
     <p className="page-subtitle">Prepare short, focused lessons, student-friendly recaps and follow-up work for Today's Session.</p>
-    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>Classroom delivery uses the Supabase backend</strong><p>Published lessons, learner assignments, teacher notes, homework and class chat are shared through Studyspace. Lesson-plan drafts remain in this browser until you publish them. Video currently uses the public Jitsi service with a unique room password shared only with assigned learners. This improves access control, but Jitsi states that meet.jit.si is not intended as a production application backend; configure Jitsi as a Service or a self-hosted provider before a full production launch.</p></div></div>
+    <div className="setup-banner warning-banner"><div className="setup-banner-icon"><Sparkles size={21}/></div><div className="setup-banner-copy"><strong>Classroom delivery uses the Supabase backend</strong><p>Published lessons, learner assignments, teacher notes, homework and class chat are shared through Studyspace. Lesson-plan drafts remain in this browser until you publish them. {publicMeetingProvider ? 'Video currently uses the public Jitsi test service with a unique room password shared only with assigned learners. This improves access control, but the public service is not intended as a production application backend. Configure a self-hosted Jitsi domain before a full production launch.' : 'Video uses your configured Jitsi domain with session-specific room passwords. Confirm that the server is managed, monitored, secured and sized for your expected classes before launch.'}</p></div></div>
     <div className="classroom-layout">
       <section className="panel classroom-editor">
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>

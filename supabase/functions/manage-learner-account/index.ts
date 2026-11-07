@@ -175,6 +175,8 @@ Deno.serve(async (request) => {
       curriculum: 120,
       academic_year: 30,
       course: 160,
+      subscription_tier: 80,
+      subscription_expires_at: 40,
     };
     const updates: Record<string, string | null> = {};
     for (const [key, value] of Object.entries(body.profile)) {

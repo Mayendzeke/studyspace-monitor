@@ -109,6 +109,25 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [viewSubjectsLoading, setViewSubjectsLoading] = useState(false);
 
   useEffect(() => {
+    const modalOpen = Boolean(editTarget || deleteTarget || viewTarget)
+    if (!modalOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || savingProfile || deleting) return
+      setEditTarget(null)
+      setDeleteTarget(null)
+      setDeleteConfirmation("")
+      setViewTarget(null)
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [editTarget, deleteTarget, viewTarget, savingProfile, deleting])
+
+  useEffect(() => {
     if (!supabase) return;
     void supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? ""));
   }, []);

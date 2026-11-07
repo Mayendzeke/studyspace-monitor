@@ -17,6 +17,7 @@ type Learner = {
   updated_at: string;
   country: string;
   institution: string;
+  course: string;
   education_level: string;
   grade: string;
   curriculum: string;
@@ -25,7 +26,7 @@ type Learner = {
 
 type ProfileForm = Pick<
   Learner,
-  "full_name" | "preferred_name" | "country" | "institution" |
+  "full_name" | "preferred_name" | "country" | "institution" | "course" |
   "education_level" | "grade" | "curriculum" | "academic_year"
 >;
 
@@ -36,6 +37,7 @@ const emptyForm: ProfileForm = {
   preferred_name: "",
   country: "",
   institution: "",
+  course: "",
   education_level: "",
   grade: "",
   curriculum: "",
@@ -113,7 +115,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,education_level,grade,curriculum,academic_year")
+      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -141,7 +143,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       const matchesStatus = statusFilter === "all" || item.account_status === statusFilter;
       const searchable = [
         item.student_id, item.full_name, item.preferred_name, item.country,
-        item.institution, item.education_level, item.grade, item.curriculum, item.academic_year,
+        item.institution, item.course, item.education_level, item.course, item.grade, item.curriculum, item.academic_year,
       ].join(" ").toLocaleLowerCase();
       return matchesStatus && (!needle || searchable.includes(needle));
     });
@@ -189,6 +191,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       preferred_name: learner.preferred_name || "",
       country: learner.country || "",
       institution: learner.institution || "",
+      course: learner.course || "",
       education_level: learner.education_level || "",
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",
@@ -278,7 +281,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   function exportCsv() {
     const headings = [
       "Student ID", "Full name", "Preferred name", "School / institution", "Country",
-      "Education level", "Grade", "Curriculum", "Academic year", "Account status", "Joined",
+      "Education level", "Course / programme", "Grade / year", "Curriculum", "Academic year", "Account status", "Joined",
     ];
     const rows = learners.map(item => [
       item.student_id, item.full_name, item.preferred_name, item.institution, item.country,
@@ -366,7 +369,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
             <div className="learner-avatar">{learnerName(learner).slice(0, 1).toUpperCase()}</div>
             <div className="learner-identity">
               <strong>{learnerName(learner)}</strong>
-              <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"} · {learner.curriculum || "Curriculum not set"}</span>
+              <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"}{learner.course ? " · " + learner.course : ""} · {learner.curriculum || "Curriculum not set"}</span>
               <small><Building2 size={12}/> {learner.institution || "School not set"} · {learner.education_level || "Level not set"} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
               <small>Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
             </div>
@@ -402,7 +405,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <button type="button" className="icon-button" aria-label="Close student details" onClick={() => setViewTarget(null)}><X size={18}/></button>
             </div>
             <div className="learner-view-profile-grid">
-              <div><span>Grade / form</span><strong>{viewTarget.grade || "Not set"}</strong></div>
+              <div><span>{/university|college/i.test(viewTarget.education_level) ? "Year of study" : "Grade / form"}</span><strong>{viewTarget.grade || "Not set"}</strong></div>
+              {viewTarget.course && <div><span>Course / programme</span><strong>{viewTarget.course}</strong></div>}
               <div><span>Curriculum</span><strong>{viewTarget.curriculum || "Not set"}</strong></div>
               <div><span>Academic year</span><strong>{viewTarget.academic_year || "Not set"}</strong></div>
               <div><span>Education level</span><strong>{viewTarget.education_level || "Not set"}</strong></div>
@@ -434,7 +438,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <label>School / institution<input maxLength={160} value={profileForm.institution} onChange={event => setProfileForm(current => ({ ...current, institution: event.target.value }))} placeholder="School or institution name"/></label>
                 <label>Country<input maxLength={80} value={profileForm.country} onChange={event => setProfileForm(current => ({ ...current, country: event.target.value }))}/></label>
                 <label>Education level<input maxLength={80} value={profileForm.education_level} onChange={event => setProfileForm(current => ({ ...current, education_level: event.target.value }))} placeholder="Primary, Secondary, Tertiary…"/></label>
-                <label>Grade / form / year<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder="e.g. Form 3"/></label>
+                <label>{/university|college/i.test(profileForm.education_level) ? "Year of study" : /primary/i.test(profileForm.education_level) ? "Grade / class" : /secondary|sixth form/i.test(profileForm.education_level) ? "Form / grade" : "Grade / form / year"}<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={/university|college/i.test(profileForm.education_level) ? "e.g. Year 1, Year 2, Final year" : "e.g. Grade 6, Form 3"}/></label>
+                {/university|college|tertiary/i.test(profileForm.education_level) && <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, BSc Nursing, Diploma in IT"/></label>}
                 <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>
               </div>

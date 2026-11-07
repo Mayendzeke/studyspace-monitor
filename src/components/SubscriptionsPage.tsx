@@ -89,7 +89,7 @@ export default function SubscriptionsPage() {
     const needle = search.trim().toLowerCase();
     return classified.filter(item => {
       const matches = filter === "all"
-        || (filter === "active" && !item.accessDisabled && !item.expired && Boolean(item.subscription_expires_at))
+        || (filter === "active" && !item.accessDisabled && !item.expired)
         || (filter === "expiring" && !item.accessDisabled && item.expiring)
         || (filter === "expired" && item.expired)
         || (filter === "no-expiry" && !item.subscription_expires_at);

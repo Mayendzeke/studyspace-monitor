@@ -174,6 +174,7 @@ Deno.serve(async (request) => {
       grade: 80,
       curriculum: 120,
       academic_year: 30,
+      course: 160,
     };
     const updates: Record<string, string | null> = {};
     for (const [key, value] of Object.entries(body.profile)) {
@@ -194,7 +195,7 @@ Deno.serve(async (request) => {
       .update(updates)
       .eq("id", learnerId)
       .eq("role", "learner")
-      .select("id,student_id,full_name,preferred_name,country,institution,education_level,grade,curriculum,academic_year,account_status,updated_at")
+      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,grade,curriculum,academic_year,account_status,updated_at")
       .single();
     if (error || !updated) return json(500, { error: "Learner profile could not be saved." });
 

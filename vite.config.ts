@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['studyspace-monitor.svg'],
       manifest: {
         name: 'Studyspace Monitor',
-        short_name: 'StudySpace',
+        short_name: 'SS Monitor',
         description: 'StudySpace teacher and administrator workspace.',
         theme_color: '#242938',
         background_color: '#242938',

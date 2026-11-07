@@ -47,13 +47,13 @@ begin
   if auth.uid() is null then
     raise exception 'Authentication required';
   end if;
-  if p_terms_version <> '2026-11-07-v1' then
+  if p_terms_version is distinct from '2026-11-07-v1' then
     raise exception 'The Terms and Conditions version is outdated. Reload the app and try again.';
   end if;
   if length(accepted_name) < 2 or length(accepted_name) > 120 then
     raise exception 'Enter the full name of the person accepting these terms.';
   end if;
-  if p_acceptance_role not in ('adult_learner', 'parent_guardian') then
+  if p_acceptance_role is null or p_acceptance_role not in ('adult_learner', 'parent_guardian') then
     raise exception 'Choose whether acceptance is by an adult learner or a parent/legal guardian.';
   end if;
 

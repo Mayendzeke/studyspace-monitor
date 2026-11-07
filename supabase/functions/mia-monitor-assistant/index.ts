@@ -79,8 +79,12 @@ Deno.serve(async request => {
         }))
       : [];
 
+    if (Deno.env.get("STUDYSPACE_ADMIN_MIA_ENABLED") !== "true") {
+      return json(503, { error: "MIA is temporarily paused while Study Space verifies an AI provider and data-processing arrangement suitable for its school-age learning service." });
+    }
     const provider = (Deno.env.get("AI_PROVIDER") ?? "gemini").toLowerCase();
-    if (!["gemini", "openai"].includes(provider)) return json(503, { error: "MIA's AI provider setting is not supported." });
+    if (provider === "gemini") return json(503, { error: "Google Gemini API is not enabled for Study Space while the service is intended for learners under 18. Select and verify another provider before enabling MIA." });
+    if (provider !== "openai") return json(503, { error: "MIA AI provider setting is not supported." });
     const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");
     if (!apiKey) return json(503, { error: "MIA's AI provider key is not configured. Check the StudySpace AI settings." });
     const configuredModel = (Deno.env.get("GEMINI_MODEL") ?? "").trim()

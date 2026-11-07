@@ -245,7 +245,15 @@ Deno.serve(async (request) => {
         },
       });
       if (activationAuditError) {
-        return json(500, { error: "The plan was updated but the payment activation audit could not be recorded. Review the learner's subscription history before proceeding." });
+        const { error: rollbackError } = await admin.from("profiles").update({
+          subscription_tier: learner.subscription_tier,
+          subscription_expires_at: learner.subscription_expires_at,
+          updated_at: new Date().toISOString(),
+        }).eq("id", learnerId).eq("role", "learner");
+        if (rollbackError) {
+          return json(500, { error: "The payment activation audit failed and the subscription rollback also needs manual reconciliation. Do not confirm access until the learner record and audit log have been checked." });
+        }
+        return json(500, { error: "The payment activation audit could not be recorded, so the subscription change was rolled back. Retry after checking the audit service." });
       }
     }
     return json(200, { success: true, learner: updated, message: "Learner profile updated." });

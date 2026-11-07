@@ -248,7 +248,7 @@ Deno.serve(async (request: Request) => {
   const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
-    .select("id,role,account_status,preferred_name,full_name")
+    .select("id,role,account_status,subscription_expires_at,preferred_name,full_name")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -258,6 +258,9 @@ Deno.serve(async (request: Request) => {
 
   const isAdministrator = profile.role === "admin";
   const isLearner = profile.role === "learner";
+  if (isLearner && profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) {
+    return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." }, origin);
+  }
   if (!isAdministrator && !isLearner) return json(403, { error: "This account cannot join Studyspace classrooms." }, origin);
 
   if (isAdministrator) {

@@ -96,7 +96,7 @@ export default function ClassroomStudio() {
           course: String(handoff.course || '').trim(),
           curriculum: String(handoff.curriculum || '').trim(),
           duration: Math.max(10, Math.min(240, Number(handoff.duration) || 45)),
-          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\\n\\n' + handoff.content.trim(),
+          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\n\n' + handoff.content.trim(),
         }
         setDraft(next)
         setCourseFilter(next.course || '')

@@ -72,7 +72,11 @@ export default function TimetableManager({
   const gradeOptions = Array.from(new Set(activeLearners.filter(item => item.education_level === educationLevel).map(item => item.grade).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
   const eligibleLearners = activeLearners.filter(item => item.education_level === educationLevel && item.grade === grade);
 
-  useEffect(() => {\n    if (!groupTag || !selectedLearners.length || !activeLearners.length) return;\n    const matching = activeLearners.find(item => selectedLearners.includes(item.id));\n    if (matching) { setEducationLevel(matching.education_level); setGrade(matching.grade); }\n  }, [groupTag, selectedLearners, activeLearners]);
+  useEffect(() => {
+    if (!groupTag || !selectedLearners.length || !activeLearners.length) return;
+    const matching = activeLearners.find(item => selectedLearners.includes(item.id));
+    if (matching) { setEducationLevel(matching.education_level); setGrade(matching.grade); }
+  }, [groupTag, selectedLearners, activeLearners]);
 
   function openNew(day = 1) {
     setEditingId(null);

@@ -194,6 +194,15 @@ jobs:
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
           if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
           if (!classroom.includes("extractSection('Learning objectives')") || !classroom.includes("extractSection('Homework')")) throw new Error('MIA lesson sections are not mapped into editable Classroom Studio fields.')
+          const termsVersion = '2026-11-07-v2'
+          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts']) {
+            const source = readFileSync(path, 'utf8')
+            if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
+            if (source.includes('2026-11-07-v1')) throw new Error(path + ' still contains a stale StudySpace terms-version check.')
+          }
+          const enrolment = readFileSync('supabase/functions/enrol-learner/index.ts', 'utf8')
+          if (!enrolment.includes(termsVersion)) throw new Error('Learner enrolment does not record the current StudySpace terms version.')
+          console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')
           NODE
       - name: Configure Pages

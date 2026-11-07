@@ -210,6 +210,9 @@ jobs:
           const learnerAdminPage = readFileSync('src/components/LearnersPage.tsx', 'utf8')
           if (!accountManagement.includes('paymentTransactionReference') || !accountManagement.includes('payment_transaction_reference')) throw new Error('Subscription audit must require and retain the MTN MoMo transaction reference.')
           if (!learnerAdminPage.includes('MTN MoMo transaction reference') || !learnerAdminPage.includes('paymentTransactionReference.trim().length < 4')) throw new Error('Monitor must collect a transaction reference before confirming payment.')
+          if (!accountManagement.includes('payment_transaction_reference') || !accountManagement.includes('already been used')) throw new Error('Subscription activation must audit and reject reused MTN MoMo transaction references.')
+          const paymentReferenceMigration = readFileSync('supabase/migrations/20261107210001_studyspace_unique_payment_transaction_references.sql', 'utf8')
+          if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
           for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes('json(503')) throw new Error(path + ' must fail closed while MIA is paused.')

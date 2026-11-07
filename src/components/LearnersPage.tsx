@@ -34,6 +34,21 @@ type ProfileForm = Pick<
 
 type ManageAction = "disable" | "enable" | "reset_password";
 
+const SUBSCRIPTION_PLANS = [
+  { value: "Free Trial", label: "Free Trial — 1 day — E0", days: 1 },
+  { value: "Weekly", label: "Weekly — 7 days — E100", days: 7 },
+  { value: "2 Weeks", label: "2 Weeks — 14 days — E200", days: 14 },
+  { value: "Monthly", label: "Monthly — 28 days — E400", days: 28 },
+] as const;
+
+function expiryFromNow(days: number): string {
+  const expiry = new Date();
+  expiry.setDate(expiry.getDate() + days);
+  expiry.setSeconds(0, 0);
+  const local = new Date(expiry.getTime() - expiry.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 const emptyForm: ProfileForm = {
   full_name: "",
   preferred_name: "",
@@ -448,8 +463,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 {/university|college|tertiary/i.test(profileForm.education_level) && <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, BSc Nursing, Diploma in IT"/></label>}
                 <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>
-                <label>Paid tier<input maxLength={80} value={profileForm.subscription_tier} onChange={event => setProfileForm(current => ({ ...current, subscription_tier: event.target.value }))} placeholder="e.g. Monthly, Term, Premium"/></label>
-                <label>Access expires at<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Set both a tier and expiry date to limit access. Leave both blank for no expiry.</small></label>
+                <label>Subscription tier<select value={profileForm.subscription_tier} onChange={event => { const tier = event.target.value; const plan = SUBSCRIPTION_PLANS.find(option => option.value === tier); setProfileForm(current => ({ ...current, subscription_tier: tier, subscription_expires_at: plan ? expiryFromNow(plan.days) : "" })); }}><option value="">No subscription / no expiry</option>{SUBSCRIPTION_PLANS.map(plan => <option key={plan.value} value={plan.value}>{plan.label}</option>)}</select></label>
+                <label>Access due date<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Automatically calculated from today when you choose a tier. You can adjust the date manually if needed.</small></label>
               </div>
               <div className="learner-readonly-row"><span>Student ID</span><strong>{editTarget.student_id || "Not assigned"}</strong><small>Student IDs are kept fixed because they are also used to identify the sign-in account.</small></div>
               <div className="learner-modal-actions">

@@ -204,6 +204,7 @@ as $function$
         (
           subscription_tier is null
           and trial_started_at is not null
+          and trial_started_at <= now()
           and trial_expires_at is not null
           and trial_expires_at > now()
         )

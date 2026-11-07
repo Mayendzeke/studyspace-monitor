@@ -198,6 +198,9 @@ Deno.serve(async (request) => {
     if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
     const nextTier = updates.subscription_tier === undefined ? null : updates.subscription_tier;
     const nextExpiry = updates.subscription_expires_at === undefined ? null : updates.subscription_expires_at;
+    if (nextTier && !["Weekly", "2 Weeks", "Monthly"].includes(nextTier)) {
+      return json(400, { error: "Choose Weekly, 2 Weeks or Monthly. The 48-hour free trial is automatic and cannot be assigned as a paid tier." });
+    }
     if (nextTier && !nextExpiry) return json(400, { error: "A paid tier must have an expiry date. Set both fields, or clear both for no expiry." });
     if (nextExpiry && !nextTier) return json(400, { error: "Choose a paid tier when setting an expiry date." });
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";

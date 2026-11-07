@@ -57,10 +57,8 @@ Deno.serve(async request => {
   if ((byId.count ?? 0) >= 8 || (bySource.count ?? 0) >= 20) return json(429, { error: "Too many sign-in attempts. Wait 15 minutes and try again." });
 
   const { data: profile } = await admin.from("profiles").select("id,role,account_status,subscription_tier,subscription_expires_at").eq("student_id", studentId).maybeSingle();
-  if (profile?.role === "learner" && profile.account_status === "active" && profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) {
-    await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "signin", was_successful: false });
-    return json(403, { error: "Your " + (profile.subscription_tier || "Studyspace") + " access has expired. Please contact your administrator to renew your account. Your saved work is still safe.", subscription_expired: true });
-  }
+  // Authentication remains available after a trial or paid plan expires.
+  // The Student App then restricts the workspace and presents subscription renewal.
   if (!profile || profile.role !== "learner" || profile.account_status !== "active") {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "signin", was_successful: false });
     return json(401, { error: "Student ID or password is incorrect." });

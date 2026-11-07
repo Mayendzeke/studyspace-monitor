@@ -41,8 +41,10 @@ Deno.serve(async request => {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
+  if (Deno.env.get("STUDYSPACE_ADMIN_MIA_ENABLED") !== "true") return json(503, { error: "AI lesson recap generation is paused while Study Space verifies a provider and data-processing arrangement suitable for its school-age learning service." });
   const provider = (Deno.env.get("AI_PROVIDER") ?? "gemini").toLowerCase();
-  if (!["gemini", "openai"].includes(provider)) return json(500, { error: "Unsupported AI provider configuration." });
+  if (provider === "gemini") return json(503, { error: "Google Gemini API is not enabled for Study Space while the service is intended for learners under 18. Select and verify another provider before enabling administrator AI." });
+  if (provider !== "openai") return json(500, { error: "Unsupported AI provider configuration." });
   const apiKey = Deno.env.get(provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY");
   const configuredGeminiModel = (Deno.env.get("GEMINI_MODEL") ?? "").trim()
     .replace(/^models\//i, "").replace(/:generateContent$/i, "");

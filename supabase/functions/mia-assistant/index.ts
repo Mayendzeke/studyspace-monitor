@@ -55,13 +55,24 @@ Deno.serve(async request => {
   if (authError || !auth.user) return json(401, { error: "Your session has expired. Sign in again." });
   const learnerId = auth.user.id;
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("role,account_status,subscription_tier,subscription_expires_at,country,institution,education_level,grade,curriculum,academic_year,course")
+    .select("role,account_status,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,terms_accepted_at,terms_version,country,institution,education_level,grade,curriculum,academic_year,course")
     .eq("id", learnerId).maybeSingle();
   if (profileError || !profile || profile.role !== "learner" || profile.account_status !== "active") {
     return json(403, { error: "MIΛ is available to active student accounts only." });
   }
-  if (profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) {
-    return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." });
+  const now = Date.now();
+  const paidExpiry = profile.subscription_expires_at ? Date.parse(profile.subscription_expires_at) : NaN;
+  const trialStart = profile.trial_started_at ? Date.parse(profile.trial_started_at) : NaN;
+  const trialExpiry = profile.trial_expires_at ? Date.parse(profile.trial_expires_at) : NaN;
+  const hasPaidAccess = Boolean(profile.subscription_tier && Number.isFinite(paidExpiry) && paidExpiry > now);
+  const hasTrialAccess = Boolean(!profile.subscription_tier && Number.isFinite(trialStart)
+    && Number.isFinite(trialExpiry) && trialStart <= now && trialExpiry > now);
+  const hasAcceptedTerms = Boolean(profile.terms_accepted_at && profile.terms_version === "2026-11-07-v1");
+  if (!hasAcceptedTerms) {
+    return json(403, { error: "Please accept the current StudySpace Terms and Conditions before using MIΛ." });
+  }
+  if (!hasPaidAccess && !hasTrialAccess) {
+    return json(403, { error: "Your StudySpace access is paused. Choose a paid subscription plan and contact StudySpace to restore access." });
   }
 
   let body: { action?: string; message?: string; conversationId?: string; image?: { mimeType?: string; data?: string }; attachment?: { name?: string; mimeType?: string; data?: string }; timetableKind?: string; notesText?: string; subject?: string; topic?: string; fileName?: string };
@@ -72,8 +83,9 @@ Deno.serve(async request => {
     body.action === "generate_topic_test" ? "generate_topic_test" : "chat";
   const tierName = String(profile.subscription_tier ?? "").trim().toLowerCase();
   const dailyLimit = tierName === "weekly" ? 10
+    : tierName === "two weeks" || tierName === "two_weeks" ? 20
     : tierName === "monthly" ? 40
-    : tierName === "free trial" || tierName === "free_trial" ? 40
+    : hasTrialAccess ? 20
     : 20;
   const sharedDailyLimit = 300;
 

@@ -111,7 +111,7 @@ create or replace function public.is_active_studyspace_learner()
 returns boolean
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $function$
   select exists (

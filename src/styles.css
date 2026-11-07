@@ -712,7 +712,7 @@ h1 span { color: #8278d9; }
 .monitor-splash-wordmark strong span{color:var(--splash-accent)}
 .monitor-splash-wordmark small{margin-top:7px;font-size:9px;letter-spacing:2.8px;font-weight:800;color:var(--splash-muted)}
 .monitor-splash-loader{width:168px;height:4px;margin-top:12px;border-radius:20px;background:rgba(135,145,165,.2);overflow:hidden}
-.monitor-splash-loader span{display:block;width:0;height:100%;border-radius:20px;background:linear-gradient(90deg,#70d7b6,#8db9ff,var(--splash-accent));animation:monitor-splash-progress 2.2s ease-out forwards}
+.monitor-splash-loader span{display:block;width:0;height:100%;border-radius:20px;background:linear-gradient(90deg,#70d7b6,#8db9ff,var(--splash-accent));animation:monitor-splash-progress 5.2s cubic-bezier(.22,.75,.2,1) forwards}
 .monitor-splash-content>p{margin:0;color:var(--splash-muted);font-size:12px;letter-spacing:.25px}
 .monitor-splash-caption{color:var(--splash-muted);font-size:8px;font-weight:800;letter-spacing:1.6px}
 .monitor-splash-footer{position:absolute;bottom:24px;display:flex;align-items:center;gap:8px;color:var(--splash-muted);font-size:8px;font-weight:700;letter-spacing:1.6px}

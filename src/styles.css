@@ -608,6 +608,10 @@ h1 span { color: #8278d9; }
 .learner-admin-actions{justify-content:flex-end;max-width:370px}
 .learner-admin-actions .text-button{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .learner-admin-actions .text-button:disabled{opacity:.45;cursor:not-allowed}
+.payment-confirmation-check{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:13px 14px;border:1px solid rgba(242,189,112,.34);border-radius:11px;background:rgba(242,189,112,.07);font-size:12px;line-height:1.55;color:var(--ink)}
+.payment-confirmation-check input{width:17px;height:17px;flex:0 0 17px;margin-top:2px;accent-color:var(--mint)}
+.payment-confirmation-check span{display:grid;gap:3px}
+.payment-confirmation-check small{font-size:10px;line-height:1.6;color:var(--muted)}
 .learner-modal-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:auto;padding:18px;background:rgba(10,14,25,.64);backdrop-filter:blur(7px)}
 .learner-admin-modal{width:min(760px,100%);max-height:min(90vh,900px);overflow:auto;padding:22px;border:1px solid var(--line,rgba(120,130,160,.25));border-radius:17px;background:var(--surface,#fff);color:var(--ink);box-shadow:0 22px 70px rgba(0,0,0,.28)}
 .learner-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:20px}

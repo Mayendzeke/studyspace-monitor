@@ -217,6 +217,19 @@ Deno.serve(async (request) => {
       if (paymentTransactionReference.length < 4 || paymentTransactionReference.length > 120) {
         return json(400, { error: "Enter the MTN MoMo transaction reference from the verified payment receipt." });
       }
+      const { data: priorPayment, error: priorPaymentError } = await admin
+        .from("audit_events")
+        .select("id")
+        .eq("event_type", "learner_subscription_activated")
+        .filter("details->>payment_transaction_reference", "eq", paymentTransactionReference)
+        .limit(1)
+        .maybeSingle();
+      if (priorPaymentError) {
+        return json(503, { error: "Payment reference checks are temporarily unavailable. Do not activate this plan until the reference can be checked." });
+      }
+      if (priorPayment) {
+        return json(409, { error: "This MTN MoMo transaction reference has already been used for a StudySpace subscription. Check the receipt or contact support." });
+      }
     }
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";
     if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
@@ -248,6 +261,8 @@ Deno.serve(async (request) => {
           payment_method: "MTN MoMo",
           payment_reference: learner.student_id,
           payment_transaction_reference: paymentTransactionReference,
+          payment_amount_emalangeni: ({ "Weekly": 100, "2 Weeks": 200, "Monthly": 350 } as Record<string, number>)[String(updated.subscription_tier)] ?? null,
+          payment_currency: "SZL",
           payment_verified_by: authData.user.id,
           payment_verified_at: new Date().toISOString(),
         },

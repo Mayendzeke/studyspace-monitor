@@ -597,7 +597,7 @@ function PinPage() {
   const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }
 
   return <div className="subpage">
-    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Create one-time invitations with a generated Student ID. PINs are hashed on the server and shown only once.</p>
+    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Create one-time invitations for first-time enrolment. The PIN expires if unused and cannot be reused after enrolment. Once a learner has enrolled, their Student ID and password remain their sign-in credentials; do not issue another enrolment PIN to restore an existing account.</p>
     <div className="panel pin-create-panel">
       <div className="panel-heading"><div><h2>Create learner access</h2><p>Requires an authenticated administrator with MFA verified.</p></div><KeyRound size={20}/></div>
       <div className="pin-create-controls"><label>PIN expiry<select value={expiresInDays} onChange={e=>setExpiresInDays(e.target.value)}><option value="1">1 day</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></label><button className="primary-button" onClick={()=>void createPin()} disabled={busy}>{busy?'Working…':'Generate Student ID + PIN'}</button></div>

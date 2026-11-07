@@ -28,6 +28,22 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Report dependency audit
+        run: |
+          npm audit --json > audit-all.json || true
+          npm audit --omit=dev --json > audit-production.json || true
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          for (const [label, file] of [['all dependencies', 'audit-all.json'], ['production dependencies', 'audit-production.json']]) {
+            const report = JSON.parse(readFileSync(file, 'utf8'))
+            const vulnerabilities = Object.entries(report.vulnerabilities || {})
+            console.log(label + ': ' + vulnerabilities.length + ' vulnerable package(s)')
+            for (const [name, item] of vulnerabilities) {
+              const titles = (item.via || []).filter(value => typeof value === 'object').map(value => value.title).join('; ')
+              console.log(' - ' + name + ' [' + item.severity + '] direct=' + item.isDirect + ' fix=' + JSON.stringify(item.fixAvailable) + (titles ? ' ' + titles : ''))
+            }
+          }
+          NODE
       - name: Validate Supabase frontend configuration
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}

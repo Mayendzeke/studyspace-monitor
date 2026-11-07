@@ -566,7 +566,7 @@ export default function ContentStudio() {
             : <p className="builder-hint">No course or programme is recorded for active {level.toLowerCase()} learners yet. Their registered year of study is still available below.</p>)}
           <label className="studio-field">{isTertiaryLevel?'3. ':'2. '}{gradeFieldLabel}<select value={grade} onChange={e=>{setGrade(e.target.value);setSubject('');setSubjectCustom(false)}} disabled={!level}><option value="">All grades / years</option>{learnerGrades.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
           <label className="studio-field">3. Subject / module<select value={subjectCustom|| (subject&&!builderSubjectOptions.includes(subject))?'__other__':subject}
-              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}} disabled={!level||!grade}>
+              onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}} disabled={!level}>
               <option value="">Choose from this level and grade</option>
               {builderSubjectOptions.map(name=><option key={name} value={name}>{name}</option>)}
               <option value="__other__">Other / enter manually</option>

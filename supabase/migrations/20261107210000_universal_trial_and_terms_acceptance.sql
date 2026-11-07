@@ -91,6 +91,71 @@ begin
 end;
 $function$;
 
+-- Keep the legacy authenticated PIN-redemption route on the same universal trial.
+-- The Student App will require current terms acceptance before loading learner data.
+create or replace function public.redeem_studyspace_pin(pin_digest text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  redeemed_id uuid;
+  trial_started timestamptz;
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if (
+    select count(*) from public.pin_redemption_attempts
+    where user_id = auth.uid() and attempted_at > now() - interval '15 minutes'
+  ) >= 5 then
+    raise exception 'Too many PIN attempts. Try again in 15 minutes.';
+  end if;
+
+  if not exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'learner' and account_status = 'pending'
+  ) then
+    raise exception 'This account is not eligible for enrolment';
+  end if;
+
+  update public.enrolment_pins
+  set redeemed_by = auth.uid(), redeemed_at = now()
+  where pin_hash = pin_digest
+    and redeemed_by is null
+    and redeemed_at is null
+    and revoked_at is null
+    and expires_at > now()
+  returning id into redeemed_id;
+
+  if redeemed_id is null then
+    insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),false);
+    return false;
+  end if;
+
+  -- Start the learner's free trial only after the one-time PIN is claimed.
+  trial_started := clock_timestamp();
+  update public.profiles
+  set account_status = 'active',
+      subscription_tier = null,
+      subscription_expires_at = null,
+      trial_started_at = trial_started,
+      trial_expires_at = trial_started + interval '48 hours',
+      trial_reminder_shown_at = null,
+      updated_at = trial_started
+  where id = auth.uid();
+
+  insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),true);
+
+  insert into public.audit_events(actor_id,event_type,target_type,target_id)
+  values (auth.uid(),'enrolment_pin_redeemed','profile',auth.uid()::text);
+
+  return true;
+end;
+$function$;
+
 create or replace function public.accept_studyspace_terms(
   p_terms_version text,
   p_accepted_by_name text,

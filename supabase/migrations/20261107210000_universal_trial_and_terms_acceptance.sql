@@ -119,7 +119,7 @@ begin
   if auth.uid() is null then
     raise exception 'Authentication required';
   end if;
-  if p_terms_version is distinct from '2026-11-07-v2' then
+  if p_terms_version is distinct from '2026-11-07-v3' then
     raise exception 'The Terms and Conditions version is outdated. Reload the app and try again.';
   end if;
   if length(accepted_name) < 2 or length(accepted_name) > 120 then
@@ -193,7 +193,7 @@ as $function$
       and role = 'learner'
       and account_status = 'active'
       and terms_accepted_at is not null
-      and terms_version = '2026-11-07-v2'
+      and terms_version = '2026-11-07-v3'
       and (
         (
           subscription_tier is not null

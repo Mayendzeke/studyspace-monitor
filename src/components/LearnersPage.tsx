@@ -304,7 +304,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       <h1>Learner accounts</h1>
       <p className="page-subtitle">Manage learner records, school placement, academic details, sign-in access and account deletion from one secure workspace.</p>
 
-      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable"/>}
+      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable" allowGroupEvents/>}
       <SharedStudyTimetable/>
 
 

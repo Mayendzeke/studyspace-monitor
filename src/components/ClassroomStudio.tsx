@@ -78,6 +78,41 @@ export default function ClassroomStudio() {
   const [boardImage, setBoardImage] = useState('')
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(plans)) } catch { setNotice('Browser storage is full. Export or remove old lesson plans.') } }, [plans])
   useEffect(() => {
+    const loadMiaDraft = () => {
+      try {
+        const raw = localStorage.getItem('studyspace-monitor-mia-lesson-handoff-v1')
+        if (!raw) return
+        const handoff = JSON.parse(raw) as {
+          title?: string; subject?: string; level?: string; grade?: string; course?: string;
+          curriculum?: string; duration?: number; content?: string
+        }
+        if (!handoff || typeof handoff.content !== 'string' || !handoff.content.trim()) return
+        const next: LessonPlan = {
+          ...blank(),
+          title: String(handoff.title || '').trim() || 'MIA lesson draft',
+          subject: String(handoff.subject || '').trim(),
+          level: String(handoff.level || '').trim(),
+          grade: String(handoff.grade || '').trim(),
+          course: String(handoff.course || '').trim(),
+          curriculum: String(handoff.curriculum || '').trim(),
+          duration: Math.max(10, Math.min(240, Number(handoff.duration) || 45)),
+          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\\n\\n' + handoff.content.trim(),
+        }
+        setDraft(next)
+        setCourseFilter(next.course || '')
+        setSelectedLearners([])
+        setSelected(null)
+        setNotice('MIA lesson draft loaded. Review the generated content, complete any missing details, then save or publish when ready.')
+        localStorage.removeItem('studyspace-monitor-mia-lesson-handoff-v1')
+      } catch {
+        setNotice('The MIA lesson draft could not be opened. Return to MIA and try creating it again.')
+      }
+    }
+    loadMiaDraft()
+    window.addEventListener('studyspace-mia-lesson-draft', loadMiaDraft)
+    return () => window.removeEventListener('studyspace-mia-lesson-draft', loadMiaDraft)
+  }, [])
+  useEffect(() => {
     if (!supabase) return;
     let alive = true;
     const loadClassOptions = async () => {

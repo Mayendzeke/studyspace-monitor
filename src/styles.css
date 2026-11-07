@@ -786,6 +786,9 @@ h1 span { color: #8278d9; }
 /* MIA administrator workspace */
 .main-nav { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .mia-page { max-width: 1120px; margin: 0 auto; }
+.mia-paused-panel{max-width:760px;margin:32px auto;padding:28px;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow)}
+.mia-paused-panel h2{margin:14px 0 8px;font-size:22px;color:var(--ink)}
+.mia-paused-panel p{max-width:620px;margin:0;color:var(--muted);font-size:13px;line-height:1.75}
 .mia-hero { display:flex; align-items:center; gap:18px; padding:23px 25px; border:1px solid rgba(255,255,255,.55); border-radius:19px; background:linear-gradient(115deg,#e7e4fb,#edf0f7 72%); box-shadow:var(--raised); }
 .mia-brand-mark { width:54px; height:54px; display:grid; place-items:center; flex:0 0 auto; color:#fff; border-radius:17px; background:linear-gradient(145deg,#8e82ed,#6256c8); box-shadow:5px 5px 11px #c6cad7,-4px -4px 9px #fff; }
 .mia-hero-copy { min-width:0; flex:1; }

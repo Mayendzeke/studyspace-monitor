@@ -30,7 +30,7 @@ function publishableKey() {
 function secretKey() {
   return namedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
-type HistoryItem = { role: "user" | "assistant"; content: string };
+type HistoryItem = { role: "user" | "model"; content: string };
 
 Deno.serve(async request => {
   try {
@@ -106,7 +106,7 @@ Deno.serve(async request => {
       "Do not request or reproduce sensitive personal information about learners. Encourage the administrator to remove names, student IDs, contact details and other identifying information from material pasted into chat.",
       "Do not invent curriculum rules, examination-board requirements or official policies. Clearly label general suggestions and ask the administrator to verify syllabus-specific material against the official source.",
       "Keep answers focused on the administrator's StudySpace work. For unrelated requests, politely redirect to teaching, learning or StudySpace operations.",
-    ].join("\\n\\n");
+    ].join("\n\n");
 
     const inputCharacters = message.length + history.reduce((total, item) => total + item.content.length, 0);
     const usage = await admin.from("ai_generation_usage").insert({
@@ -125,7 +125,7 @@ Deno.serve(async request => {
       if (provider === "openai") {
         const contents = [
           { role: "system", content: system },
-          ...history.map(item => ({ role: item.role, content: item.content })),
+          ...history.map(item => ({ role: item.role === "model" ? "assistant" : "user", content: item.content })),
           { role: "user", content: message },
         ];
         response = await fetch("https://api.openai.com/v1/chat/completions", {

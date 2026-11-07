@@ -671,8 +671,9 @@ h1 span { color: #8278d9; }
 @media(max-width:760px){.timetable-manager-grid{grid-template-columns:1fr}.timetable-manager-wide{grid-column:auto}.timetable-manager-day article{grid-template-columns:1fr auto auto}.timetable-manager-time{grid-column:1/-1}.learner-view-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.learner-view-timetables{grid-template-columns:1fr}}
 
 /* Weekly grid shared by teacher timetable review and editing. */
-.teacher-week-grid-scroll{width:100%;overflow:auto;border:1px solid var(--border);border-radius:12px}
-.teacher-week-grid{width:100%;min-width:700px;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:10px}
+.teacher-week-grid-scroll{width:100%;overflow:hidden;border:1px solid var(--border);border-radius:12px}
+.teacher-week-grid-zoom{width:100%;max-width:100%;margin-inline:auto}
+.teacher-week-grid{width:100%;min-width:0;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:10px}
 .teacher-week-grid th,.teacher-week-grid td{padding:7px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);vertical-align:top}
 .teacher-week-grid thead th{position:sticky;top:0;z-index:2;background:var(--panel);text-align:center}
 .teacher-week-grid thead th:first-child{left:0;z-index:3;width:68px}
@@ -686,7 +687,7 @@ h1 span { color: #8278d9; }
 
 
 /* Teacher timetable matches the student layout: days at left, time slots across top. */
-.teacher-week-grid{min-width:760px}
+.teacher-week-grid{min-width:0}
 .teacher-week-grid th.teacher-week-day-heading,.teacher-week-grid th.teacher-week-day-cell{position:sticky;left:0;width:92px;min-width:92px;background:var(--panel);text-align:left;z-index:3}
 .teacher-week-grid th.teacher-week-day-heading{top:0;z-index:5;text-align:center}
 .teacher-week-grid th.teacher-week-day-cell{font-weight:750;color:var(--text);vertical-align:middle}
@@ -726,3 +727,9 @@ h1 span { color: #8278d9; }
 .timetable-event-learner-list span{overflow-wrap:anywhere}
 .timetable-event-learner-list>small{grid-column:1/-1;color:var(--muted);font-size:11px}
 @media(max-width:600px){.timetable-event-learner-list{grid-template-columns:1fr}}
+
+/* Timetable scaling controls; the grid remains centred and never side-scrolls. */
+.timetable-zoom-controls{display:inline-flex;align-items:center;gap:5px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.timetable-zoom-button,.timetable-zoom-reset{display:grid;place-items:center;min-width:29px;height:28px;padding:0 7px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:11px;font-weight:700}
+.timetable-zoom-button:hover,.timetable-zoom-reset:hover{background:var(--panel-strong)}
+.timetable-zoom-button:disabled{opacity:.35;cursor:not-allowed}

@@ -10,6 +10,7 @@ type LessonPlan = {
   subject: string
   level: string
   grade: string
+  course?: string
   curriculum: string
   date: string
   duration: number
@@ -50,7 +51,8 @@ async function describeEdgeFunctionError(reason: unknown, fallback: string): Pro
   return reason instanceof Error ? reason.message : fallback;
 }
 
-const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
+const standardEducationLevels = ['Primary school', 'Secondary school', 'High school / Sixth form', 'College', 'University', 'Other']
+const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', course: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
   const [plans, setPlans] = useState<LessonPlan[]>(readPlans)
@@ -151,12 +153,22 @@ export default function ClassroomStudio() {
     else {setSessionStatus(status);setNotice(status==='live'?'Class is live. The teacher and assigned learners can now join the secured video room.':'Class has been ended.')}
   };
 
-  const levelOptions = Array.from(new Set(learners.map(item => item.education_level).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  const levelLearners = learners.filter(item => !draft.level || item.education_level === draft.level);
-  const courseOptions = Array.from(new Set(levelLearners.map(item => item.course).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  const courseLearners = levelLearners.filter(item => !courseFilter || item.course === courseFilter);
-  const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const levelOptions = [...standardEducationLevels, ...Array.from(new Set(learners.map(item => item.education_level.trim()).filter(Boolean))).filter(level => !standardEducationLevels.includes(level)).sort((a,b)=>a.localeCompare(b))];
+  const levelLearners = learners.filter(item => !!draft.level && item.education_level === draft.level);
+  const isTertiaryLevel = draft.level === 'College' || draft.level === 'University';
+  const courseOptions = Array.from(new Set(levelLearners.map(item => item.course?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
+  // Course/programme filters are populated from actual active learners at the selected level.
+  // If older learner profiles have no course recorded, the teacher can still use their recorded year/grade.
+  const courseLearners = isTertiaryLevel && courseFilter
+    ? levelLearners.filter(item => item.course?.trim() === courseFilter)
+    : levelLearners;
+  const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   const scopedLearners = courseLearners.filter(item => !draft.grade || item.grade === draft.grade);
+  const gradeFieldLabel = draft.level === 'Primary school' ? 'Grade / class'
+    : draft.level === 'Secondary school' ? 'Form / grade'
+    : draft.level === 'High school / Sixth form' ? 'Form / sixth form year'
+    : isTertiaryLevel ? 'Year of study' : 'Grade / year';
+  const scopedLearnerCountLabel = scopedLearners.length + ' matching active learner(s)';
   const scopedIds = new Set(scopedLearners.map(item => item.id));
   const scopedSubjectOptions = Array.from(new Set(registeredSubjectRows.filter(row => scopedIds.has(row.learner_id)).map(row => row.name))).sort((a,b)=>a.localeCompare(b));
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
@@ -288,19 +300,21 @@ export default function ClassroomStudio() {
       if (boardError) { await supabase.from('class_sessions').delete().eq('id',session.id); throw boardError }
       update({publishedSessionId:session.id,meetingUrl})
       setSessionStatus('scheduled')
-      setPlans(current => [{...draft,publishedSessionId:session.id,meetingUrl,updatedAt:new Date().toISOString()},...current.filter(plan=>plan.id!==draft.id)])
+      setPlans(current => [{...draft,course:courseFilter,publishedSessionId:session.id,meetingUrl,updatedAt:new Date().toISOString()},...current.filter(plan=>plan.id!==draft.id)])
       setNotice("Session published to " + selectedLearners.length + " learner(s). Their Today’s Session workspace can now load the shared lesson, notes and homework.")
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
     finally { setPublishing(false) }
   }
   const save = () => {
     if (!draft.title.trim() || !draft.subject.trim()) { setNotice('Add a lesson title and subject before saving.'); return }
-    const saved = { ...draft, title: draft.title.trim(), subject: draft.subject.trim(), checkpoints: completePoints }
+    const saved = { ...draft, course: courseFilter, title: draft.title.trim(), subject: draft.subject.trim(), checkpoints: completePoints }
     setPlans(current => [saved, ...current.filter(x => x.id !== saved.id)])
     setSelected(saved.id); setDraft(saved); setNotice('Lesson plan saved in this browser. It is not yet synced to learners.')
   }
   const load = (plan: LessonPlan) => {
     setDraft(plan);
+    setCourseFilter(plan.course || '');
+    setSelectedLearners([]);
     setSubjectManual(!!plan.subject && !subjectOptions.includes(plan.subject));
     setSelected(plan.id);
     setNotice('Lesson plan loaded.');
@@ -320,8 +334,10 @@ export default function ClassroomStudio() {
         <div className="classroom-form-grid">
           <label>Lesson title<input value={draft.title} onChange={e=>update({title:e.target.value})} placeholder="e.g. Linear equations"/></label>
           <label>1. Education level<select value={draft.level} onChange={e=>{setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);update({level:e.target.value,grade:'',subject:'',curriculum:''})}}><option value="">Choose a level from registered learners</option>{levelOptions.map(item=><option key={item}>{item}</option>)}</select></label>
-          {(draft.level==='University'||draft.level==='College')&&<label>2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setSelectedLearners([]);setSubjectManual(false);update({grade:'',subject:''})}}><option value="">Choose a course / programme</option>{courseOptions.map(item=><option key={item}>{item}</option>)}</select></label>}
-          <label>2. Grade / year<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level||((draft.level==='University'||draft.level==='College')&&!courseFilter)}><option value="">Choose grade / year</option>{gradeOptions.map(item=><option key={item}>{item}</option>)}</select></label>
+          {isTertiaryLevel && (courseOptions.length > 0
+            ? <label>2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setSelectedLearners([]);setSubjectManual(false);update({grade:'',subject:''})}}><option value="">All courses / programmes</option>{courseOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+            : isTertiaryLevel && <p className="classroom-filter-note">No course or programme has been recorded for active {draft.level.toLowerCase()} learners yet. You can still filter by their registered year of study.</p>)}
+          <label>{isTertiaryLevel ? '3.' : '2.'} {gradeFieldLabel}<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level}><option value="">All grades / years</option>{gradeOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
           <label>3. Subject / module<select value={subjectManual || (draft.subject && !scopedSubjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
               onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}} disabled={!draft.level||!draft.grade}>
               <option value="">Choose from this level and year</option>
@@ -342,14 +358,14 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
-        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select the active learner accounts that should receive this session.</small></div>{learners.length ? <div className="classroom-learner-checks">{scopedLearners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'}</small></span></label>)}</div> : <p>No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
+        <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select from the {draft.level || 'selected'} learners. {scopedLearnerCountLabel}.</small></div>{scopedLearners.length ? <div className="classroom-learner-checks">{scopedLearners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'} · {learner.grade || 'Grade not set'}{learner.course ? ' · ' + learner.course : ''}</small></span></label>)}</div> : <p>{learners.length ? 'No active learners match this level and group yet. Choose another level, course or grade, or enrol learners with complete profile details.' : 'No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.'}</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
         <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
         {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}
         {sessionStatus==='scheduled'&&<p className="classroom-live-waiting">Start the lesson to open the embedded video room. Learners will see the same Join button in Today's Session.</p>}
         <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat{chatNotice&&<small className="classroom-chat-notice" role="status">{chatNotice}</small>}</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':(learners.find(learner=>learner.id===item.sender_id)?.preferred_name||learners.find(learner=>learner.id===item.sender_id)?.full_name||'Unknown learner')}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
         {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}
       </div>}</section>
-        <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
+        <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
         {notice&&<p className="inline-message" role="status">{notice}</p>}
       </section>
       <aside className="panel classroom-side">

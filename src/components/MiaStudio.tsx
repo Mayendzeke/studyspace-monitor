@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Plus, Send, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import { Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }

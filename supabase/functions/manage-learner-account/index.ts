@@ -136,6 +136,7 @@ Deno.serve(async (request) => {
     action?: string;
     profile?: Record<string, unknown>;
     confirmation?: string;
+    paymentConfirmed?: boolean;
   };
   try {
     body = await request.json();
@@ -154,7 +155,7 @@ Deno.serve(async (request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin
     .from("profiles")
-    .select("id,role,account_status,student_id,full_name,preferred_name")
+    .select("id,role,account_status,student_id,full_name,preferred_name,subscription_tier,subscription_expires_at")
     .eq("id", learnerId)
     .single();
   if (learnerError || !learner || learner.role !== "learner") {
@@ -203,6 +204,13 @@ Deno.serve(async (request) => {
     }
     if (nextTier && !nextExpiry) return json(400, { error: "A paid tier must have an expiry date. Set both fields, or clear both for no expiry." });
     if (nextExpiry && !nextTier) return json(400, { error: "Choose a paid tier when setting an expiry date." });
+    const tierChanged = updates.subscription_tier !== undefined
+      && updates.subscription_tier !== (learner.subscription_tier ?? null);
+    const expiryChanged = updates.subscription_expires_at !== undefined
+      && updates.subscription_expires_at !== (learner.subscription_expires_at ?? null);
+    if (nextTier && (tierChanged || expiryChanged) && body.paymentConfirmed !== true) {
+      return json(400, { error: "Confirm that the MTN MoMo payment has been received and verified against this learner's Student ID before activating or renewing a paid plan." });
+    }
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";
     if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
     updates.updated_at = new Date().toISOString();
@@ -221,6 +229,25 @@ Deno.serve(async (request) => {
       target_type: "profile",
       target_id: learnerId,
     });
+    if (nextTier && (tierChanged || expiryChanged)) {
+      const { error: activationAuditError } = await admin.from("audit_events").insert({
+        actor_id: authData.user.id,
+        event_type: "learner_subscription_activated",
+        target_type: "profile",
+        target_id: learnerId,
+        details: {
+          tier: updated.subscription_tier,
+          expires_at: updated.subscription_expires_at,
+          payment_method: "MTN MoMo",
+          payment_reference: learner.student_id,
+          payment_verified_by: authData.user.id,
+          payment_verified_at: new Date().toISOString(),
+        },
+      });
+      if (activationAuditError) {
+        return json(500, { error: "The plan was updated but the payment activation audit could not be recorded. Review the learner's subscription history before proceeding." });
+      }
+    }
     return json(200, { success: true, learner: updated, message: "Learner profile updated." });
   }
 

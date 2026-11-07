@@ -194,7 +194,7 @@ jobs:
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
           if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
           if (!classroom.includes("extractSection('Learning objectives')") || !classroom.includes("extractSection('Homework')")) throw new Error('MIA lesson sections are not mapped into editable Classroom Studio fields.')
-          const termsVersion = '2026-11-07-v2'
+          const termsVersion = '2026-11-07-v3'
           for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
@@ -213,7 +213,7 @@ jobs:
           const migration = readFileSync('supabase/migrations/20261107210000_universal_trial_and_terms_acceptance.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
-          if (!migration.includes("terms_version = '2026-11-07-v2'")) throw new Error('Database access must require the current Terms version.')
+          if (!migration.includes("terms_version = '2026-11-07-v3'")) throw new Error('Database access must require the current Terms version.')
           console.log('Database trial-start, invoker-security and current-terms guards passed.')
           console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')

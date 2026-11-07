@@ -167,6 +167,7 @@ jobs:
           if (!app.includes('beforeinstallprompt') || !app.includes('monitor-install-button')) throw new Error('The Monitor install control is missing.')
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
           if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
+          if (!classroom.includes("extractSection('Learning objectives')") || !classroom.includes("extractSection('Homework')")) throw new Error('MIA lesson sections are not mapped into editable Classroom Studio fields.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')
           NODE
       - name: Configure Pages

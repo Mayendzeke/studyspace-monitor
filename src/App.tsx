@@ -116,6 +116,7 @@ function App() {
   }, [installHelpOpen])
 
   const installMonitor = async () => {
+    setMobileOpen(false)
     if (!installPrompt) { setInstallHelpOpen(true); return }
     await installPrompt.prompt()
     const choice = await installPrompt.userChoice

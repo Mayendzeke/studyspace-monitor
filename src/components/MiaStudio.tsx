@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2, ClipboardCheck, FileText, X } from 'lucide-react'
+import { Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2, ClipboardCheck, FileText, X, Library } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 type AcademicProfile = { id: string; education_level: string | null; grade: string | null; curriculum: string | null; course: string | null }
 type SubjectRow = { learner_id: string; name: string }
-type MiaActivity = 'lesson' | 'assessment' | 'schedule' | 'worksheet' | 'teaching' | 'support'
+type MiaActivity = 'lesson' | 'assessment' | 'schedule' | 'worksheet' | 'teaching' | 'support' | 'research'
 type LessonHandoff = { title: string; subject: string; level: string; grade: string; course: string; curriculum: string; duration: number; content: string }
 const lessonHandoffKey = 'studyspace-monitor-mia-lesson-handoff-v1'
 type GuidedDraft = {
@@ -39,6 +39,7 @@ const activities = [
   { id: 'worksheet' as const, icon: FileText, title: 'Make a worksheet', description: 'Prepare practice questions, worked examples and answers for a selected topic.' },
   { id: 'teaching' as const, icon: Lightbulb, title: 'Find teaching ideas', description: 'Explore practical, engaging activities and low-cost teaching resources.' },
   { id: 'support' as const, icon: GraduationCap, title: 'Plan learner support', description: 'Create a focused support plan for a topic, skill gap or exam-preparation need.' },
+  { id: 'research' as const, icon: Library, title: 'Support college / university research', description: 'Guide tertiary learners through credible sources, citations, research and their own academic writing.' },
 ]
 const standardLevels = ['Primary school', 'Secondary school', 'High school / Sixth form', 'College', 'University']
 const commonSubjects = ['Mathematics', 'English', 'Siswati', 'Science', 'Biology', 'Chemistry', 'Physics', 'Agriculture', 'ICT / Computer Science', 'Geography', 'History', 'Business Studies', 'Economics', 'Accounting', 'French', 'Literature']
@@ -193,6 +194,7 @@ export default function MiaStudio() {
     return guided.grade ? courseRows.filter(item => item.grade === guided.grade) : courseRows
   }, [profiles, guided.level, guided.course, guided.grade])
   const levelOptions = unique([...standardLevels, ...profiles.map(item => item.education_level)])
+  const showResearchSupport = profiles.some(item => /college|university|tertiary/i.test(item.education_level || ''))
   const levelRows = profiles.filter(item => item.education_level === guided.level)
   const courseOptions = unique(levelRows.map(item => item.course))
   const courseRows = guided.course && !courseManual ? levelRows.filter(item => item.course === guided.course) : levelRows
@@ -229,11 +231,13 @@ export default function MiaStudio() {
     if (activeGuide === 'worksheet') requirements = 'Create a ' + guided.worksheetType.toLowerCase() + ' with ' + guided.questionCount + ' questions. Use age-appropriate language, a gradual increase in difficulty, worked examples where useful, and a complete answer key.'
     if (activeGuide === 'teaching') requirements = 'Suggest at least five practical ways to teach this topic. Resource preference: ' + guided.resourceStyle + '. Include a short activity sequence, materials, learner participation, differentiation and a quick way to check understanding.'
     if (activeGuide === 'support') requirements = 'Design a supportive teaching and learning plan. Main need: ' + guided.supportFocus + '. Include likely learning barriers, a short intervention sequence, accessible practice, ways to check progress and next steps. Avoid labelling or making assumptions about a learner.'
+    if (activeGuide === 'research') requirements = 'Act as an academic research coach for a college/university learner, not a ghostwriter. Prioritise a credible source plan and references before writing guidance. First identify the research question and key concepts; then provide a source-search strategy (Google Scholar, subject databases, library catalogue, official and institutional sources as appropriate), search terms, source-evaluation criteria and a shortlist of reliable sources with full bibliographic details, DOI/stable URL only when known and verifiable. Never fabricate references or claim to have verified a source that you cannot verify. Use the referencing style specified by the institution; if unknown, ask or label APA 7 as provisional. Provide example in-text citations and reference-list formatting, explain the evidence and limitations, propose a thesis and outline, and give a brief illustrative example only. Do not write a complete assignment, essay or report for submission. Include a section explaining the concepts, a student-authored work checklist and 2–3 questions to check understanding. The learner must read the sources and write their own analysis.'
     return 'Act as MIA, the StudySpace teaching assistant. Use the following selected academic context and do not ask me to re-enter it:\n' + (academic || 'Education context not yet specified.') + '\n\nTask: ' + (activity?.title || 'Teaching support') + '\n' + requirements + '\n\nWrite in clear, well-structured sections. Keep the material age-appropriate and practical. State any assumptions and ask only for information that is genuinely essential. Do not invent curriculum requirements.'
   }
   const submitGuide = () => {
     if (!activeGuide || !guided.topic.trim()) return
     if (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) return
+    if (activeGuide === 'research' && (!/college|university|tertiary/i.test(guided.level) || !guided.subject.trim())) return
     const prompt = buildGuidedRequest()
     const lessonContext = activeGuide === 'lesson' ? {
       title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
@@ -291,7 +295,7 @@ export default function MiaStudio() {
         <div className="mia-guided-launch">
           <div><strong>Start a guided task</strong><span>These options stay available while you chat with MIA.</span></div>
           <div className="mia-prompt-grid">
-            {activities.map(({ id, icon: Icon, title, description }) => (
+            {activities.filter(item => item.id !== 'research' || showResearchSupport).map(({ id, icon: Icon, title, description }) => (
               <button type="button" key={id} className="mia-prompt-card" onClick={() => openGuide(id)}>
                 <span><Icon size={18}/></span><strong>{title}</strong><small>{description}</small><em>Choose options <span aria-hidden="true">→</span></em>
               </button>
@@ -366,8 +370,8 @@ export default function MiaStudio() {
               {activeGuide === 'worksheet' && <div className="mia-guided-grid mia-guided-options"><label>Worksheet type<select value={guided.worksheetType} onChange={event => setGuideField({ worksheetType: event.target.value })}>{['Practice worksheet','Revision worksheet','Worked-example sheet','Homework exercise','Exam-style practice'].map(value => <option key={value}>{value}</option>)}</select></label><label>Number of questions<select value={guided.questionCount} onChange={event => setGuideField({ questionCount: event.target.value })}>{['5','8','10','12','15','20','25'].map(value => <option key={value}>{value}</option>)}</select></label></div>}
             </div>
             <footer className="mia-guided-footer">
-              <span>For lessons, select an education level and subject, then enter the topic. Other details are optional.</span>
-              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIA</button></div>
+              <span>Select the education level and subject for lessons. Research support is restricted to college and university learners; enter the assignment topic or question.</span>
+              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) || (activeGuide === 'research' && (!/college|university|tertiary/i.test(guided.level) || !guided.subject.trim())) || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIA</button></div>
             </footer>
           </section>
         </div>

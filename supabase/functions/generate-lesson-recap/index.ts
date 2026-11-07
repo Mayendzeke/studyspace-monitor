@@ -58,7 +58,7 @@ Deno.serve(async request => {
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 
-  let body: { action?: string; title?: string; subject?: string; level?: string; grade?: string; curriculum?: string; objectives?: string; sourceNotes?: string };
+  let body: { action?: string; title?: string; subject?: string; level?: string; grade?: string; course?: string; curriculum?: string; objectives?: string; sourceNotes?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
 
   // A low-cost preflight validates that the configured provider key and model
@@ -104,6 +104,7 @@ Deno.serve(async request => {
   const subject = suppliedSubject || "General learning";
   const level = String(body.level ?? "").trim().slice(0, 60) || "Not specified";
   const grade = String(body.grade ?? "").trim().slice(0, 60);
+  const course = String(body.course ?? "").trim().slice(0, 160);
   const curriculum = String(body.curriculum ?? "").trim().slice(0, 100);
   const objectives = String(body.objectives ?? "").trim().slice(0, 2500);
   const sourceNotes = String(body.sourceNotes ?? "").trim().slice(0, 14000);
@@ -129,7 +130,8 @@ Deno.serve(async request => {
     "LESSON TITLE: " + title,
     "SUBJECT: " + subject,
     "LEVEL: " + level,
-    "GRADE: " + grade,
+    "GRADE / YEAR: " + grade,
+    "COURSE / PROGRAMME: " + course,
     "CURRICULUM: " + curriculum,
     "OBJECTIVES: " + objectives,
     "TEACHER SOURCE MATERIAL: " + sourceNotes,

@@ -92,6 +92,8 @@ export default function MiaStudio() {
   const [guided, setGuided] = useState<GuidedDraft>(initialGuided)
   const [subjectManual, setSubjectManual] = useState(false)
   const [curriculumManual, setCurriculumManual] = useState(false)
+  const [gradeManual, setGradeManual] = useState(false)
+  const [courseManual, setCourseManual] = useState(false)
   const [lessonHandoff, setLessonHandoff] = useState<LessonHandoff | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -180,6 +182,8 @@ export default function MiaStudio() {
     setGuided(initialGuided())
     setSubjectManual(false)
     setCurriculumManual(false)
+    setGradeManual(false)
+    setCourseManual(false)
     setActiveGuide(activity)
   }
 
@@ -191,8 +195,16 @@ export default function MiaStudio() {
   const levelOptions = unique([...standardLevels, ...profiles.map(item => item.education_level)])
   const levelRows = profiles.filter(item => item.education_level === guided.level)
   const courseOptions = unique(levelRows.map(item => item.course))
-  const courseRows = guided.course ? levelRows.filter(item => item.course === guided.course) : levelRows
-  const gradeOptions = unique(courseRows.map(item => item.grade))
+  const courseRows = guided.course && !courseManual ? levelRows.filter(item => item.course === guided.course) : levelRows
+  const profileGradeOptions = unique(courseRows.map(item => item.grade))
+  const defaultGrades: Record<string, string[]> = {
+    'Primary school': ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7'],
+    'Secondary school': ['Form 1','Form 2','Form 3'],
+    'High school / Sixth form': ['Form 4','Form 5','Lower Sixth','Upper Sixth'],
+    College: ['Year 1','Year 2','Year 3','Year 4'],
+    University: ['Year 1','Year 2','Year 3','Year 4','Postgraduate'],
+  }
+  const gradeOptions = profileGradeOptions.length ? profileGradeOptions : (defaultGrades[guided.level] || [])
   const scopedRows = guided.grade ? courseRows.filter(item => item.grade === guided.grade) : courseRows
   const scopedIds = new Set(scopedRows.map(item => item.id))
   const registeredSubjects = unique(subjectRows.filter(item => scopedIds.has(item.learner_id)).map(item => item.name))
@@ -221,6 +233,7 @@ export default function MiaStudio() {
   }
   const submitGuide = () => {
     if (!activeGuide || !guided.topic.trim()) return
+    if (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) return
     const prompt = buildGuidedRequest()
     const lessonContext = activeGuide === 'lesson' ? {
       title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
@@ -326,15 +339,15 @@ export default function MiaStudio() {
         <div className="mia-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setActiveGuide(null) }}>
           <section className="mia-guided-dialog" role="dialog" aria-modal="true" aria-labelledby="mia-guided-title">
             <header className="mia-guided-header">
-              <div><span className="eyebrow">MIA GUIDED WORKSPACE</span><h2 id="mia-guided-title">{activities.find(item => item.id === activeGuide)?.title}</h2><p>Choose from information already recorded in StudySpace. Only the topic needs to be typed to start.</p></div>
+              <div><span className="eyebrow">MIA GUIDED WORKSPACE</span><h2 id="mia-guided-title">{activities.find(item => item.id === activeGuide)?.title}</h2><p>Choose the education level and subject for a lesson. Existing grades, courses and curricula appear automatically; enter a missing detail only when necessary.</p></div>
               <button type="button" className="mia-dialog-close" onClick={() => setActiveGuide(null)} aria-label="Close guided workspace"><X size={19}/></button>
             </header>
             <div className="mia-guided-body">
               <div className="mia-guided-section-title"><strong>Academic context</strong><span>Options from active learner profiles</span></div>
               <div className="mia-guided-grid">
-                <label>Education level<select value={guided.level} onChange={event => { setSubjectManual(false); setCurriculumManual(false); setGuideField({ level: event.target.value, grade: '', course: '', subject: '', curriculum: '' }) }}><option value="">Choose education level</option>{levelOptions.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
-                {['College', 'University'].includes(guided.level) && <label>Course / programme<select value={guided.course} onChange={event => setGuideField({ course: event.target.value, grade: '', subject: '', curriculum: '' })}><option value="">All courses / programmes</option>{courseOptions.map(item => <option key={item} value={item}>{item}</option>)}</select></label>}
-                <label>{guided.level === 'Primary school' ? 'Grade / class' : guided.level === 'Secondary school' ? 'Form / grade' : ['College', 'University'].includes(guided.level) ? 'Year of study' : 'Grade / year'}<select value={guided.grade} onChange={event => setGuideField({ grade: event.target.value, subject: '', curriculum: '' })} disabled={!guided.level}><option value="">Any grade / year</option>{gradeOptions.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+                <label>Education level<select value={guided.level} onChange={event => { setSubjectManual(false); setCurriculumManual(false); setGradeManual(false); setCourseManual(false); setGuideField({ level: event.target.value, grade: '', course: '', subject: '', curriculum: '' }) }}><option value="">Choose education level</option>{levelOptions.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+                {['College', 'University'].includes(guided.level) && <><label>Course / programme<select value={courseManual ? '__other__' : guided.course} onChange={event => { const other = event.target.value === '__other__'; setCourseManual(other); setGuideField({ course: other ? '' : event.target.value, grade: '', subject: '', curriculum: '' }) }}><option value="">All courses / programmes</option>{courseOptions.map(item => <option key={item} value={item}>{item}</option>)}<option value="__other__">Other / enter manually</option></select></label>{courseManual && <label>Enter course / programme<input value={guided.course} onChange={event => setGuideField({ course: event.target.value })} placeholder="Type the course or programme"/></label>}</>}
+                <label>{guided.level === 'Primary school' ? 'Grade / class' : guided.level === 'Secondary school' ? 'Form / grade' : ['College', 'University'].includes(guided.level) ? 'Year of study' : 'Grade / year'}<select value={gradeManual ? '__other__' : guided.grade} onChange={event => { const other = event.target.value === '__other__'; setGradeManual(other); setGuideField({ grade: other ? '' : event.target.value, subject: '', curriculum: '' }) }} disabled={!guided.level}><option value="">Any grade / year</option>{gradeOptions.map(item => <option key={item} value={item}>{item}</option>)}<option value="__other__">Other / enter manually</option></select></label>{gradeManual && <label>Enter grade / year<input value={guided.grade} onChange={event => setGuideField({ grade: event.target.value })} placeholder="Type the grade, form or year"/></label>}
                 <label>Subject / module<select value={subjectManual ? '__other__' : guided.subject} onChange={event => { const other = event.target.value === '__other__'; setSubjectManual(other); setGuideField({ subject: other ? '' : event.target.value }) }} disabled={!guided.level}><option value="">Choose a subject</option>{subjectOptions.map(item => <option key={item} value={item}>{item}</option>)}<option value="__other__">Other / enter manually</option></select></label>
                 {subjectManual && <label>Enter subject / module<input value={guided.subject} onChange={event => setGuideField({ subject: event.target.value })} placeholder="Type the subject or module"/></label>}
                 <label>Curriculum / syllabus<select value={curriculumManual ? '__other__' : guided.curriculum} onChange={event => { const other = event.target.value === '__other__'; setCurriculumManual(other); setGuideField({ curriculum: other ? '' : event.target.value }) }}><option value="">Choose a curriculum</option>{curriculumOptions.map(item => <option key={item} value={item}>{item}</option>)}<option value="__other__">Other / enter manually</option></select></label>
@@ -353,8 +366,8 @@ export default function MiaStudio() {
               {activeGuide === 'worksheet' && <div className="mia-guided-grid mia-guided-options"><label>Worksheet type<select value={guided.worksheetType} onChange={event => setGuideField({ worksheetType: event.target.value })}>{['Practice worksheet','Revision worksheet','Worked-example sheet','Homework exercise','Exam-style practice'].map(value => <option key={value}>{value}</option>)}</select></label><label>Number of questions<select value={guided.questionCount} onChange={event => setGuideField({ questionCount: event.target.value })}>{['5','8','10','12','15','20','25'].map(value => <option key={value}>{value}</option>)}</select></label></div>}
             </div>
             <footer className="mia-guided-footer">
-              <span>Academic options are selectable. You can change them before sending.</span>
-              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIA</button></div>
+              <span>For lessons, select an education level and subject, then enter the topic. Other details are optional.</span>
+              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIA</button></div>
             </footer>
           </section>
         </div>

@@ -60,6 +60,7 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [splashElapsed, setSplashElapsed] = useState(false)
   const [adminAllowed, setAdminAllowed] = useState(false)
   const [mfaVerified, setMfaVerified] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
@@ -67,6 +68,11 @@ function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [adminName, setAdminName] = useState('Administrator')
   const handleMfaVerified = useCallback(() => setMfaVerified(true), [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashElapsed(true), 5200)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -129,7 +135,7 @@ function App() {
 
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} />
-  if (authLoading || adminLoading) return <SplashScreen theme={theme} />
+  if (authLoading || adminLoading || !splashElapsed) return <SplashScreen theme={theme} />
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
   if (!mfaVerified) return <AdminMfaGate onVerified={handleMfaVerified} />
 

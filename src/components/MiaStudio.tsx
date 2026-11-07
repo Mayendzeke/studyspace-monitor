@@ -7,6 +7,8 @@ type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 type AcademicProfile = { id: string; education_level: string | null; grade: string | null; curriculum: string | null; course: string | null }
 type SubjectRow = { learner_id: string; name: string }
 type MiaActivity = 'lesson' | 'assessment' | 'schedule' | 'worksheet' | 'teaching' | 'support'
+type LessonHandoff = { title: string; subject: string; level: string; grade: string; course: string; curriculum: string; duration: number; content: string }
+const lessonHandoffKey = 'studyspace-monitor-mia-lesson-handoff-v1'
 type GuidedDraft = {
   level: string
   grade: string
@@ -90,6 +92,7 @@ export default function MiaStudio() {
   const [guided, setGuided] = useState<GuidedDraft>(initialGuided)
   const [subjectManual, setSubjectManual] = useState(false)
   const [curriculumManual, setCurriculumManual] = useState(false)
+  const [lessonHandoff, setLessonHandoff] = useState<LessonHandoff | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -119,6 +122,15 @@ export default function MiaStudio() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, busy])
 
+  useEffect(() => {
+    if (!activeGuide) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setActiveGuide(null) }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape) }
+  }, [activeGuide])
+
   const saveMessages = (next: ChatMessage[]) => {
     setMessages(next)
     if (userId) {
@@ -127,7 +139,7 @@ export default function MiaStudio() {
     }
   }
 
-  const sendMessage = async (value: string, includeHistory = true) => {
+  const sendMessage = async (value: string, includeHistory = true, lessonContext?: Omit<LessonHandoff, 'content'>) => {
     const clean = value.trim()
     if (!clean || busy || !supabase || !userId) return
     setError('')
@@ -147,6 +159,7 @@ export default function MiaStudio() {
       }
       const completed = [...next, { id: crypto.randomUUID(), role: 'assistant' as const, content: data.reply }]
       saveMessages(completed)
+      if (lessonContext) setLessonHandoff({ ...lessonContext, content: data.reply })
       setRemaining(typeof data.remainingDailyRequests === 'number' ? data.remainingDailyRequests : null)
     } catch (reason) {
       setError(await edgeError(reason))
@@ -209,8 +222,24 @@ export default function MiaStudio() {
   const submitGuide = () => {
     if (!activeGuide || !guided.topic.trim()) return
     const prompt = buildGuidedRequest()
+    const lessonContext = activeGuide === 'lesson' ? {
+      title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
+      course: guided.course, curriculum: guided.curriculum, duration: Number(guided.duration) || 45,
+    } : undefined
+    setLessonHandoff(null)
     setActiveGuide(null)
-    void sendMessage(prompt, false)
+    void sendMessage(prompt, false, lessonContext)
+  }
+
+  const openLessonInClassroom = () => {
+    if (!lessonHandoff) return
+    try {
+      localStorage.setItem(lessonHandoffKey, JSON.stringify({ ...lessonHandoff, createdAt: new Date().toISOString() }))
+      setLessonHandoff(null)
+      window.dispatchEvent(new CustomEvent('studyspace-open-classroom-studio'))
+    } catch {
+      setError('The lesson draft could not be handed to Classroom Studio. Check browser storage and try again.')
+    }
   }
 
   const clearConversation = () => {
@@ -270,6 +299,7 @@ export default function MiaStudio() {
           {busy && <article className="mia-message mia-message-assistant"><span className="mia-message-avatar"><Sparkles size={15}/></span><div className="mia-message-bubble"><small>MIA</small><p className="mia-thinking">Preparing your response…</p></div></article>}
         </div>
 
+        {lessonHandoff && <div className="mia-lesson-handoff"><div><strong><BookOpen size={16}/> Your lesson draft is ready</strong><p>MIA has prepared the lesson content. Open it in Classroom Studio to edit, save locally or publish it to selected learners.</p></div><button type="button" className="primary-button" onClick={openLessonInClassroom}>Create in Classroom Studio <span aria-hidden="true">→</span></button></div>}
         {error && <p className="mia-error" role="alert">{error}</p>}
         {profileNotice && <p className="mia-profile-notice" role="status">{profileNotice}</p>}
         <form className="mia-compose" onSubmit={send}>

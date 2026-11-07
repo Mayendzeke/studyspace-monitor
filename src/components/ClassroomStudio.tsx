@@ -109,8 +109,8 @@ export default function ClassroomStudio() {
       }
     }
     loadMiaDraft()
-    window.addEventListener('studyspace-mia-lesson-draft', loadMiaDraft)
-    return () => window.removeEventListener('studyspace-mia-lesson-draft', loadMiaDraft)
+    window.addEventListener('studyspace-open-classroom-studio', loadMiaDraft)
+    return () => window.removeEventListener('studyspace-open-classroom-studio', loadMiaDraft)
   }, [])
   useEffect(() => {
     if (!supabase) return;

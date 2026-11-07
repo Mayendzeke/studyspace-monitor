@@ -10,6 +10,9 @@ type SubscriptionLearner = {
   account_status: string;
   subscription_tier: string | null;
   subscription_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_expires_at: string | null;
+  trial_reminder_shown_at: string | null;
 };
 
 type Filter = "all" | "active" | "expiring" | "expired" | "no-expiry";
@@ -17,7 +20,7 @@ type Filter = "all" | "active" | "expiring" | "expired" | "no-expiry";
 function tierLabel(value: string | null): string {
   if (!value) return "Not assigned";
   const known: Record<string, string> = {
-    free_trial: "Free Trial", trial: "Free Trial", weekly: "Weekly", two_weeks: "2 Weeks",
+    weekly: "Weekly", two_weeks: "2 Weeks",
     fortnightly: "2 Weeks", monthly: "Monthly", month: "Monthly",
   };
   return known[value.trim().toLowerCase()] || value;
@@ -54,7 +57,7 @@ export default function SubscriptionsPage() {
     setLoading(true);
     setError("");
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,subscription_tier,subscription_expires_at")
+      .select("id,student_id,full_name,preferred_name,account_status,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("subscription_expires_at", { ascending: true, nullsFirst: false });
     if (queryError) {
@@ -70,11 +73,14 @@ export default function SubscriptionsPage() {
 
   const now = Date.now();
   const classified = useMemo(() => learners.map(item => {
-    const days = item.subscription_expires_at ? remainingDays(item.subscription_expires_at, now) : null;
+    const isTrial = !item.subscription_tier && Boolean(item.trial_expires_at);
+    const effectiveExpiry = item.subscription_tier ? item.subscription_expires_at : item.trial_expires_at;
+    const days = effectiveExpiry ? remainingDays(effectiveExpiry, now) : null;
     const expired = days !== null && days <= 0;
-    const expiring = days !== null && days > 0 && days <= 14;
+    const expiring = days !== null && days > 0 && days <= (isTrial ? 1 : 14);
     const accessDisabled = item.account_status !== "active";
-    return { ...item, days, expired, expiring, accessDisabled };
+    const displayedTier = item.subscription_tier ? tierLabel(item.subscription_tier) : isTrial ? "48-hour Free Trial" : "No active plan";
+    return { ...item, days, expired, expiring, accessDisabled, effectiveExpiry, isTrial, displayedTier };
   }), [learners, now]);
 
   const counts = useMemo(() => ({
@@ -82,7 +88,7 @@ export default function SubscriptionsPage() {
     active: classified.filter(x => !x.accessDisabled && !x.expired).length,
     expiring: classified.filter(x => !x.accessDisabled && x.expiring).length,
     expired: classified.filter(x => x.expired).length,
-    noExpiry: classified.filter(x => !x.subscription_expires_at).length,
+    noExpiry: classified.filter(x => !x.effectiveExpiry).length,
   }), [learners, classified]);
 
   const visible = useMemo(() => {
@@ -92,7 +98,7 @@ export default function SubscriptionsPage() {
         || (filter === "active" && !item.accessDisabled && !item.expired)
         || (filter === "expiring" && !item.accessDisabled && item.expiring)
         || (filter === "expired" && item.expired)
-        || (filter === "no-expiry" && !item.subscription_expires_at);
+        || (filter === "no-expiry" && !item.effectiveExpiry);
       const haystack = [item.student_id, item.full_name, item.preferred_name, item.subscription_tier].filter(Boolean).join(" ").toLowerCase();
       return matches && (!needle || haystack.includes(needle));
     }).sort((a,b) => {
@@ -123,15 +129,15 @@ export default function SubscriptionsPage() {
       {loading ? <div className="subscription-empty">Loading subscription records…</div> : visible.length === 0 ? <div className="subscription-empty">No learners match this view.</div> : <div className="subscription-table-scroll"><table className="subscription-table">
         <thead><tr><th>Learner</th><th>Student ID</th><th>Current tier</th><th>Access status</th><th>Expires</th><th>Time remaining</th></tr></thead>
         <tbody>{visible.map(item => {
-          const status = item.accessDisabled ? "Account disabled" : item.expired ? "Expired" : item.expiring ? "Expiring soon" : item.subscription_expires_at ? "Active" : "No expiry";
+          const status = item.accessDisabled ? "Account disabled" : item.expired ? (item.isTrial ? "Trial ended" : "Expired") : item.expiring ? (item.isTrial ? "Trial ending soon" : "Expiring soon") : item.effectiveExpiry ? "Active" : "No active plan";
           const statusClass = item.accessDisabled || item.expired ? "danger" : item.expiring ? "warning" : "good";
           const remaining = item.days === null ? "Not limited" : item.days <= 0 ? "Expired" : item.days === 1 ? "1 day" : item.days + " days";
           return <tr key={item.id}>
             <td><strong>{learnerLabel(item)}</strong><small>{item.account_status}</small></td>
             <td>{item.student_id || "—"}</td>
-            <td><span className="subscription-tier"><CreditCard size={14}/>{tierLabel(item.subscription_tier)}</span></td>
+            <td><span className="subscription-tier"><CreditCard size={14}/>{item.displayedTier}</span></td>
             <td><span className={"subscription-status " + statusClass}>{status}</span></td>
-            <td>{dateLabel(item.subscription_expires_at)}</td>
+            <td>{dateLabel(item.effectiveExpiry)}</td>
             <td>{remaining}</td>
           </tr>;
         })}</tbody>

@@ -55,7 +55,7 @@ Deno.serve(async request => {
   if (authError || !auth.user) return json(401, { error: "Your session has expired. Sign in again." });
   const learnerId = auth.user.id;
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("role,account_status,subscription_expires_at,education_level,grade,curriculum,academic_year,course")
+    .select("role,account_status,subscription_tier,subscription_expires_at,country,institution,education_level,grade,curriculum,academic_year,course")
     .eq("id", learnerId).maybeSingle();
   if (profileError || !profile || profile.role !== "learner" || profile.account_status !== "active") {
     return json(403, { error: "MIΛ is available to active student accounts only." });
@@ -70,6 +70,13 @@ Deno.serve(async request => {
     body.action === "usage_status" ? "usage_status" :
     body.action === "parse_timetable" ? "parse_timetable" :
     body.action === "generate_topic_test" ? "generate_topic_test" : "chat";
+  const tierName = String(profile.subscription_tier ?? "").trim().toLowerCase();
+  const dailyLimit = tierName === "weekly" ? 10
+    : tierName === "monthly" ? 40
+    : tierName === "free trial" || tierName === "free_trial" ? 40
+    : 20;
+  const sharedDailyLimit = 300;
+
   if (action === "usage_status") {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const [personalUsage, sharedUsage] = await Promise.all([
@@ -85,12 +92,16 @@ Deno.serve(async request => {
     }
     return json(200, {
       success: true,
-      remainingDailyRequests: Math.max(0, 20 - (personalUsage.count ?? 0)),
-      remainingSharedRequests: Math.max(0, 100 - (sharedUsage.count ?? 0)),
+      plan: profile.subscription_tier ?? "Standard",
+      dailyLimit,
+      remainingDailyRequests: Math.max(0, dailyLimit - (personalUsage.count ?? 0)),
+      remainingSharedRequests: Math.max(0, sharedDailyLimit - (sharedUsage.count ?? 0)),
     });
   }
 
   const message = String(body.message ?? "").trim().slice(0, 18000);
+  // Search only for explicit syllabus/examination currency questions; routine tutoring stays lightweight.
+  const curriculumSearchEnabled = action === "chat" && /(syllabus|curriculum|exam board|examination requirements|assessment objectives|past papers?|IGCSE|SGCSE|GCSE|A-Level|Cambridge|Pearson|\bCAPS\b|\bIB\b|official topics|exam changes|current requirements|up[- ]to[- ]date)/i.test(message);
   if (action === "chat" && !message) return json(400, { error: "Write a short study question first." });
   if (action === "chat" && body.attachment?.data) {
     const mimeType = body.attachment.mimeType ?? "";
@@ -117,12 +128,12 @@ Deno.serve(async request => {
   const { count, error: countError } = await admin.from("ai_generation_usage")
     .select("id", { count: "exact", head: true }).eq("actor_id", learnerId).gte("created_at", since);
   if (countError) return json(503, { error: "MIΛ could not check today's free usage allowance. Try again later." });
-  if ((count ?? 0) >= 20) return json(429, { error: "You've reached today's MIΛ allowance. Try again tomorrow." });
+  if ((count ?? 0) >= dailyLimit) return json(429, { error: "You've reached today's MIΛ allowance for your " + (profile.subscription_tier || "current") + " plan. Your allowance resets on a rolling 24-hour basis." });
   const { count: projectCount, error: projectCountError } = await admin.from("ai_generation_usage")
     .select("id", { count: "exact", head: true })
     .in("purpose", ["mia_chat", "mia_timetable_image", "mia_topic_test"]).gte("created_at", since);
   if (projectCountError) return json(503, { error: "MIΛ could not check the shared free-use allowance. Try again later." });
-  if ((projectCount ?? 0) >= 100) return json(429, { error: "StudySpace has reached its shared daily MIΛ allowance. Please try again tomorrow." });
+  if ((projectCount ?? 0) >= sharedDailyLimit) return json(429, { error: "StudySpace has reached its shared daily MIΛ capacity. Please try again later." });
 
   const [subjectsResult, goalResult, memoryResult] = await Promise.all([
     admin.from("student_subjects").select("name,target_mark").eq("learner_id", learnerId).order("name").limit(30),
@@ -153,7 +164,10 @@ Deno.serve(async request => {
   const studentContext = [
     "STUDENT PROFILE (trusted database fields):",
     "Student identifiers are not included in the model context.",
-    "Level and grade: " + [profile.education_level, profile.grade].filter(Boolean).join(" / "),
+    "Country: " + (profile.country || "Not provided"),
+    "School or institution: " + (profile.institution || "Not provided"),
+    "Education level: " + (profile.education_level || "Not provided"),
+    "Exact grade / form / year of study: " + (profile.grade || "Not provided"),
     "Curriculum: " + (profile.curriculum || "Not provided"),
     "Academic year: " + (profile.academic_year || "Not provided"),
     "Course or programme: " + (profile.course || "Not provided"),
@@ -175,7 +189,15 @@ Deno.serve(async request => {
   const models = [...new Set([configuredModel, "gemini-3.5-flash-lite", "gemini-3.8-flash"].filter(Boolean))];
   const system = [
     "You are MIΛ (Mia), the private StudySpace learning companion. Your scope is strictly school, education and studying. If asked for unrelated help, politely redirect to learning.",
-    "Be concise, accurate, encouraging and age-appropriate. Prefer short answers, one clear next step and simple explanations matched to the learner's grade and curriculum.",
+    "Be concise, accurate, encouraging and age-appropriate. Prefer short answers, one clear next step and simple explanations matched to the learner's exact education level, grade/form/year, country and curriculum.",
+    "PROFILE LOCK — use the trusted STUDENT PROFILE supplied below as persistent context in every response and every generated learning resource. The learner has already given these details during signup. Do NOT ask them to repeat their education level, grade/form/year, country, curriculum, course or enrolled subjects when those fields are present. If a field is missing, ask only for the specific missing information that is essential to the request; never ask again for fields already supplied.",
+    "STRICT LEARNING-LEVEL BOUNDARY — all explanations, examples, lessons, notes, revision materials, flashcards, practice questions, tests and study plans must be suitable for the learner's exact recorded level AND exact grade/form/year. Do not treat labels such as Primary, Secondary, High School, College or University as broad permission to teach every year in that phase. The exact grade/form/year is the scope. Do not include content from higher or lower grades unless the learner explicitly asks for a comparison or extension, and label that extension clearly.",
+    "PRIMARY SCHOOL MODE — use concrete examples, age-appropriate vocabulary, short instructions and suitable question difficulty. Keep content within the recorded primary grade and selected curriculum. Do not introduce secondary-school methods, terminology or assessment expectations unless explicitly requested as an extension.",
+    "SECONDARY / HIGH SCHOOL MODE — use the exact recorded form/grade, country and selected curriculum. Never produce a generic whole-secondary or whole-high-school syllabus when the learner is in one specific form/year. Select only the knowledge, skills, terminology and difficulty appropriate to that year. A qualification label such as IGCSE, GCSE, SGCSE, A-Level, IB or CAPS does not by itself identify the learner's current school year; use the recorded grade/form as the teaching boundary.",
+    "CURRICULUM MAPPING — distinguish the national school year, the qualification/exam level and the subject syllabus. Do not assume that every country maps Form 1, Grade 8, Year 9 or another local year to the same exam-board stage. Use the learner's country and institution when interpreting the mapping. If the recorded grade and curriculum appear inconsistent or the official progression is unclear, say so plainly, teach only what is confidently appropriate to the recorded grade, and ask the learner to confirm the school's actual subject/year route before claiming syllabus alignment.",
+    "COLLEGE / UNIVERSITY MODE — use the recorded course or programme, year of study, curriculum (when applicable) and enrolled subjects. Keep explanations at that tertiary stage and discipline. Do not return primary/secondary material unless the learner asks for prerequisite revision, and then identify it as a prerequisite.",
+    "CURRENT SYLLABUS ACCURACY — when the question asks about an official syllabus, current exam requirements, assessment objectives, examination changes, syllabus coverage or whether a topic is examinable, use the available Google Search grounding tool. Prioritise the official ministry, national curriculum authority, examination council or qualification-awarding body for the learner's country and curriculum. Prefer the correct syllabus/exam year. Cite only sources actually returned by the search. If current official material cannot be verified, state that limitation and do not claim that a topic is officially required or up to date.",
+    "FLASHCARD OUTPUT RULE: When the learner asks for flashcards, study cards or revision cards, output ONLY a clean sequence of cards using exactly two lines per card: CARD FRONT: [short prompt] then CARD BACK: [short accurate answer]. Separate cards with a blank line. Do not add notes, introductions, explanations, markdown tables, numbered instructions, or text describing what should appear on each side. Keep each side concise (ideally under 100 characters). Generate 8–12 cards unless the learner specifies a number.",
     "Teach rather than merely dump answers: ask a brief checking question when useful, but do not interrogate the student. Never pretend to know a syllabus detail absent from supplied resources.",
     ...( /college|university|tertiary/i.test(String(profile.education_level ?? "")) ? [
       "TERTIARY ACADEMIC RESEARCH MODE: This learner is in college or university. For homework, assignments, essays, reports, projects and research questions, prioritise credible academic references and evidence before drafting guidance. Prefer peer-reviewed journal articles, scholarly books, official statistics, legislation, institutional repositories and authoritative professional or government publications appropriate to the discipline.",
@@ -239,6 +261,7 @@ Deno.serve(async request => {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: action === "chat" ? [...history, { role: "user", parts: body.attachment?.data ? [{ text: message }, { inlineData: { mimeType: body.attachment.mimeType, data: body.attachment.data } }] : [{ text: message }] }] : [{ role: "user", parts }],
+          ...(curriculumSearchEnabled ? { tools: [{ google_search: {} }] } : {}),
           generationConfig: { responseMimeType: "application/json", maxOutputTokens: action === "chat" ? 2600 : action === "parse_timetable" ? 1800 : 4200, temperature: action === "generate_topic_test" ? 0.2 : 0.25 },
         }),
         signal: AbortSignal.timeout(45000),
@@ -274,7 +297,29 @@ Deno.serve(async request => {
   if (!generated) return json(502, { error: "MIΛ received an empty response. Please try again." });
   let result: any;
   try { result = parseJson(generated); } catch { return json(502, { error: "MIΛ returned an unreadable response. Please try again." }); }
-  const reply = typeof result.reply === "string" ? result.reply.slice(0, 7000) : "";
+  let reply = typeof result.reply === "string" ? result.reply.slice(0, 6200) : "";
+  const groundingChunks = curriculumSearchEnabled && Array.isArray(payload?.candidates?.[0]?.groundingMetadata?.groundingChunks)
+    ? payload.candidates[0].groundingMetadata.groundingChunks : [];
+  const groundingSources = groundingChunks.map((item: any) => item?.web)
+    .filter((item: any) => item && typeof item.uri === "string" && item.uri.startsWith("https://") && typeof item.title === "string")
+    .filter((item: any) => {
+      try {
+        const host = new URL(item.uri).hostname.toLowerCase();
+        return /(^|\.)gov(\.|$)|(^|\.)go\.[a-z]{2,}$|(^|\.)gouv\.|(^|\.)edu(\.|$)/i.test(host)
+          || host.endsWith("cambridgeinternational.org")
+          || host.endsWith("qualifications.pearson.com")
+          || host.endsWith("ibo.org");
+      } catch { return false; }
+    })
+    .filter((item: any, index: number, all: any[]) => all.findIndex((candidate: any) => candidate.uri === item.uri) === index)
+    .slice(0, 4);
+  if (curriculumSearchEnabled && groundingSources.length) {
+    reply += "\n\nOfficial curriculum sources checked:\n" + groundingSources.map((source: any) => "- " + source.title.slice(0, 160) + ": " + source.uri).join("\n");
+  } else if (curriculumSearchEnabled) {
+    reply += "\n\nI could not verify this against a current official curriculum or examination-board source in this response. Please confirm the exact syllabus year with your school or examination authority before treating this as an official syllabus requirement.";
+  }
+  reply = reply.slice(0, 7000);
+  result.reply = reply;
   if (!reply) return json(502, { error: "MIΛ could not form a useful reply." });
 
   const nextMemory = {
@@ -335,7 +380,7 @@ Deno.serve(async request => {
       && x.ends_at > x.starts_at && typeof x.title === "string")
       .map((x: any) => ({ day_of_week: x.day_of_week, subject_name: String(x.subject_name ?? "").slice(0,100), title: x.title.slice(0,120), starts_at: x.starts_at, ends_at: x.ends_at, location: String(x.location ?? "").slice(0,120), notes: String(x.notes ?? "").slice(0,300) }))
     : [];
-  return json(200, { success: true, conversationId, reply, timetableDraft, questions: topicQuestions, model: activeModel, memoryUpdated: true, remainingDailyRequests: Math.max(0, 19 - (count ?? 0)) });
+  return json(200, { success: true, conversationId, reply, timetableDraft, questions: topicQuestions, model: activeModel, memoryUpdated: true, remainingDailyRequests: Math.max(0, dailyLimit - ((count ?? 0) + 1)), dailyLimit, plan: profile.subscription_tier ?? "Standard" });
   } catch (error) {
     const reference = request.headers.get("cf-ray") ?? crypto.randomUUID();
     console.error("MIΛ request failed", {

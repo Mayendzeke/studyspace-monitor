@@ -70,7 +70,9 @@ export default function TimetableManager({
 
   const levelOptions = Array.from(new Set(activeLearners.map(item => item.education_level).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
   const gradeOptions = Array.from(new Set(activeLearners.filter(item => item.education_level === educationLevel).map(item => item.grade).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  const eligibleLearners = activeLearners.filter(item => item.education_level === educationLevel && item.grade === grade);\n\n  useEffect(() => {\n    if (!groupTag || !selectedLearners.length || !activeLearners.length) return;\n    const matching = activeLearners.find(item => selectedLearners.includes(item.id));\n    if (matching) { setEducationLevel(matching.education_level); setGrade(matching.grade); }\n  }, [groupTag, selectedLearners, activeLearners]);
+  const eligibleLearners = activeLearners.filter(item => item.education_level === educationLevel && item.grade === grade);
+
+  useEffect(() => {\n    if (!groupTag || !selectedLearners.length || !activeLearners.length) return;\n    const matching = activeLearners.find(item => selectedLearners.includes(item.id));\n    if (matching) { setEducationLevel(matching.education_level); setGrade(matching.grade); }\n  }, [groupTag, selectedLearners, activeLearners]);
 
   function openNew(day = 1) {
     setEditingId(null);
@@ -113,7 +115,9 @@ export default function TimetableManager({
     }
     setSaving(true); setError(""); setNotice("");
     const activity = allowGroupEvents && kind === "personal" ? eventType : (draft.subject_name.trim() || "Other");
-    const subject = allowGroupEvents && kind === "personal"\n      ? (eventType === "Other" && !groupTag ? (draft.subject_name.trim() || activity) : activity)\n      : draft.subject_name.trim();
+    const subject = allowGroupEvents && kind === "personal"
+      ? (eventType === "Other" && !groupTag ? (draft.subject_name.trim() || activity) : activity)
+      : draft.subject_name.trim();
     const titleValue = draft.title.trim() || subject || (kind === "school" ? "School lesson" : "Study session");
     const tag = groupTag || (eventType === "Study session" && allowGroupEvents ? crypto.randomUUID() : "");
     const marker = tag ? "[MONITOR_EVENT:" + tag + "] " : "";

@@ -202,6 +202,14 @@ jobs:
           }
           const enrolment = readFileSync('supabase/functions/enrol-learner/index.ts', 'utf8')
           if (!enrolment.includes(termsVersion)) throw new Error('Learner enrolment does not record the current StudySpace terms version.')
+          for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
+            const source = readFileSync(path, 'utf8')
+            if (!source.includes('json(503')) throw new Error(path + ' must fail closed while MIA is paused.')
+            if (/generativelanguage\.googleapis\.com|api\.openai\.com|GEMINI_API_KEY|OPENAI_API_KEY/.test(source)) {
+              throw new Error(path + ' must not contain an active external AI provider integration while MIA is paused.')
+            }
+          }
+          console.log('MIA server-side privacy pause checks passed for learner, administrator and lesson-recap endpoints.')
           console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')
           NODE

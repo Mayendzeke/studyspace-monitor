@@ -55,10 +55,13 @@ Deno.serve(async request => {
   if (authError || !auth.user) return json(401, { error: "Your session has expired. Sign in again." });
   const learnerId = auth.user.id;
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("role,account_status,education_level,grade,curriculum,academic_year,course")
+    .select("role,account_status,subscription_expires_at,education_level,grade,curriculum,academic_year,course")
     .eq("id", learnerId).maybeSingle();
   if (profileError || !profile || profile.role !== "learner" || profile.account_status !== "active") {
     return json(403, { error: "MIΛ is available to active student accounts only." });
+  }
+  if (profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) {
+    return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." });
   }
 
   let body: { action?: string; message?: string; conversationId?: string; image?: { mimeType?: string; data?: string }; timetableKind?: string; notesText?: string; subject?: string; topic?: string; fileName?: string };

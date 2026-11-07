@@ -38,7 +38,7 @@ const SUBSCRIPTION_PLANS = [
   { value: "Free Trial", label: "Free Trial — 1 day — E0", days: 1 },
   { value: "Weekly", label: "Weekly — 7 days — E100", days: 7 },
   { value: "2 Weeks", label: "2 Weeks — 14 days — E200", days: 14 },
-  { value: "Monthly", label: "Monthly — 28 days — E400", days: 28 },
+  { value: "Monthly", label: "Monthly — 28 days — E350", days: 28 },
 ] as const;
 
 function expiryFromNow(days: number): string {

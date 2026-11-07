@@ -64,7 +64,7 @@ Deno.serve(async request => {
     return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." });
   }
 
-  let body: { action?: string; message?: string; conversationId?: string; image?: { mimeType?: string; data?: string }; timetableKind?: string; notesText?: string; subject?: string; topic?: string; fileName?: string };
+  let body: { action?: string; message?: string; conversationId?: string; image?: { mimeType?: string; data?: string }; attachment?: { name?: string; mimeType?: string; data?: string }; timetableKind?: string; notesText?: string; subject?: string; topic?: string; fileName?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request." }); }
   const action: "chat" | "parse_timetable" | "generate_topic_test" | "usage_status" =
     body.action === "usage_status" ? "usage_status" :
@@ -92,6 +92,14 @@ Deno.serve(async request => {
 
   const message = String(body.message ?? "").trim().slice(0, 3000);
   if (action === "chat" && !message) return json(400, { error: "Write a short study question first." });
+  if (action === "chat" && body.attachment?.data) {
+    const mimeType = body.attachment.mimeType ?? "";
+    const data = body.attachment.data;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)
+      || !/^[A-Za-z0-9+/=]+$/.test(data) || data.length > 5_600_000) {
+      return json(400, { error: "Attach a JPG, PNG or WebP image smaller than 4 MB." });
+    }
+  }
   if (action === "generate_topic_test") {
     const notesText = String(body.notesText ?? "").trim();
     if (notesText.length < 50) return json(400, { error: "There is not enough readable text yet. Add at least a short paragraph of notes or choose a clearer text-based file." });
@@ -200,12 +208,15 @@ Deno.serve(async request => {
     ].join("\n\n") });
   } else {
     parts.push({ text: system + "\n\nRECENT CHAT:\n" + history.map(x => x.role.toUpperCase() + ": " + x.parts[0].text).join("\n") + "\n\nSTUDENT: " + message });
+    if (action === "chat" && body.attachment?.data) {
+      parts.push({ inlineData: { mimeType: body.attachment.mimeType, data: body.attachment.data } });
+    }
   }
 
   const prompt = action === "parse_timetable" ? studentContext + "\n\n" + parts[0].text : parts[0].text;
   const usage = await admin.from("ai_generation_usage").insert({
     actor_id: learnerId, provider: "gemini", purpose: action === "chat" ? "mia_chat" : action === "parse_timetable" ? "mia_timetable_image" : "mia_topic_test",
-    input_characters: prompt.length + (body.image?.data?.length ?? 0), output_characters: 0,
+    input_characters: prompt.length + (body.image?.data?.length ?? 0) + (body.attachment?.data?.length ?? 0), output_characters: 0,
   }).select("id").single();
   if (usage.error || !usage.data) return json(503, { error: "MIΛ could not record this request. Try again later." });
 
@@ -219,7 +230,7 @@ Deno.serve(async request => {
         headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: action === "chat" ? [...history, { role: "user", parts: [{ text: message }] }] : [{ role: "user", parts }],
+          contents: action === "chat" ? [...history, { role: "user", parts: body.attachment?.data ? [{ text: message }, { inlineData: { mimeType: body.attachment.mimeType, data: body.attachment.data } }] : [{ text: message }] }] : [{ role: "user", parts }],
           generationConfig: { responseMimeType: "application/json", maxOutputTokens: action === "chat" ? 500 : action === "parse_timetable" ? 1800 : 4200, temperature: action === "generate_topic_test" ? 0.2 : 0.25 },
         }),
         signal: AbortSignal.timeout(45000),

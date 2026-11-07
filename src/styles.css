@@ -1049,3 +1049,14 @@ input,select,textarea{min-width:0}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+@media(max-width:420px){
+  .topbar{padding-inline:12px}
+  .topbar-left{gap:8px}
+  .breadcrumb{font-size:10px}
+  .breadcrumb span{padding-inline:5px}
+  .topbar-actions{gap:6px}
+  .theme-switch{width:35px;height:35px;justify-content:center;padding:0}
+  .theme-switch span,.theme-switch .switch-knob{display:none}
+  .top-avatar{display:none}
+}

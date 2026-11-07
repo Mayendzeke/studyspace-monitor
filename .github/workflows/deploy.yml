@@ -202,6 +202,14 @@ jobs:
           }
           const enrolment = readFileSync('supabase/functions/enrol-learner/index.ts', 'utf8')
           if (!enrolment.includes(termsVersion)) throw new Error('Learner enrolment does not record the current StudySpace terms version.')
+          if (!enrolment.includes('48 * 60 * 60 * 1000')) throw new Error('The learner trial must start at enrolment and last 48 hours.')
+          const pinCreation = readFileSync('supabase/functions/create-enrolment-pin/index.ts', 'utf8')
+          if (!pinCreation.includes('24 * 60 * 60 * 1000')) throw new Error('New enrolment PINs must expire after exactly 24 hours.')
+          if (!pinCreation.includes('STUDYSPACE_PUBLIC_ENROLMENT_ENABLED')) throw new Error('PIN creation must remain behind the server-side enrolment gate.')
+          const accountManagement = readFileSync('supabase/functions/manage-learner-account/index.ts', 'utf8')
+          const learnerAdminPage = readFileSync('src/components/LearnersPage.tsx', 'utf8')
+          if (!accountManagement.includes('paymentTransactionReference') || !accountManagement.includes('payment_transaction_reference')) throw new Error('Subscription audit must require and retain the MTN MoMo transaction reference.')
+          if (!learnerAdminPage.includes('MTN MoMo transaction reference') || !learnerAdminPage.includes('paymentTransactionReference.trim().length < 4')) throw new Error('Monitor must collect a transaction reference before confirming payment.')
           for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes('json(503')) throw new Error(path + ' must fail closed while MIA is paused.')

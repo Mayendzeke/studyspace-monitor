@@ -221,6 +221,7 @@ function App() {
             <p>Your learner workspace is being prepared.</p>
             <button onClick={() => navigate('Settings')}>View setup guide <ArrowUpRight size={14} /></button>
           </div>
+          <button type="button" className="nav-item monitor-sidebar-install" onClick={() => void installMonitor()}><Download size={18}/><span>{installPrompt ? 'Install Studyspace Monitor' : 'Install / add to device'}</span></button>
           <div className="sidebar-profile">
             <div className="profile-avatar">A</div>
             <div className="profile-copy"><strong>{adminName}</strong><small>Authenticated administrator</small></div>

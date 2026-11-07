@@ -87,8 +87,24 @@ export default function ClassroomStudio() {
           curriculum?: string; duration?: number; content?: string
         }
         if (!handoff || typeof handoff.content !== 'string' || !handoff.content.trim()) return
+        const generated = handoff.content.trim()
+        const extractSection = (heading: string) => {
+          const lines = generated.split(/\r?\n/)
+          const start = lines.findIndex(line => line.replace(/^#{1,3}\s*/, '').trim().toLowerCase() === heading.toLowerCase())
+          if (start < 0) return ''
+          const section: string[] = []
+          for (let index = start + 1; index < lines.length; index += 1) {
+            if (/^#{1,3}\s+/.test(lines[index])) break
+            section.push(lines[index])
+          }
+          return section.join('\n').trim()
+        }
+        const checkpointLines = extractSection('Lesson checkpoints').split(/\r?\n/)
+          .map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+          .filter(Boolean).slice(0, 5)
+        const emptyDraft = blank()
         const next: LessonPlan = {
-          ...blank(),
+          ...emptyDraft,
           title: String(handoff.title || '').trim() || 'MIA lesson draft',
           subject: String(handoff.subject || '').trim(),
           level: String(handoff.level || '').trim(),
@@ -96,7 +112,10 @@ export default function ClassroomStudio() {
           course: String(handoff.course || '').trim(),
           curriculum: String(handoff.curriculum || '').trim(),
           duration: Math.max(10, Math.min(240, Number(handoff.duration) || 45)),
-          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\n\n' + handoff.content.trim(),
+          objectives: extractSection('Learning objectives'),
+          checkpoints: checkpointLines.length ? [...checkpointLines, '', '', '', ''].slice(0, 5) : emptyDraft.checkpoints,
+          homework: extractSection('Homework'),
+          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\n\n' + generated,
         }
         setDraft(next)
         setCourseFilter(next.course || '')

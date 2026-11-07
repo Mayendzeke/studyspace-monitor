@@ -40,6 +40,8 @@ export default function TimetableManager({
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [groupTag, setGroupTag] = useState("");
   const [timetableZoom, setTimetableZoom] = useState(1);
+  const [savedLearnerSubjects, setSavedLearnerSubjects] = useState<string[]>([]);
+  const subjectOptions = Array.from(new Set([...subjects, ...savedLearnerSubjects])).filter(Boolean);
 
   async function refresh() {
     if (!supabase) { setLoading(false); setError("Supabase is not connected."); return; }
@@ -55,6 +57,19 @@ export default function TimetableManager({
   }
 
   useEffect(() => { void refresh(); }, [learnerId, kind]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadSubjects() {
+      if (!supabase) return;
+      const { data, error } = await supabase.from("student_subjects")
+        .select("name").eq("learner_id", learnerId).order("name");
+      if (!alive) return;
+      if (!error) setSavedLearnerSubjects(Array.from(new Set((data ?? []).map(row => String(row.name ?? "").trim()).filter(Boolean))));
+    }
+    void loadSubjects();
+    return () => { alive = false; };
+  }, [learnerId]);
 
   useEffect(() => {
     if (!allowGroupEvents || kind !== "personal" || !supabase) return;
@@ -193,7 +208,7 @@ export default function TimetableManager({
     {error && <p className="inline-message error-message" role="alert">{error}</p>}
     {editorOpen && <form className="timetable-manager-editor" onSubmit={event => void save(event)}>
       <div className="timetable-manager-grid">
-        {allowGroupEvents && kind === "personal" ? <label>Event type<select value={eventType} onChange={event => { setEventType(event.target.value); setDraft(current => ({ ...current, subject_name: event.target.value, title: "" })); if (event.target.value !== "Study session") { setEducationLevel(""); setGrade(""); setSelectedLearners([]); } }}>{eventTypes.map(option => <option key={option} value={option}>{option}</option>)}</select></label> : <label>Subject / activity<select value={draft.subject_name} onChange={event => setDraft(current => ({ ...current, subject_name: event.target.value, title: current.title || event.target.value }))}><option value="">General / other</option>{subjects.map(subject => <option key={subject} value={subject}>{subject}</option>)}</select></label>}
+        {allowGroupEvents && kind === "personal" ? <label>Event type<select value={eventType} onChange={event => { setEventType(event.target.value); setDraft(current => ({ ...current, subject_name: event.target.value, title: "" })); if (event.target.value !== "Study session") { setEducationLevel(""); setGrade(""); setSelectedLearners([]); } }}>{eventTypes.map(option => <option key={option} value={option}>{option}</option>)}</select></label> : <label>Subject / activity<select value={draft.subject_name} onChange={event => setDraft(current => ({ ...current, subject_name: event.target.value, title: current.title || event.target.value }))}><option value="">General / other</option>{subjectOptions.map(subject => <option key={subject} value={subject}>{subject}</option>)}</select></label>}
         <label>Day<select value={draft.day_of_week} onChange={event => setDraft(current => ({ ...current, day_of_week: Number(event.target.value) }))}>{days.map((day,index) => <option key={day} value={index}>{day}</option>)}</select></label>
         <label>Start<input required type="time" value={draft.starts_at} onChange={event => setDraft(current => ({ ...current, starts_at: event.target.value }))}/></label>
         <label>End<input required type="time" value={draft.ends_at} onChange={event => setDraft(current => ({ ...current, ends_at: event.target.value }))}/></label>

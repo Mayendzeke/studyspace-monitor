@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, RefreshCw, Users } from "lucide-react";
+import { CalendarDays, Minus, Plus, RefreshCw, Users } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Learner = { id: string; full_name: string; preferred_name: string; grade: string; education_level: string };
@@ -13,6 +13,7 @@ export default function SharedStudyTimetable() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [timetableZoom, setTimetableZoom] = useState(1);
 
   async function refresh(quiet = false) {
     if (!supabase) { setError("Studyspace is not connected."); setLoading(false); return; }
@@ -50,13 +51,20 @@ export default function SharedStudyTimetable() {
   return <section className="panel timetable-manager shared-study-timetable">
     <div className="panel-heading">
       <div><h2>Shared student study availability</h2><p>Students' available study slots, synced from their personal timetables · {slots.length} slot(s)</p></div>
-      <button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh shared study timetable"><RefreshCw size={14}/></button>
+      <div className="timetable-manager-actions">
+        <div className="timetable-zoom-controls" role="group" aria-label="Shared timetable zoom controls">
+          <button type="button" className="timetable-zoom-button" aria-label="Zoom out" title="Zoom out" onClick={() => setTimetableZoom(value => Math.max(0.45, Math.round((value - 0.1) * 100) / 100))} disabled={timetableZoom <= 0.45}><Minus size={14}/></button>
+          <button type="button" className="timetable-zoom-reset" onClick={() => setTimetableZoom(1)} aria-label="Reset timetable zoom">{Math.round(timetableZoom * 100)}%</button>
+          <button type="button" className="timetable-zoom-button" aria-label="Zoom in" title="Zoom in" onClick={() => setTimetableZoom(value => Math.min(1.5, Math.round((value + 0.1) * 100) / 100))} disabled={timetableZoom >= 1.5}><Plus size={14}/></button>
+        </div>
+        <button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh shared study timetable"><RefreshCw size={14}/></button>
+      </div>
     </div>
     <p className="subtle-note"><Users size={14}/> When a learner completes signup, Studyspace creates editable study slots from their preferred days and weekly study hours. Changes made in the student app appear here after refresh.</p>
     {error && <p className="inline-message error-message" role="alert">{error}</p>}
     {loading ? <div className="classroom-empty">Loading shared availability…</div> :
       !slots.length ? <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No student study slots are available yet. Learners' signup preferences create the initial schedule.</span></div> :
-      <div className="teacher-week-grid-scroll"><table className="teacher-week-grid">
+      <div className="teacher-week-grid-scroll"><div className="teacher-week-grid-zoom" style={{ zoom: timetableZoom, width: (100 / timetableZoom) + "%" }}><table className="teacher-week-grid">
         <thead><tr><th className="teacher-week-day-heading">DAY</th>{times.map(start => <th key={start}>{start}</th>)}</tr></thead>
         <tbody>{[1,2,3,4,5,6,0].map(day => <tr key={day}>
           <th className="teacher-week-day-cell">{days[day]}</th>
@@ -70,6 +78,6 @@ export default function SharedStudyTimetable() {
             </article>;
           })}</td>)}
         </tr>)}</tbody>
-      </table></div>}
+      </table></div></div>}
   </section>;
 }

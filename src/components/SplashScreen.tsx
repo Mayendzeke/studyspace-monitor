@@ -24,9 +24,7 @@ export default function SplashScreen({ theme = 'light' }: { theme?: Theme }) {
         </div>
         <div className="monitor-splash-loader" aria-hidden="true"><span /></div>
         <p>Preparing your administrator workspace</p>
-        <small className="monitor-splash-caption">SECURE ACCESS · LEARNER MANAGEMENT</small>
       </div>
-      <div className="monitor-splash-footer"><GraduationCap size={14} /> LEARN · GROW · ACHIEVE</div>
     </main>
   )
 }

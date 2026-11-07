@@ -1060,3 +1060,7 @@ input,select,textarea{min-width:0}
   .theme-switch span,.theme-switch .switch-knob{display:none}
   .top-avatar{display:none}
 }
+
+.monitor-sidebar-install{margin:9px 0 5px;color:var(--purple);background:rgba(113,100,216,.07)}
+.monitor-sidebar-install:hover{color:var(--purple-dark);background:rgba(113,100,216,.13)}
+:root[data-theme='dark'] .monitor-sidebar-install{color:#c4bdff;background:rgba(113,100,216,.12)}

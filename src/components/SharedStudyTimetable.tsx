@@ -64,7 +64,7 @@ export default function SharedStudyTimetable() {
     {error && <p className="inline-message error-message" role="alert">{error}</p>}
     {loading ? <div className="classroom-empty">Loading shared availability…</div> :
       !slots.length ? <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No student study slots are available yet. Learners' signup preferences create the initial schedule.</span></div> :
-      <div className="teacher-week-grid-scroll"><div className="teacher-week-grid-zoom" style={{ zoom: timetableZoom }}><table className="teacher-week-grid">
+      <div className="teacher-week-grid-scroll"><div className="teacher-week-grid-zoom" style={{ zoom: timetableZoom, width: (100 / timetableZoom) + "%" }}><table className="teacher-week-grid">
         <thead><tr><th className="teacher-week-day-heading">DAY</th>{times.map(start => <th key={start}>{start}</th>)}</tr></thead>
         <tbody>{[1,2,3,4,5,6,0].map(day => <tr key={day}>
           <th className="teacher-week-day-cell">{days[day]}</th>

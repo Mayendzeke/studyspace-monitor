@@ -66,9 +66,30 @@ Deno.serve(async request => {
 
   let body: { action?: string; message?: string; conversationId?: string; image?: { mimeType?: string; data?: string }; timetableKind?: string; notesText?: string; subject?: string; topic?: string; fileName?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request." }); }
-  const action: "chat" | "parse_timetable" | "generate_topic_test" =
+  const action: "chat" | "parse_timetable" | "generate_topic_test" | "usage_status" =
+    body.action === "usage_status" ? "usage_status" :
     body.action === "parse_timetable" ? "parse_timetable" :
     body.action === "generate_topic_test" ? "generate_topic_test" : "chat";
+  if (action === "usage_status") {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [personalUsage, sharedUsage] = await Promise.all([
+      admin.from("ai_generation_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("actor_id", learnerId).gte("created_at", since),
+      admin.from("ai_generation_usage")
+        .select("id", { count: "exact", head: true })
+        .in("purpose", ["mia_chat", "mia_timetable_image", "mia_topic_test"]).gte("created_at", since),
+    ]);
+    if (personalUsage.error || sharedUsage.error) {
+      return json(503, { error: "MIΛ could not check today's usage allowance. Try again later." });
+    }
+    return json(200, {
+      success: true,
+      remainingDailyRequests: Math.max(0, 20 - (personalUsage.count ?? 0)),
+      remainingSharedRequests: Math.max(0, 100 - (sharedUsage.count ?? 0)),
+    });
+  }
+
   const message = String(body.message ?? "").trim().slice(0, 3000);
   if (action === "chat" && !message) return json(400, { error: "Write a short study question first." });
   if (action === "generate_topic_test") {

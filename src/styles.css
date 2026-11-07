@@ -736,3 +736,44 @@ h1 span { color: #8278d9; }
 
 .teacher-week-grid-scroll{width:100%;max-width:100%;overflow:hidden}
 .teacher-week-grid{width:100%;min-width:0}
+
+
+/* Subscription monitoring */
+.subscription-heading-row{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}
+.subscription-refresh{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:39px;padding:0 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer}
+.subscription-refresh:disabled{opacity:.55;cursor:wait}
+.subscription-refresh .spin{animation:subscription-spin 1s linear infinite}
+@keyframes subscription-spin{to{transform:rotate(360deg)}}
+.subscription-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin:18px 0 20px}
+.subscription-metric{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);text-align:left;cursor:pointer;transition:border-color .16s,transform .16s,box-shadow .16s}
+.subscription-metric:hover{transform:translateY(-2px)}
+.subscription-metric.selected{border-color:var(--purple);box-shadow:inset 0 0 0 1px var(--purple)}
+.subscription-metric>span{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:10px;font-weight:700}
+.subscription-metric>span svg{color:var(--purple);flex:0 0 auto}
+.subscription-metric strong{font:800 26px Manrope,sans-serif;line-height:1.05}
+.subscription-metric small{color:var(--muted);font-size:10px;line-height:1.4}
+.subscription-table-panel{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--raised-small)}
+.subscription-table-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 19px;border-bottom:1px solid var(--line)}
+.subscription-table-header h2{margin:0;color:var(--ink);font:800 15px Manrope,sans-serif}
+.subscription-table-header p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.subscription-search{display:flex;align-items:center;gap:8px;min-width:220px;max-width:300px;padding:0 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted)}
+.subscription-search input{width:100%;height:37px;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:11px}
+.subscription-table-scroll{overflow-x:auto}
+.subscription-table{width:100%;border-collapse:collapse;min-width:780px}
+.subscription-table th{padding:12px 14px;background:var(--surface-2);color:var(--muted);font-size:9px;letter-spacing:.07em;text-align:left;text-transform:uppercase;white-space:nowrap}
+.subscription-table td{padding:13px 14px;border-top:1px solid var(--line);color:var(--ink);font-size:11px;vertical-align:middle;white-space:nowrap}
+.subscription-table td:first-child{white-space:normal;min-width:150px}
+.subscription-table td strong{display:block;font-size:11px}
+.subscription-table td small{display:block;margin-top:4px;color:var(--muted);font-size:9px;text-transform:capitalize}
+.subscription-tier{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:700}
+.subscription-tier svg{color:var(--purple)}
+.subscription-status{display:inline-flex;align-items:center;padding:5px 8px;border-radius:20px;font-size:9px;font-weight:800}
+.subscription-status.good{color:#187454;background:rgba(42,166,119,.12)}
+.subscription-status.warning{color:#9b6912;background:rgba(226,171,61,.16)}
+.subscription-status.danger{color:#b4233a;background:rgba(220,70,90,.12)}
+.subscription-empty{display:flex;align-items:center;justify-content:center;min-height:120px;padding:25px;color:var(--muted);font-size:12px;text-align:center}
+.subscription-error{margin:15px;padding:12px 14px;border:1px solid rgba(190,55,70,.25);border-radius:10px;background:rgba(190,55,70,.08);color:var(--danger);font-size:11px}
+.subscription-table-footer{display:flex;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}
+.subscription-admin-note{margin:13px 2px;color:var(--muted);font-size:11px;line-height:1.6}
+@media(max-width:1000px){.subscription-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.subscription-heading-row{align-items:flex-start;flex-direction:column}.subscription-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subscription-metric{padding:12px}.subscription-table-header{align-items:stretch;flex-direction:column}.subscription-search{max-width:none;min-width:0}.subscription-table-footer{font-size:9px}}

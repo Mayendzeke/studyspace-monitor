@@ -157,6 +157,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
+          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: ${{ vars.VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED || 'false' }}
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
         run: |

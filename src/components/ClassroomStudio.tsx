@@ -199,7 +199,7 @@ export default function ClassroomStudio() {
     try {
       const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
-        curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
+        course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
       } })
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
@@ -226,7 +226,7 @@ export default function ClassroomStudio() {
     try {
       const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
-        curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
+        course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
       }});
       if (error) throw error;
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return lesson structure.');

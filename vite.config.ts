@@ -16,8 +16,10 @@ export default defineConfig({
         background_color: '#111827',
         display: 'standalone',
         orientation: 'any',
+        id: '/studyspace-monitor/',
         start_url: '/studyspace-monitor/',
         scope: '/studyspace-monitor/',
+        display_override: ['standalone', 'minimal-ui'],
         icons: [{ src: '/studyspace-monitor/studyspace-monitor.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }]
       },
       workbox: {

@@ -28,6 +28,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Apply compatible dependency security fixes
+        run: npm audit fix
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

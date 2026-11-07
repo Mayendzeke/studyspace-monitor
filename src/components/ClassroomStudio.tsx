@@ -164,6 +164,7 @@ export default function ClassroomStudio() {
     : levelLearners;
   const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   const scopedLearners = courseLearners.filter(item => !draft.grade || item.grade === draft.grade);
+  const curriculumOptions = Array.from(new Set(scopedLearners.map(item => item.curriculum?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   const gradeFieldLabel = draft.level === 'Primary school' ? 'Grade / class'
     : draft.level === 'Secondary school' ? 'Form / grade'
     : draft.level === 'High school / Sixth form' ? 'Form / sixth form year'
@@ -345,7 +346,7 @@ export default function ClassroomStudio() {
               <option value="__other__">Other / enter manually</option>
             </select></label>
           {(subjectManual || (!!draft.subject && !scopedSubjectOptions.includes(draft.subject))) && <label>Enter subject / module<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Type the subject or module"/></label>}
-          <label>Curriculum<input value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="IGCSE, CAPS, etc."/></label>
+          <label>Curriculum / syllabus<input list="classroom-curriculum-options" value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="Select or type a curriculum"/><datalist id="classroom-curriculum-options">{curriculumOptions.map(item=><option key={item} value={item}/>)}</datalist></label>
           <label>Date<input type="date" value={draft.date} onChange={e=>update({date:e.target.value})}/></label>
           <label>Lesson length (minutes)<input type="number" min="10" max="240" value={draft.duration} onChange={e=>update({duration:Math.max(10,Math.min(240,Number(e.target.value)||45))})}/></label>
         </div>

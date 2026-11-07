@@ -9,7 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['studyspace-monitor.svg'],
       manifest: {
-        name: 'StudySpace Monitor',
+        name: 'Studyspace Monitor',
         short_name: 'StudySpace',
         description: 'StudySpace teacher and administrator workspace.',
         theme_color: '#242938',

@@ -1066,3 +1066,28 @@ input,select,textarea{min-width:0}
 :root[data-theme='dark'] .monitor-sidebar-install{color:#c4bdff;background:rgba(113,100,216,.12)}
 
 html,body,#root{max-width:100%;overflow-x:hidden}
+
+
+/* StudySpace shared timetable: keep every label inside its own cell. */
+.teacher-week-grid { table-layout:fixed; width:100%; min-width:0; }
+.teacher-week-grid th.teacher-week-day-heading,
+.teacher-week-grid th.teacher-week-day-cell { width:clamp(54px,11%,92px); min-width:clamp(54px,11%,92px); }
+.teacher-week-grid td { min-width:0; width:auto; padding:3px; }
+.teacher-week-lesson,.teacher-week-lesson.shared-study-slot { min-width:0; max-width:100%; padding:5px 4px; gap:3px; overflow:hidden; overflow-wrap:anywhere; word-break:break-word; }
+.teacher-week-lesson b,.teacher-week-lesson small,.shared-study-slot b,.shared-study-slot small { display:block; min-width:0; max-width:100%; font-size:clamp(8px,1vw,10px); line-height:1.25; overflow-wrap:anywhere; word-break:break-word; }
+.teacher-week-lesson .pin-status { justify-self:start; max-width:100%; font-size:8px; padding:2px 5px; }
+.teacher-week-lesson>div { flex-wrap:wrap; justify-content:flex-end; }
+@media(max-width:760px) {
+ .timetable-manager { padding:12px; }
+ .teacher-week-grid th,.teacher-week-grid td { padding:3px 2px; }
+ .teacher-week-grid th.teacher-week-day-heading,.teacher-week-grid th.teacher-week-day-cell { width:52px; min-width:52px; font-size:8px; }
+ .teacher-week-lesson,.teacher-week-lesson.shared-study-slot { padding:4px 3px; border-left-width:2px; }
+ .teacher-week-lesson b,.teacher-week-lesson small,.shared-study-slot b,.shared-study-slot small { font-size:8px; }
+}
+.timetable-manager-editor input,.timetable-manager-editor select,.timetable-manager-grid input,.timetable-manager-grid select,.timetable-manager-grid textarea {
+ color:var(--ink); background:var(--surface); border:1px solid var(--border);
+ font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
+}
+.timetable-manager-editor input:focus,.timetable-manager-editor select:focus,.timetable-manager-grid input:focus,.timetable-manager-grid select:focus {
+ outline:2px solid color-mix(in srgb,var(--blue) 45%,transparent); outline-offset:1px;
+}

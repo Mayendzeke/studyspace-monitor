@@ -1,5 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+function getNamedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const value = parsed?.default;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function getPublishableKey(): string {
+  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+function getSecretKey(): string {
+  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",

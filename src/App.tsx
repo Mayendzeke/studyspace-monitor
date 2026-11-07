@@ -1,6 +1,7 @@
 import ContentStudio from './components/ContentStudio'
 import ClassroomStudio from './components/ClassroomStudio'
 import LearnersPage from './components/LearnersPage'
+import SubscriptionsPage from './components/SubscriptionsPage'
 import SplashScreen from './components/SplashScreen'
 import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
@@ -12,15 +13,16 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
-  Clock3, FileText, RefreshCw, TrendingUp,
+  Clock3, FileText, RefreshCw, TrendingUp, CreditCard,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Subscriptions' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Learners', icon: Users },
+  { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Enrolment PINs', icon: KeyRound },
@@ -200,6 +202,7 @@ function App() {
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
+          {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <ClassroomStudio />}
           {page === 'Enrolment PINs' && <PinPage />}

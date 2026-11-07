@@ -184,9 +184,20 @@ Deno.serve(async (request) => {
       if (cleaned.length > allowedFields[key]) {
         return json(400, { error: key.replaceAll("_", " ") + " is too long." });
       }
-      updates[key] = cleaned;
+      if (key === "subscription_expires_at") {
+        if (!cleaned) { updates[key] = null; continue; }
+        const expiry = new Date(cleaned);
+        if (Number.isNaN(expiry.getTime())) return json(400, { error: "A valid subscription expiry date is required." });
+        updates[key] = expiry.toISOString();
+      } else {
+        updates[key] = cleaned || (key === "subscription_tier" ? null : "");
+      }
     }
     if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
+    const nextTier = updates.subscription_tier === undefined ? null : updates.subscription_tier;
+    const nextExpiry = updates.subscription_expires_at === undefined ? null : updates.subscription_expires_at;
+    if (nextTier && !nextExpiry) return json(400, { error: "A paid tier must have an expiry date. Set both fields, or clear both for no expiry." });
+    if (nextExpiry && !nextTier) return json(400, { error: "Choose a paid tier when setting an expiry date." });
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";
     if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
     updates.updated_at = new Date().toISOString();
@@ -195,7 +206,7 @@ Deno.serve(async (request) => {
       .update(updates)
       .eq("id", learnerId)
       .eq("role", "learner")
-      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,grade,curriculum,academic_year,account_status,updated_at")
+      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,account_status,updated_at")
       .single();
     if (error || !updated) return json(500, { error: "Learner profile could not be saved." });
 

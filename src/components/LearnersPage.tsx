@@ -285,7 +285,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     ];
     const rows = learners.map(item => [
       item.student_id, item.full_name, item.preferred_name, item.institution, item.country,
-      item.education_level, item.grade, item.curriculum, item.academic_year,
+      item.education_level, item.course, item.grade, item.curriculum, item.academic_year,
       item.account_status, item.created_at,
     ]);
     const csv = [headings, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");

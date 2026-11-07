@@ -339,7 +339,7 @@ export default function ClassroomStudio() {
             ? <label>2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setSelectedLearners([]);setSubjectManual(false);update({grade:'',subject:''})}}><option value="">All courses / programmes</option>{courseOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
             : isTertiaryLevel && <p className="classroom-filter-note">No course or programme has been recorded for active {draft.level.toLowerCase()} learners yet. You can still filter by their registered year of study.</p>)}
           <label>{isTertiaryLevel ? '3.' : '2.'} {gradeFieldLabel}<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level}><option value="">All grades / years</option>{gradeOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
-          <label>3. Subject / module<select value={subjectManual || (draft.subject && !scopedSubjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
+          <label>{isTertiaryLevel ? '4.' : '3.'} Subject / module<select value={subjectManual || (draft.subject && !scopedSubjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
               onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}} disabled={!draft.level}>
               <option value="">Choose from this level and year</option>
               {scopedSubjectOptions.map(name=><option key={name} value={name}>{name}</option>)}

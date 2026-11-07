@@ -137,6 +137,7 @@ Deno.serve(async (request) => {
     profile?: Record<string, unknown>;
     confirmation?: string;
     paymentConfirmed?: boolean;
+    paymentTransactionReference?: string;
   };
   try {
     body = await request.json();
@@ -146,6 +147,7 @@ Deno.serve(async (request) => {
 
   const learnerId = String(body.learnerId ?? "");
   const action = String(body.action ?? "");
+  const paymentTransactionReference = String(body.paymentTransactionReference ?? "").trim();
   if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
   if (learnerId === authData.user.id) return json(400, { error: "An administrator cannot manage or delete their own account as a learner." });
   if (!["disable", "enable", "reset_password", "update_profile", "delete"].includes(action)) {
@@ -208,8 +210,13 @@ Deno.serve(async (request) => {
       && updates.subscription_tier !== (learner.subscription_tier ?? null);
     const expiryChanged = updates.subscription_expires_at !== undefined
       && updates.subscription_expires_at !== (learner.subscription_expires_at ?? null);
-    if (nextTier && (tierChanged || expiryChanged) && body.paymentConfirmed !== true) {
-      return json(400, { error: "Confirm that the MTN MoMo payment has been received and verified against this learner's Student ID before activating or renewing a paid plan." });
+    if (nextTier && (tierChanged || expiryChanged)) {
+      if (body.paymentConfirmed !== true) {
+        return json(400, { error: "Confirm that the MTN MoMo payment has been received and verified against this learner's Student ID before activating or renewing a paid plan." });
+      }
+      if (paymentTransactionReference.length < 4 || paymentTransactionReference.length > 120) {
+        return json(400, { error: "Enter the MTN MoMo transaction reference from the verified payment receipt." });
+      }
     }
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";
     if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
@@ -240,6 +247,7 @@ Deno.serve(async (request) => {
           expires_at: updated.subscription_expires_at,
           payment_method: "MTN MoMo",
           payment_reference: learner.student_id,
+          payment_transaction_reference: paymentTransactionReference,
           payment_verified_by: authData.user.id,
           payment_verified_at: new Date().toISOString(),
         },

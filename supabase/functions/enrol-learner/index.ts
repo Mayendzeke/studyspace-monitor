@@ -78,8 +78,17 @@ Deno.serve(async request => {
     return json(409, { error: "This invitation has just been used or revoked. Ask your administrator for a new one." });
   }
 
+  const trialStartedAt = new Date();
+  const trialExpiresAt = new Date(trialStartedAt.getTime() + 48 * 60 * 60 * 1000);
   const { data: completedProfile, error: profileError } = await admin.from("profiles").update({
-    student_id: studentId, account_status: "active", updated_at: new Date().toISOString(),
+    student_id: studentId,
+    account_status: "active",
+    subscription_tier: null,
+    subscription_expires_at: null,
+    trial_started_at: trialStartedAt.toISOString(),
+    trial_expires_at: trialExpiresAt.toISOString(),
+    trial_reminder_shown_at: null,
+    updated_at: trialStartedAt.toISOString(),
   }).eq("id", created.user.id).select("id").single();
   if (profileError || !completedProfile) {
     await admin.from("enrolment_pins").update({ redeemed_by: null, redeemed_at: null }).eq("id", invitation.id);

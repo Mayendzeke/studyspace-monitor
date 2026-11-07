@@ -142,6 +142,33 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
         run: npm run build
+      - name: Verify Monitor PWA and MIA lesson handoff
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync } from 'node:fs'
+          import { join } from 'node:path'
+
+          const files = readdirSync('dist')
+          const manifestName = files.find(name => name.endsWith('.webmanifest'))
+          if (!manifestName) throw new Error('The PWA web app manifest was not generated.')
+          const manifest = JSON.parse(readFileSync(join('dist', manifestName), 'utf8'))
+          if (manifest.name !== 'Studyspace Monitor' || manifest.start_url !== '/studyspace-monitor/' || manifest.scope !== '/studyspace-monitor/') {
+            throw new Error('The Monitor PWA manifest has an unexpected app name, start URL or scope.')
+          }
+          if (!Array.isArray(manifest.icons) || !manifest.icons.length) throw new Error('The PWA manifest has no app icons.')
+          for (const icon of manifest.icons) {
+            const relative = String(icon.src).replace(/^\\/studyspace-monitor\\//, '')
+            if (!existsSync(join('dist', relative))) throw new Error('A declared PWA icon is missing from the build: ' + icon.src)
+          }
+          if (!files.includes('sw.js')) throw new Error('The offline service worker was not generated.')
+          const app = readFileSync('src/App.tsx', 'utf8')
+          const mia = readFileSync('src/components/MiaStudio.tsx', 'utf8')
+          const classroom = readFileSync('src/components/ClassroomStudio.tsx', 'utf8')
+          if (!app.includes('beforeinstallprompt') || !app.includes('monitor-install-button')) throw new Error('The Monitor install control is missing.')
+          if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
+          if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
+          console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')
+          NODE
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

@@ -22,13 +22,15 @@ type Learner = {
   grade: string;
   curriculum: string;
   academic_year: string;
+  subscription_tier: string | null;
+  subscription_expires_at: string | null;
 };
 
 type ProfileForm = Pick<
   Learner,
   "full_name" | "preferred_name" | "country" | "institution" | "course" |
   "education_level" | "grade" | "curriculum" | "academic_year"
->;
+> & { subscription_tier: string; subscription_expires_at: string };
 
 type ManageAction = "disable" | "enable" | "reset_password";
 
@@ -42,6 +44,8 @@ const emptyForm: ProfileForm = {
   grade: "",
   curriculum: "",
   academic_year: "",
+  subscription_tier: "",
+  subscription_expires_at: "",
 };
 
 async function functionError(reason: unknown, fallback: string): Promise<string> {
@@ -115,7 +119,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year")
+      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -196,6 +200,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",
       academic_year: learner.academic_year || "",
+      subscription_tier: learner.subscription_tier || "",
+      subscription_expires_at: learner.subscription_expires_at ? new Date(learner.subscription_expires_at).toLocaleString("sv-SE").replace(" ", "T").slice(0, 16) : "",
     });
     setError("");
     setNotice("");
@@ -209,7 +215,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", profile: profileForm },
+        body: { learnerId: editTarget.id, action: "update_profile", profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -442,6 +448,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 {/university|college|tertiary/i.test(profileForm.education_level) && <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, BSc Nursing, Diploma in IT"/></label>}
                 <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>
+                <label>Paid tier<input maxLength={80} value={profileForm.subscription_tier} onChange={event => setProfileForm(current => ({ ...current, subscription_tier: event.target.value }))} placeholder="e.g. Monthly, Term, Premium"/></label>
+                <label>Access expires at<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Set both a tier and expiry date to limit access. Leave both blank for no expiry.</small></label>
               </div>
               <div className="learner-readonly-row"><span>Student ID</span><strong>{editTarget.student_id || "Not assigned"}</strong><small>Student IDs are kept fixed because they are also used to identify the sign-in account.</small></div>
               <div className="learner-modal-actions">

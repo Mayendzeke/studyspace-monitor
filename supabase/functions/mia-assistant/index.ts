@@ -90,7 +90,7 @@ Deno.serve(async request => {
     });
   }
 
-  const message = String(body.message ?? "").trim().slice(0, 3000);
+  const message = String(body.message ?? "").trim().slice(0, 18000);
   if (action === "chat" && !message) return json(400, { error: "Write a short study question first." });
   if (action === "chat" && body.attachment?.data) {
     const mimeType = body.attachment.mimeType ?? "";

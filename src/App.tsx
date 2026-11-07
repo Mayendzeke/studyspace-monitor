@@ -96,6 +96,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!mobileOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false) }
+    const closeOnBack = () => setMobileOpen(false)
+    window.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('popstate', closeOnBack)
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape); window.removeEventListener('popstate', closeOnBack) }
+  }, [mobileOpen])
+
+  useEffect(() => {
     if (!installHelpOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'

@@ -101,7 +101,7 @@ Deno.serve(async request => {
 
   const message = String(body.message ?? "").trim().slice(0, 18000);
   // Search only for explicit syllabus/examination currency questions; routine tutoring stays lightweight.
-  const curriculumSearchEnabled = action === "chat" && /(syllabus|curriculum|exam board|examination requirements|assessment objectives|past papers?|IGCSE|SGCSE|GCSE|A-Level|Cambridge|Pearson|\bCAPS\b|\bIB\b|official topics|exam changes|current requirements|up[- ]to[- ]date)/i.test(message);
+  const curriculumSearchEnabled = action === "chat" && /(syllabus|curriculum|exam board|\\bexams?\\b|examinable|examination requirements|assessment objectives|past papers?|IGCSE|SGCSE|GCSE|A-Level|Cambridge|Pearson|\bCAPS\b|\bIB\b|official topics|syllabus coverage|exam changes|current requirements|up[- ]to[- ]date)/i.test(message);
   if (action === "chat" && !message) return json(400, { error: "Write a short study question first." });
   if (action === "chat" && body.attachment?.data) {
     const mimeType = body.attachment.mimeType ?? "";
@@ -304,11 +304,12 @@ Deno.serve(async request => {
     .filter((item: any) => item && typeof item.uri === "string" && item.uri.startsWith("https://") && typeof item.title === "string")
     .filter((item: any) => {
       try {
-        const host = new URL(item.uri).hostname.toLowerCase();
-        return /(^|\.)gov(\.|$)|(^|\.)go\.[a-z]{2,}$|(^|\.)gouv\.|(^|\.)edu(\.|$)/i.test(host)
-          || host.endsWith("cambridgeinternational.org")
-          || host.endsWith("qualifications.pearson.com")
-          || host.endsWith("ibo.org");
+        // Gemini grounding chunks may use a Google redirect URI; use the original publisher domain in the source title.
+        const publisher = String(item.title || "").toLowerCase().replace(/^www\\./, "");
+        return /(^|\\.)gov(\\.|$)|(^|\\.)go\\.[a-z]{2,}$|(^|\\.)gouv\\.|(^|\\.)edu(\\.|$)/i.test(publisher)
+          || publisher.endsWith("cambridgeinternational.org")
+          || publisher.endsWith("qualifications.pearson.com")
+          || publisher.endsWith("ibo.org");
       } catch { return false; }
     })
     .filter((item: any, index: number, all: any[]) => all.findIndex((candidate: any) => candidate.uri === item.uri) === index)

@@ -31,66 +31,6 @@ set trial_started_at = coalesce(trial_started_at, created_at),
 where role = 'learner'
   and lower(coalesce(subscription_tier, '')) = 'free trial';
 
--- Start the universal 48-hour trial only when a valid one-time PIN is
--- successfully redeemed and the pending learner account becomes active.
-create or replace function public.redeem_studyspace_pin(pin_digest text)
-returns boolean
-language plpgsql
-security definer
-set search_path = ''
-as $function$
-declare
-  redeemed_id uuid;
-begin
-  if auth.uid() is null then
-    raise exception 'Authentication required';
-  end if;
-
-  if (
-    select count(*) from public.pin_redemption_attempts
-    where user_id = auth.uid() and attempted_at > now() - interval '15 minutes'
-  ) >= 5 then
-    raise exception 'Too many PIN attempts. Try again in 15 minutes.';
-  end if;
-
-  if not exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'learner' and account_status = 'pending'
-  ) then
-    raise exception 'This account is not eligible for enrolment';
-  end if;
-
-  update public.enrolment_pins
-  set redeemed_by = auth.uid(), redeemed_at = now()
-  where pin_hash = pin_digest
-    and redeemed_by is null
-    and redeemed_at is null
-    and revoked_at is null
-    and expires_at > now()
-  returning id into redeemed_id;
-
-  if redeemed_id is null then
-    insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),false);
-    return false;
-  end if;
-
-  update public.profiles
-  set account_status = 'active',
-      trial_started_at = now(),
-      trial_expires_at = now() + interval '48 hours',
-      trial_reminder_shown_at = null,
-      updated_at = now()
-  where id = auth.uid();
-
-  insert into public.pin_redemption_attempts(user_id,was_successful) values (auth.uid(),true);
-
-  insert into public.audit_events(actor_id,event_type,target_type,target_id)
-  values (auth.uid(),'enrolment_pin_redeemed','profile',auth.uid()::text);
-
-  return true;
-end;
-$function$;
-
 -- Keep the legacy authenticated PIN-redemption route on the same universal trial.
 -- The Student App will require current terms acceptance before loading learner data.
 create or replace function public.redeem_studyspace_pin(pin_digest text)
@@ -156,6 +96,9 @@ begin
 end;
 $function$;
 
+revoke all on function public.redeem_studyspace_pin(text) from public, anon;
+grant execute on function public.redeem_studyspace_pin(text) to authenticated;
+
 create or replace function public.accept_studyspace_terms(
   p_terms_version text,
   p_accepted_by_name text,
@@ -172,7 +115,7 @@ begin
   if auth.uid() is null then
     raise exception 'Authentication required';
   end if;
-  if p_terms_version is distinct from '2026-11-07-v1' then
+  if p_terms_version is distinct from '2026-11-07-v2' then
     raise exception 'The Terms and Conditions version is outdated. Reload the app and try again.';
   end if;
   if length(accepted_name) < 2 or length(accepted_name) > 120 then
@@ -246,7 +189,7 @@ as $function$
       and role = 'learner'
       and account_status = 'active'
       and terms_accepted_at is not null
-      and terms_version = '2026-11-07-v1'
+      and terms_version = '2026-11-07-v2'
       and (
         (
           subscription_tier is not null
@@ -263,3 +206,25 @@ as $function$
       )
   );
 $function$;
+
+
+-- Expired learners cannot mutate classroom messages; active members and
+-- administrators retain the existing delete capability.
+drop policy if exists session_messages_sender_delete on public.session_messages;
+create policy session_messages_sender_delete
+on public.session_messages
+for delete
+to authenticated
+using (
+  (
+    sender_id = (select auth.uid())
+    and (select public.is_active_studyspace_learner())
+    and exists (
+      select 1
+      from public.class_session_members m
+      where m.session_id = session_messages.session_id
+        and m.learner_id = (select auth.uid())
+    )
+  )
+  or (select public.is_studyspace_admin())
+);

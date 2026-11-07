@@ -46,15 +46,14 @@ Deno.serve(async request => {
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 
-  let body: { expiresInDays?: number };
-  try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
-  const days = Number(body.expiresInDays ?? 7);
-  if (!Number.isInteger(days) || days < 1 || days > 30) return json(400, { error: "Expiry must be between 1 and 30 days." });
+  // Enrolment invitations always expire exactly 24 hours after generation.
+  // The learner trial is a separate 48-hour period beginning after successful enrolment.
+  try { await request.json(); } catch { /* Empty request bodies are valid. */ }
 
   const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
   const studentId = "STU-" + Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => (byte % 36).toString(36)).join("").toUpperCase();
   const pinHash = await pinDigest(pin, pinPepper);
-  const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { error: insertError } = await admin.from("enrolment_pins").insert({
     pin_hash: pinHash,

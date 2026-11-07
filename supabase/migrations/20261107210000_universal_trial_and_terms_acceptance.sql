@@ -96,8 +96,12 @@ begin
 end;
 $function$;
 
-revoke all on function public.redeem_studyspace_pin(text) from public, anon, authenticated;
-grant execute on function public.redeem_studyspace_pin(text) to service_role;
+-- The legacy redeem-enrolment-pin Edge Function calls this RPC with the
+-- authenticated learner JWT. Keep EXECUTE limited to authenticated users;
+-- the function itself enforces auth.uid(), pending-account eligibility,
+-- one-time PIN validity and per-account attempt limits.
+revoke all on function public.redeem_studyspace_pin(text) from public, anon;
+grant execute on function public.redeem_studyspace_pin(text) to authenticated, service_role;
 
 create or replace function public.accept_studyspace_terms(
   p_terms_version text,

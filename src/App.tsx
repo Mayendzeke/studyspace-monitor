@@ -14,11 +14,12 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
-  Clock3, FileText, RefreshCw, TrendingUp, CreditCard,
+  Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download,
 } from 'lucide-react'
 
 type Page = 'Overview' | 'Learners' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
+type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
@@ -65,6 +66,8 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [splashElapsed, setSplashElapsed] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [adminAllowed, setAdminAllowed] = useState(false)
   const [mfaVerified, setMfaVerified] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
@@ -77,6 +80,36 @@ function App() {
     const timer = window.setTimeout(() => setSplashElapsed(true), 5200)
     return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    const captureInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent) }
+    const installed = () => { setInstallPrompt(null); setInstallHelpOpen(false) }
+    window.addEventListener('beforeinstallprompt', captureInstall)
+    window.addEventListener('appinstalled', installed)
+    return () => { window.removeEventListener('beforeinstallprompt', captureInstall); window.removeEventListener('appinstalled', installed) }
+  }, [])
+
+  useEffect(() => {
+    const openClassroom = () => { setPage('Classroom Studio'); setMobileOpen(false) }
+    window.addEventListener('studyspace-open-classroom-studio', openClassroom)
+    return () => window.removeEventListener('studyspace-open-classroom-studio', openClassroom)
+  }, [])
+
+  useEffect(() => {
+    if (!installHelpOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setInstallHelpOpen(false) }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape) }
+  }, [installHelpOpen])
+
+  const installMonitor = async () => {
+    if (!installPrompt) { setInstallHelpOpen(true); return }
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    if (choice.outcome === 'accepted') setInstallPrompt(null)
+  }
 
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -192,6 +225,7 @@ function App() {
             <div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div>
           </div>
           <div className="topbar-actions">
+            <button type="button" className="monitor-install-button" onClick={() => void installMonitor()} title="Install Studyspace Monitor on this device"><Download size={15}/><span>{installPrompt ? 'Install app' : 'Add to device'}</span></button>
             <div className="system-status"><span className="status-dot" /> MFA verified</div>
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
@@ -213,6 +247,7 @@ function App() {
           {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} />}
         </div>
       </main>
+      {installHelpOpen && <div className="monitor-install-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setInstallHelpOpen(false) }}><section className="monitor-install-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-install-title"><header><div><span className="eyebrow">STUDYSPACE MONITOR</span><h2 id="monitor-install-title">Install on your device</h2><p>Use Monitor like an app, with its own icon and app window. Your administrator sign-in and MFA remain required.</p></div><button type="button" className="icon-button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={18}/></button></header><div className="monitor-install-instructions"><article><strong>Android · Chrome</strong><p>Open the browser menu (⋮), then choose <b>Install app</b> or <b>Add to Home screen</b>.</p></article><article><strong>Windows · Chrome or Edge</strong><p>Use the install icon in the address bar, or open the browser menu and choose <b>Install Studyspace Monitor</b>.</p></article><article><strong>iPhone / iPad · Safari</strong><p>Tap <b>Share</b>, choose <b>Add to Home Screen</b>, then confirm.</p></article><article><strong>Mac · Chrome or Safari</strong><p>In Chrome use <b>Install page as app</b>. In supported Safari versions, use <b>File → Add to Dock</b>.</p></article></div><footer><span>Requires an internet connection for the latest learner and administrator records. Offline caching does not bypass sign-in or access checks.</span><button type="button" className="primary-button" onClick={() => setInstallHelpOpen(false)}>Got it</button></footer></section></div>}
     </div>
   )
 }

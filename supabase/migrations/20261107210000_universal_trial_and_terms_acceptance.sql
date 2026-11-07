@@ -121,6 +121,7 @@ as $function$
       and role = 'learner'
       and account_status = 'active'
       and terms_accepted_at is not null
+      and terms_version = '2026-11-07-v1'
       and (
         (
           subscription_tier is not null

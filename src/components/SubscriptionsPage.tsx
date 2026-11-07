@@ -85,7 +85,7 @@ export default function SubscriptionsPage() {
 
   const counts = useMemo(() => ({
     total: learners.length,
-    active: classified.filter(x => !x.accessDisabled && !x.expired).length,
+    active: classified.filter(x => !x.accessDisabled && x.days !== null && !x.expired).length,
     expiring: classified.filter(x => !x.accessDisabled && x.expiring).length,
     expired: classified.filter(x => x.expired).length,
     noExpiry: classified.filter(x => !x.effectiveExpiry).length,
@@ -95,7 +95,7 @@ export default function SubscriptionsPage() {
     const needle = search.trim().toLowerCase();
     return classified.filter(item => {
       const matches = filter === "all"
-        || (filter === "active" && !item.accessDisabled && !item.expired)
+        || (filter === "active" && !item.accessDisabled && item.days !== null && !item.expired)
         || (filter === "expiring" && !item.accessDisabled && item.expiring)
         || (filter === "expired" && item.expired)
         || (filter === "no-expiry" && !item.effectiveExpiry);

@@ -26,7 +26,6 @@
     "vite-plugin-pwa": "^0.21.1"
   },
   "overrides": {
-    "deepmerge": "^4.3.1",
     "glob": "^14.0.2",
     "minimatch": "^11.0.1"
   }

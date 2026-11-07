@@ -23,7 +23,7 @@ export default function SplashScreen({ theme = 'light' }: { theme?: Theme }) {
           </div>
         </div>
         <div className="monitor-splash-loader" aria-hidden="true"><span /></div>
-        <p>Preparing your administrator workspace</p>
+        <p>Manage learners, create lessons and follow academic progress.</p>
       </div>
     </main>
   )

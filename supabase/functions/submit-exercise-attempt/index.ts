@@ -48,9 +48,18 @@ Deno.serve(async request => {
   const caller = createClient(url, publishableKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
   if (authError || !authData.user) return json(401, { error: "Sign in is required." });
-  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status,subscription_expires_at").eq("id", authData.user.id).single();
+  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,terms_accepted_at,terms_version").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "learner" || profile?.account_status !== "active") return json(403, { error: "An active learner account is required." });
-  if (profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." });
+  const now = Date.now();
+  const paidExpiry = profile.subscription_expires_at ? Date.parse(profile.subscription_expires_at) : NaN;
+  const trialStart = profile.trial_started_at ? Date.parse(profile.trial_started_at) : NaN;
+  const trialExpiry = profile.trial_expires_at ? Date.parse(profile.trial_expires_at) : NaN;
+  const hasPaidAccess = Boolean(profile.subscription_tier && Number.isFinite(paidExpiry) && paidExpiry > now);
+  const hasTrialAccess = Boolean(!profile.subscription_tier && Number.isFinite(trialStart)
+    && Number.isFinite(trialExpiry) && trialStart <= now && trialExpiry > now);
+  const hasAcceptedTerms = Boolean(profile.terms_accepted_at && profile.terms_version === "2026-11-07-v1");
+  if (!hasAcceptedTerms) return json(403, { error: "Please accept the current StudySpace Terms and Conditions before submitting assessments." });
+  if (!hasPaidAccess && !hasTrialAccess) return json(403, { error: "Your StudySpace access is paused. Choose a paid plan to continue." });
 
   let body: { assignmentId?: string; answers?: Record<string, unknown> };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }

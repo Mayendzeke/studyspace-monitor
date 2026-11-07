@@ -1,5 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+function getNamedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const value = parsed?.default;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function getPublishableKey(): string {
+  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+function getSecretKey(): string {
+  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
@@ -32,8 +48,9 @@ Deno.serve(async request => {
   const caller = createClient(url, publishableKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
   const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
   if (authError || !authData.user) return json(401, { error: "Sign in is required." });
-  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
+  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status,subscription_expires_at").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "learner" || profile?.account_status !== "active") return json(403, { error: "An active learner account is required." });
+  if (profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." });
 
   let body: { assignmentId?: string; answers?: Record<string, unknown> };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }

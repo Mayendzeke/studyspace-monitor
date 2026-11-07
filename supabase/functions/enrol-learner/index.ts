@@ -28,13 +28,33 @@ Deno.serve(async request => {
   const serviceKey = getSecretKey();
   const pinPepper = Deno.env.get("PIN_PEPPER"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
   if (!url || !anonKey || !serviceKey || !pinPepper || !ratePepper) return json(500, { error: "Enrolment service configuration is incomplete." });
-  let body: { studentId?: string; pin?: string; password?: string };
+  let body: {
+    studentId?: string;
+    pin?: string;
+    password?: string;
+    termsAccepted?: boolean;
+    termsVersion?: string;
+    acceptedByName?: string;
+    acceptanceRole?: string;
+  };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
   const studentId = String(body.studentId ?? "").trim().toUpperCase();
   const pin = String(body.pin ?? "").replace(/\s+/g, "");
   const password = String(body.password ?? "");
   if (!/^STU-[A-Z0-9]{8}$/.test(studentId) || !/^\d{8}$/.test(pin)) return json(400, { error: "Check the Student ID and 8-digit enrolment PIN." });
   if (password.length < 10 || password.length > 128) return json(400, { error: "Choose a password between 10 and 128 characters." });
+
+  const acceptedByName = String(body.acceptedByName ?? "").trim();
+  const acceptanceRole = String(body.acceptanceRole ?? "");
+  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v1") {
+    return json(400, { error: "Read and accept the current StudySpace Terms and Conditions before creating your account." });
+  }
+  if (acceptedByName.length < 2 || acceptedByName.length > 120) {
+    return json(400, { error: "Enter the full name of the person accepting the Terms and Conditions." });
+  }
+  if (!["adult_learner", "parent_guardian"].includes(acceptanceRole)) {
+    return json(400, { error: "Confirm whether acceptance is by an adult learner or a parent/legal guardian." });
+  }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const source = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -88,6 +108,10 @@ Deno.serve(async request => {
     trial_started_at: trialStartedAt.toISOString(),
     trial_expires_at: trialExpiresAt.toISOString(),
     trial_reminder_shown_at: null,
+    terms_accepted_at: trialStartedAt.toISOString(),
+    terms_version: "2026-11-07-v1",
+    terms_accepted_by_name: acceptedByName,
+    terms_acceptance_role: acceptanceRole,
     updated_at: trialStartedAt.toISOString(),
   }).eq("id", created.user.id).select("id").single();
   if (profileError || !completedProfile) {

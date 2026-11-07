@@ -315,7 +315,7 @@ Deno.serve(async request => {
     .filter((item: any, index: number, all: any[]) => all.findIndex((candidate: any) => candidate.uri === item.uri) === index)
     .slice(0, 4);
   if (curriculumSearchEnabled && groundingSources.length) {
-    reply += "\n\nOfficial curriculum sources checked:\n" + groundingSources.map((source: any) => "- " + source.title.slice(0, 160) + ": " + source.uri).join("\n");
+    reply += "\n\nSources checked:\n" + groundingSources.map((source: any) => "- " + source.title.slice(0, 160) + ": " + source.uri).join("\n");
   } else if (curriculumSearchEnabled) {
     reply += "\n\nI could not verify this against a current official curriculum or examination-board source in this response. Please confirm the exact syllabus year with your school or examination authority before treating this as an official syllabus requirement.";
   }
@@ -381,7 +381,10 @@ Deno.serve(async request => {
       && x.ends_at > x.starts_at && typeof x.title === "string")
       .map((x: any) => ({ day_of_week: x.day_of_week, subject_name: String(x.subject_name ?? "").slice(0,100), title: x.title.slice(0,120), starts_at: x.starts_at, ends_at: x.ends_at, location: String(x.location ?? "").slice(0,120), notes: String(x.notes ?? "").slice(0,300) }))
     : [];
-  return json(200, { success: true, conversationId, reply, timetableDraft, questions: topicQuestions, model: activeModel, memoryUpdated: true, remainingDailyRequests: Math.max(0, dailyLimit - ((count ?? 0) + 1)), dailyLimit, plan: profile.subscription_tier ?? "Standard" });
+  const searchSuggestionsHtml = curriculumSearchEnabled && typeof payload?.candidates?.[0]?.groundingMetadata?.searchEntryPoint?.renderedContent === "string"
+    ? payload.candidates[0].groundingMetadata.searchEntryPoint.renderedContent.slice(0, 30000)
+    : null;
+  return json(200, { success: true, conversationId, reply, timetableDraft, questions: topicQuestions, sources: groundingSources, searchSuggestionsHtml, model: activeModel, memoryUpdated: true, remainingDailyRequests: Math.max(0, dailyLimit - ((count ?? 0) + 1)), dailyLimit, plan: profile.subscription_tier ?? "Standard" });
   } catch (error) {
     const reference = request.headers.get("cf-ray") ?? crypto.randomUUID();
     console.error("MIΛ request failed", {

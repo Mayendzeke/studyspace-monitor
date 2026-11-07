@@ -30,6 +30,8 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
+  content: "MIA is temporarily paused while Study Space verifies an AI provider and data-processing arrangement suitable for its school-age learning service. Your prompts are not currently sent to an AI provider. The Monitor and learner-management tools remain available.",
+}
   content: "Hello. I'm MIA — Mayendzeke's Artificial Intelligence. Choose a guided task to prepare a lesson, assessment, worksheet, study plan or learner-support strategy. I will use the academic options already recorded in StudySpace where available.",
 }
 const activities = [

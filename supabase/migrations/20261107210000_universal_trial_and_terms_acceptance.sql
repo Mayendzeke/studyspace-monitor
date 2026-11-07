@@ -96,8 +96,8 @@ begin
 end;
 $function$;
 
-revoke all on function public.redeem_studyspace_pin(text) from public, anon;
-grant execute on function public.redeem_studyspace_pin(text) to authenticated;
+revoke all on function public.redeem_studyspace_pin(text) from public, anon, authenticated;
+grant execute on function public.redeem_studyspace_pin(text) to service_role;
 
 create or replace function public.accept_studyspace_terms(
   p_terms_version text,

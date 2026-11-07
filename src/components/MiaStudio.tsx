@@ -127,14 +127,14 @@ export default function MiaStudio() {
     }
   }
 
-  const sendMessage = async (value: string) => {
+  const sendMessage = async (value: string, includeHistory = true) => {
     const clean = value.trim()
     if (!clean || busy || !supabase || !userId) return
     setError('')
     setDraft('')
     setBusy(true)
     const previousMessages = messages
-    const history = previousMessages.filter(item => item.id !== 'mia-welcome').slice(-12)
+    const history = includeHistory ? previousMessages.filter(item => item.id !== 'mia-welcome').slice(-12) : []
     const next = [...previousMessages, { id: crypto.randomUUID(), role: 'user' as const, content: clean }]
     saveMessages(next)
     try {
@@ -210,7 +210,7 @@ export default function MiaStudio() {
     if (!activeGuide || !guided.topic.trim()) return
     const prompt = buildGuidedRequest()
     setActiveGuide(null)
-    void sendMessage(prompt)
+    void sendMessage(prompt, false)
   }
 
   const clearConversation = () => {

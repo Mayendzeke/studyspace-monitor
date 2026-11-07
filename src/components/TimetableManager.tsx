@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { CalendarDays, Minus, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Kind = "school" | "personal";
@@ -39,6 +39,7 @@ export default function TimetableManager({
   const [grade, setGrade] = useState("");
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [groupTag, setGroupTag] = useState("");
+  const [timetableZoom, setTimetableZoom] = useState(1);
 
   async function refresh() {
     if (!supabase) { setLoading(false); setError("Supabase is not connected."); return; }
@@ -178,7 +179,15 @@ export default function TimetableManager({
   return <section className="panel timetable-manager">
     <div className="panel-heading">
       <div><h2>{title}</h2><p>{kind === "school" ? "School lessons" : "Personal study sessions"} · {rows.length} saved</p></div>
-      <div className="timetable-manager-actions"><button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh timetable"><RefreshCw size={14}/></button><button type="button" className="primary-button" onClick={() => openNew()}><Plus size={14}/> Add entry</button></div>
+      <div className="timetable-manager-actions">
+        <div className="timetable-zoom-controls" role="group" aria-label="Timetable zoom controls">
+          <button type="button" className="timetable-zoom-button" aria-label="Zoom out" title="Zoom out" onClick={() => setTimetableZoom(value => Math.max(0.45, Math.round((value - 0.1) * 100) / 100))} disabled={timetableZoom <= 0.45}><Minus size={14}/></button>
+          <button type="button" className="timetable-zoom-reset" onClick={() => setTimetableZoom(1)} aria-label="Reset timetable zoom">{Math.round(timetableZoom * 100)}%</button>
+          <button type="button" className="timetable-zoom-button" aria-label="Zoom in" title="Zoom in" onClick={() => setTimetableZoom(value => Math.min(1.5, Math.round((value + 0.1) * 100) / 100))} disabled={timetableZoom >= 1.5}><Plus size={14}/></button>
+        </div>
+        <button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh timetable"><RefreshCw size={14}/></button>
+        <button type="button" className="primary-button" onClick={() => openNew()}><Plus size={14}/> Add entry</button>
+      </div>
     </div>
     {notice && <p className="inline-message" role="status">{notice}</p>}
     {error && <p className="inline-message error-message" role="alert">{error}</p>}
@@ -198,7 +207,7 @@ export default function TimetableManager({
     {loading ? <div className="classroom-empty">Loading timetable…</div> :
       <div className="teacher-week-grid-wrap">
         {!rows.length && <div className="timetable-manager-empty"><CalendarDays size={20}/><span>No timetable entries saved yet. The learner can add or import lessons from the student app.</span></div>}
-        <div className="teacher-week-grid-scroll"><table className="teacher-week-grid">
+        <div className="teacher-week-grid-scroll"><div className="teacher-week-grid-zoom" style={{ zoom: timetableZoom }}><table className="teacher-week-grid">
           <thead><tr><th className="teacher-week-day-heading">DAY</th>{Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><th key={start}><span>{start}</span><small>SUBJECT / ACTIVITY</small></th>)}</tr></thead>
           <tbody>{[1,2,3,4,5,6,0].map(day=><tr key={day}><th className="teacher-week-day-cell">{days[day]}</th>
             {Array.from(new Set(rows.map(row=>shortTime(row.starts_at)))).sort().map(start=><td key={start}>{rows.filter(row=>row.day_of_week===day&&shortTime(row.starts_at)===start).map(row=><article className={"teacher-week-lesson "+(/break/i.test(row.title)?"is-break":/lunch/i.test(row.title)?"is-lunch":"")} key={row.id}>
@@ -206,7 +215,7 @@ export default function TimetableManager({
               <div><button type="button" className="icon-button" onClick={()=>openEdit(row)} aria-label={"Edit "+row.title}><Pencil size={12}/></button><button type="button" className="icon-button danger-text" onClick={()=>void remove(row)} aria-label={"Remove "+row.title}><Trash2 size={12}/></button></div>
             </article>)}</td>)}
           </tr>)}</tbody>
-        </table></div>
+        </table></div></div>
       </div>}
   </section>;
 }

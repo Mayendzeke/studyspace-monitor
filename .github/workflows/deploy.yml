@@ -157,7 +157,7 @@ jobs:
           }
           if (!Array.isArray(manifest.icons) || !manifest.icons.length) throw new Error('The PWA manifest has no app icons.')
           for (const icon of manifest.icons) {
-            const relative = String(icon.src).replace(/^\\/studyspace-monitor\\//, '')
+            const relative = String(icon.src).replace('/studyspace-monitor/', '')
             if (!existsSync(join('dist', relative))) throw new Error('A declared PWA icon is missing from the build: ' + icon.src)
           }
           if (!files.includes('sw.js')) throw new Error('The offline service worker was not generated.')

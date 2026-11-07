@@ -24,6 +24,7 @@ Deno.serve(async request => {
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   const origin = request.headers.get("Origin");
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
+  if (Deno.env.get("STUDYSPACE_PUBLIC_ENROLMENT_ENABLED") !== "true") return json(503, { error: "New learner enrolment is temporarily closed while Study Space completes its required data-protection registration. Existing learners can still sign in." });
   const url = Deno.env.get("SUPABASE_URL"), anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
   const pinPepper = Deno.env.get("PIN_PEPPER"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
@@ -46,7 +47,7 @@ Deno.serve(async request => {
 
   const acceptedByName = String(body.acceptedByName ?? "").trim();
   const acceptanceRole = String(body.acceptanceRole ?? "");
-  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v1") {
+  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v2") {
     return json(400, { error: "Read and accept the current StudySpace Terms and Conditions before creating your account." });
   }
   if (acceptedByName.length < 2 || acceptedByName.length > 120) {
@@ -109,7 +110,7 @@ Deno.serve(async request => {
     trial_expires_at: trialExpiresAt.toISOString(),
     trial_reminder_shown_at: null,
     terms_accepted_at: trialStartedAt.toISOString(),
-    terms_version: "2026-11-07-v1",
+    terms_version: "2026-11-07-v2",
     terms_accepted_by_name: acceptedByName,
     terms_acceptance_role: acceptanceRole,
     updated_at: trialStartedAt.toISOString(),

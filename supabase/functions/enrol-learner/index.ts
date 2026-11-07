@@ -47,7 +47,7 @@ Deno.serve(async request => {
 
   const acceptedByName = String(body.acceptedByName ?? "").trim();
   const acceptanceRole = String(body.acceptanceRole ?? "");
-  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v2") {
+  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v3") {
     return json(400, { error: "Read and accept the current StudySpace Terms and Conditions before creating your account." });
   }
   if (acceptedByName.length < 2 || acceptedByName.length > 120) {
@@ -110,7 +110,7 @@ Deno.serve(async request => {
     trial_expires_at: trialExpiresAt.toISOString(),
     trial_reminder_shown_at: null,
     terms_accepted_at: trialStartedAt.toISOString(),
-    terms_version: "2026-11-07-v2",
+    terms_version: "2026-11-07-v3",
     terms_accepted_by_name: acceptedByName,
     terms_acceptance_role: acceptanceRole,
     updated_at: trialStartedAt.toISOString(),

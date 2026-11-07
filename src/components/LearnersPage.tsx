@@ -24,6 +24,9 @@ type Learner = {
   academic_year: string;
   subscription_tier: string | null;
   subscription_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_expires_at: string | null;
+  trial_reminder_shown_at: string | null;
 };
 
 type ProfileForm = Pick<
@@ -35,7 +38,6 @@ type ProfileForm = Pick<
 type ManageAction = "disable" | "enable" | "reset_password";
 
 const SUBSCRIPTION_PLANS = [
-  { value: "Free Trial", label: "Free Trial — 1 day — E0", days: 1 },
   { value: "Weekly", label: "Weekly — 7 days — E100", days: 7 },
   { value: "2 Weeks", label: "2 Weeks — 14 days — E200", days: 14 },
   { value: "Monthly", label: "Monthly — 28 days — E350", days: 28 },
@@ -43,7 +45,7 @@ const SUBSCRIPTION_PLANS = [
 
 function expiryFromNow(days: number): string {
   const expiry = new Date();
-  expiry.setDate(expiry.getDate() + days);
+  expiry.setTime(expiry.getTime() + days * 24 * 60 * 60 * 1000);
   expiry.setSeconds(0, 0);
   const local = new Date(expiry.getTime() - expiry.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
@@ -153,7 +155,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at")
+      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -412,6 +414,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"}{learner.course ? " · " + learner.course : ""} · {learner.curriculum || "Curriculum not set"}</span>
               <small><Building2 size={12}/> {learner.institution || "School not set"} · {learner.education_level || "Level not set"} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
               <small>Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
+              <small>{learner.subscription_tier
+                ? "Paid plan: " + learner.subscription_tier + (learner.subscription_expires_at ? " · expires " + new Date(learner.subscription_expires_at).toLocaleString() : " · no expiry")
+                : learner.trial_expires_at
+                  ? "48-hour trial · " + (new Date(learner.trial_expires_at).getTime() <= Date.now() ? "expired" : "ends " + new Date(learner.trial_expires_at).toLocaleString())
+                  : "No active trial or paid plan"}</small>
             </div>
             <span className={"pin-status " + learner.account_status}>{learner.account_status}</span>
             <div className="learner-actions learner-admin-actions">

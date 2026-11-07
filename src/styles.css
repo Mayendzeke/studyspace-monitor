@@ -672,7 +672,7 @@ h1 span { color: #8278d9; }
 
 /* Weekly grid shared by teacher timetable review and editing. */
 .teacher-week-grid-scroll{display:flex;justify-content:center;align-items:flex-start;width:100%;overflow:hidden;border:1px solid var(--border);border-radius:12px}
-.teacher-week-grid-zoom{flex:0 0 100%;width:100%;max-width:100%;margin-inline:auto}
+.teacher-week-grid-zoom{flex:0 0 auto;width:100%;max-width:none;min-width:0;margin-inline:auto}
 .teacher-week-grid{width:100%;min-width:0;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:10px}
 .teacher-week-grid th,.teacher-week-grid td{padding:7px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);vertical-align:top}
 .teacher-week-grid thead th{position:sticky;top:0;z-index:2;background:var(--panel);text-align:center}
@@ -733,3 +733,6 @@ h1 span { color: #8278d9; }
 .timetable-zoom-button,.timetable-zoom-reset{display:grid;place-items:center;min-width:29px;height:28px;padding:0 7px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:11px;font-weight:700}
 .timetable-zoom-button:hover,.timetable-zoom-reset:hover{background:var(--panel-strong)}
 .timetable-zoom-button:disabled{opacity:.35;cursor:not-allowed}
+
+.teacher-week-grid-scroll{width:100%;max-width:100%;overflow:hidden}
+.teacher-week-grid{width:100%;min-width:0}

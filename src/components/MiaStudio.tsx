@@ -246,7 +246,8 @@ export default function MiaStudio() {
           </div>
         </div>
 
-        {messages.length === 1 && (
+        <div className="mia-guided-launch">
+          <div><strong>Start a guided task</strong><span>These options stay available while you chat with MIA.</span></div>
           <div className="mia-prompt-grid">
             {activities.map(({ id, icon: Icon, title, description }) => (
               <button type="button" key={id} className="mia-prompt-card" onClick={() => openGuide(id)}>
@@ -254,7 +255,7 @@ export default function MiaStudio() {
               </button>
             ))}
           </div>
-        )}
+        </div>
 
         <div className="mia-message-list" ref={scrollRef} aria-live="polite">
           {messages.map(item => (

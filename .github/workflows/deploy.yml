@@ -43,6 +43,14 @@ jobs:
               console.log(' - ' + name + ' [' + item.severity + '] direct=' + item.isDirect + ' fix=' + JSON.stringify(item.fixAvailable) + (titles ? ' ' + titles : ''))
             }
           }
+          const production = JSON.parse(readFileSync('audit-production.json', 'utf8'))
+          const productionVulnerabilities = Object.entries(production.vulnerabilities || {})
+          if (productionVulnerabilities.length > 0) {
+            console.error('Production dependency audit failed: ' + productionVulnerabilities.length + ' vulnerable package(s).')
+            process.exitCode = 1
+          } else {
+            console.log('Production dependency audit passed: no vulnerable production packages.')
+          }
           NODE
       - name: Validate Supabase frontend configuration
         env:

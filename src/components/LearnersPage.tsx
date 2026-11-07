@@ -102,6 +102,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [editTarget, setEditTarget] = useState<Learner | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyForm);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Learner | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -170,6 +171,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
 
   useEffect(() => { void refresh(); }, []);
 
+  const paymentVerificationRequired = Boolean(editTarget && profileForm.subscription_tier && (
+    profileForm.subscription_tier !== (editTarget.subscription_tier ?? "") ||
+    new Date(profileForm.subscription_expires_at).getTime() !== new Date(editTarget.subscription_expires_at ?? "").getTime()
+  ));
+
   const counts = useMemo(() => ({
     all: learners.length,
     active: learners.filter(item => item.account_status === "active").length,
@@ -226,6 +232,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
 
   function openEdit(learner: Learner) {
     setEditTarget(learner);
+    setPaymentConfirmed(false);
     setProfileForm({
       full_name: learner.full_name || "",
       preferred_name: learner.preferred_name || "",
@@ -251,7 +258,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
+        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -493,9 +500,10 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <label>Access due date<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Automatically calculated from today when you choose a tier. You can adjust the date manually if needed.</small></label>
               </div>
               <div className="learner-readonly-row"><span>Student ID</span><strong>{editTarget.student_id || "Not assigned"}</strong><small>Student IDs are kept fixed because they are also used to identify the sign-in account.</small></div>
+              {paymentVerificationRequired && <label className="payment-confirmation-check"><input type="checkbox" checked={paymentConfirmed} onChange={event => setPaymentConfirmed(event.target.checked)}/><span><strong>Payment verified</strong><small>I confirm that the MTN MoMo payment has been received and verified against this learner’s exact Student ID reference. I understand this will activate the selected paid plan.</small></span></label>}
               <div className="learner-modal-actions">
                 <button type="button" className="subtle-button" disabled={savingProfile} onClick={() => setEditTarget(null)}>Cancel</button>
-                <button type="submit" className="primary-button" disabled={savingProfile}><Save size={14}/>{savingProfile ? "Saving…" : "Save profile"}</button>
+                <button type="submit" className="primary-button" disabled={savingProfile || (paymentVerificationRequired && !paymentConfirmed)}><Save size={14}/>{savingProfile ? "Saving…" : "Save profile"}</button>
               </div>
             </form>
           </section>

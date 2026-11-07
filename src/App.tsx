@@ -22,9 +22,9 @@ type Theme = 'light' | 'dark'
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
+  { label: 'MIA', icon: Sparkles },
   { label: 'Learners', icon: Users },
   { label: 'Subscriptions', icon: CreditCard },
-  { label: 'MIA', icon: Sparkles },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Enrolment PINs', icon: KeyRound },

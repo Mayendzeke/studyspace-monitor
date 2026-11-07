@@ -50,7 +50,19 @@ The current migration sequence is:
 18. `supabase/migrations/20261105224728_studyspace_remove_identical_duplicate_policies.sql`
 19. `supabase/migrations/20261105224839_studyspace_harden_security_definer_search_paths.sql`
 20. `supabase/migrations/20261105225421_studyspace_remove_duplicate_storage_read_policy.sql`
-21. `supabase/migrations/20261106051354_studyspace_realtime_classroom_membership.sql`
+21. `supabase/migrations/20261106051401_studyspace_realtime_classroom_membership.sql`
+22. `supabase/migrations/20261106062504_studyspace_link_past_paper_source_resource.sql`
+23. `supabase/migrations/20261106062657_studyspace_secure_classroom_meetings.sql`
+24. `supabase/migrations/20261106071138_studyspace_atomic_assessment_save.sql`
+25. `supabase/migrations/20261106074344_studyspace_student_feedback.sql`
+26. `supabase/migrations/20261106121531_mia_learning_companion_foundation.sql`
+27. `supabase/migrations/20261106171600_remove_duplicate_timetable_index.sql`
+28. `supabase/migrations/20261106214130_teacher_timetable_access.sql`
+29. `supabase/migrations/20261106214438_consolidate_timetable_access_policy.sql`
+30. `supabase/migrations/20261106214510_remove_duplicate_timetable_index.sql`
+31. `supabase/migrations/20261106235339_mia_messages_learner_id_index.sql`
+32. `supabase/migrations/20261107002924_studyspace_single_learner_profile_rpc.sql`
+33. `supabase/migrations/20261107005219_add_student_subscription_expiry.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 
@@ -86,6 +98,10 @@ Deploy these functions to the same Supabase project:
 - `generate-lesson-recap`
 - `submit-exercise-attempt`
 - `jaas-token`
+- `mia-assistant` — learner-facing MIΛ learning companion
+- `mia-monitor-assistant` — administrator-facing MIA teaching and StudySpace assistant
+
+Both MIA functions require gateway JWT verification. The learner function validates the active learner account and subscription access. The Monitor function validates a signed-in active administrator and requires AAL2 MFA. Keep these two authorization paths separate; the Monitor assistant must never accept a learner session, and the learner assistant must never accept an administrator session.
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 

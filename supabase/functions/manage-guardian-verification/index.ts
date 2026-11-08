@@ -75,7 +75,7 @@ Deno.serve(async request => {
     const learnerIds = (data ?? []).map(row => row.id);
     const { data: guardianRows, error: guardianRowsError } = learnerIds.length
       ? await admin.from("guardian_verifications")
-          .select("learner_id,guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at")
+          .select("learner_id,guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at,testimonial_marketing_consent")
           .in("learner_id", learnerIds)
       : { data: [], error: null };
     if (guardianRowsError) return json(503, { error: "Guardian consent submissions could not be loaded." });

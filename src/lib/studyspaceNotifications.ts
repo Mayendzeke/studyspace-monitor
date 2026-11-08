@@ -51,6 +51,7 @@ export async function showStudyspaceNotification(
   body: string,
   tag: string,
   icon = "/favicon.svg",
+  groupId?: string,
 ) {
   if (!supabase || !userId || typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
@@ -64,6 +65,15 @@ export async function showStudyspaceNotification(
     const prefs = { ...defaults, ...(data || {}) } as StudyspaceNotificationPreferences;
     if (!prefs.master_enabled || !prefs[category]) return;
     if (prefs.quiet_hours_enabled && inQuietHours(prefs.quiet_hours_start, prefs.quiet_hours_end)) return;
+    if (groupId) {
+      const { data: groupPreference } = await supabase
+        .from("studyspace_group_notification_preferences")
+        .select("muted")
+        .eq("user_id", userId)
+        .eq("group_id", groupId)
+        .maybeSingle();
+      if (groupPreference?.muted) return;
+    }
 
     const options: NotificationOptions = {
       body,

@@ -1138,3 +1138,13 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .guardian-record-grid span{color:var(--muted,#7b8496)}
 .guardian-record-grid b{font-weight:650;overflow-wrap:anywhere}
 .learner-pending-action{font-size:.75rem;color:var(--muted,#7b8496);padding:.3rem .45rem}
+
+
+.guardian-queue-row{display:flex;gap:.6rem;align-items:stretch}
+.guardian-queue-row .guardian-queue-item{flex:1;min-width:0}
+.guardian-create-link{align-self:center;white-space:nowrap}
+.guardian-link-panel{display:grid;gap:.7rem;margin-top:1rem;padding:1rem}
+.guardian-link-panel p{margin:0;color:var(--muted,#7b8496);font-size:.84rem;line-height:1.5}
+.guardian-link-panel input{width:100%;min-width:0;padding:.7rem;border:1px solid var(--border,#dce2ec);border-radius:10px;background:var(--surface,#fff);color:inherit;font-size:.82rem}
+.guardian-form-grid input[readonly],.guardian-form-grid select:disabled{opacity:.8;cursor:not-allowed}
+@media(max-width:720px){.guardian-queue-row{flex-direction:column}.guardian-create-link{align-self:stretch}}

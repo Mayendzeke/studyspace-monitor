@@ -1,5 +1,6 @@
 import ContentStudio from './components/ContentStudio'
 import ClassroomStudio from './components/ClassroomStudio'
+import AssessmentReviewQueue from './components/AssessmentReviewQueue'
 import LearnersPage from './components/LearnersPage'
 import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
@@ -257,7 +258,7 @@ function App() {
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIA' && <MiaStudio />}
           {page === 'Content Studio' && <ContentStudio />}
-          {page === 'Classroom Studio' && <ClassroomStudio />}
+          {page === 'Classroom Studio' && <><ClassroomStudio /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
           {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} />}

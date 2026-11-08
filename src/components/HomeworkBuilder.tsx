@@ -129,6 +129,7 @@ export default function HomeworkBuilder() {
     let alive = true;
     const loadGroupMembers = async () => {
       if (!supabase || !groupId) { setGroupLearnerIds([]); setGroupLoading(false); return; }
+      setGroupLearnerIds([]);
       setGroupLoading(true);
       const { data, error: memberError } = await supabase.from("class_session_members").select("learner_id").eq("session_id", groupId);
       if (!alive) return;
@@ -336,7 +337,7 @@ export default function HomeworkBuilder() {
       </article>)}
       <button className="subtle-button" type="button" onClick={addQuestion}><Plus size={15}/> Add a question</button>
       <label className="homework-review-confirm"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/><span>I have reviewed the question prompts, answers, marks and explanations, and approve this homework for the selected learners.</span></label>
-      <div className="homework-publish-row"><span><Clock3 size={15}/> {recipients.length} learner(s) · {dueDate?"Due "+dueDate:"No due date"}</span><button className="primary-button" type="button" onClick={()=>void publish()} disabled={publishing||!reviewed||recipients.length===0}>{publishing?"Saving and assigning…":"Publish homework"}</button></div>
+      <div className="homework-publish-row"><span><Clock3 size={15}/> {recipients.length} learner(s) · {dueDate?"Due "+dueDate:"No due date"}</span><button className="primary-button" type="button" onClick={()=>void publish()} disabled={publishing||groupLoading||!reviewed||recipients.length===0}>{publishing?"Saving and assigning…":"Publish homework"}</button></div>
     </div>}
     {!questions.length && <div className="homework-empty"><BookOpen size={23}/><strong>Your questions will appear here.</strong><span>Generate a set with MIA or add questions after generating a set.</span></div>}
   </section>;

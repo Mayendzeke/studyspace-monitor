@@ -8,6 +8,7 @@ import AdminTimetablePage from './components/AdminTimetablePage'
 import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
 import MiaStudio from './components/MiaStudio'
+import TestimonialsInbox from './components/TestimonialsInbox'
 import SplashScreen from './components/SplashScreen'
 import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
@@ -22,7 +23,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -37,6 +38,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Enrolment PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
+  { label: 'Testimonials', icon: Users },
   { label: 'Settings', icon: Settings },
 ]
 
@@ -271,6 +273,7 @@ function App() {
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
+          {page === 'Testimonials' && <TestimonialsInbox />}
           {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} theme={theme} onThemeChange={setTheme} onOpenTimetable={() => navigate('Timetable')} />}
 
         </div>
@@ -695,6 +698,31 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
   const [checking, setChecking] = useState(false);
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[]>([]);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordNotice, setPasswordNotice] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  async function changeAdminPassword() {
+    if (!supabase || passwordBusy) return;
+    setPasswordError('');
+    setPasswordNotice('');
+    if (newPassword.length < 12) { setPasswordError('Use at least 12 characters for your new password.'); return; }
+    if (newPassword !== confirmPassword) { setPasswordError('The password confirmation does not match.'); return; }
+    setPasswordBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordNotice('Your administrator password has been updated.');
+    } catch (reason) {
+      setPasswordError(reason instanceof Error ? reason.message : 'Your password could not be updated. Try again.');
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
 
   async function runWorkspaceChecks() {
     if (!supabase) return;
@@ -726,6 +754,17 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
         <button type="button" className={theme === "light" ? "chosen" : ""} aria-pressed={theme === "light"} onClick={() => onThemeChange("light")}><Sun size={15}/> Light</button>
         <button type="button" className={theme === "dark" ? "chosen" : ""} aria-pressed={theme === "dark"} onClick={() => onThemeChange("dark")}><Moon size={15}/> Dark</button>
       </div>
+    </div>
+
+    <div className="panel settings-card">
+      <div className="panel-heading"><div><h2>Administrator security</h2><p>Change the password for the account that controls StudySpace Monitor. MFA remains mandatory.</p></div><LockKeyhole size={19}/></div>
+      <div className="settings-form-grid">
+        <label>New password<input type="password" autoComplete="new-password" minLength={12} maxLength={128} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="At least 12 characters"/></label>
+        <label>Confirm new password<input type="password" autoComplete="new-password" minLength={12} maxLength={128} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="Enter it again"/></label>
+      </div>
+      {passwordError && <p className="inline-message error-message" role="alert">{passwordError}</p>}
+      {passwordNotice && <p className="inline-message" role="status">{passwordNotice}</p>}
+      <div className="setting-row"><div><strong>Change administrator password</strong><span>Use a unique password that you do not reuse on another service.</span></div><button type="button" className="primary-button" onClick={() => void changeAdminPassword()} disabled={!supabaseConfigured || passwordBusy || !newPassword || !confirmPassword}>{passwordBusy ? 'Updating…' : 'Update password'}</button></div>
     </div>
 
     <div className="panel settings-card">

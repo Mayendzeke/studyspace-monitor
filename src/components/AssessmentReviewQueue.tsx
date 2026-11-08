@@ -69,7 +69,7 @@ export default function AssessmentReviewQueue() {
         if (answerKeyError) throw answerKeyError;
         markingGuides = new Map((answerKeys || []).map(row => [
           row.question_id,
-          String((row.answer_key as Record<string, unknown> | null)?.explanation || "")
+          String((row.answer_key as Record<string, unknown> | null)?.markingGuide || (row.answer_key as Record<string, unknown> | null)?.explanation || "")
         ]));
       }
       const setMap = new Map((setResult.data || []).map(row => [row.id, row]));

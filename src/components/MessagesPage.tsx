@@ -45,7 +45,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       const rows=(contactData??[]) as Contact[];
       setContacts(rows);
       setSelected(current=>current&&rows.some(x=>x.contact_id===current)?current:(rows[0]?.contact_id??""));
-      const {data:messageData,error:messageError}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at").or("sender_id.eq."+data.user.id+",recipient_id.eq."+data.user.id).order("created_at",{ascending:true}).limit(400);
+      const {data:messageData,error:messageError}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at").or("sender_id.eq."+data.user.id+",recipient_id.eq."+data.user.id).order("created_at",{ascending:true}).limit(400);
       if(messageError)throw messageError;
       const rows=(messageData??[]) as Message[];setMessages(rows);const undelivered=rows.filter(m=>m.recipient_id===data.user.id&&!m.delivered_at);if(undelivered.length)void supabase.from("direct_messages").update({delivered_at:new Date().toISOString()}).in("id",undelivered.map(m=>m.id));
       const {data:presenceRows}=await supabase.from("studyspace_user_presence").select("user_id,last_seen_at").in("user_id",rows.map(x=>x.contact_id));const pmap:Record<string,string>={};(presenceRows??[]).forEach((x:any)=>pmap[x.user_id]=Date.now()-new Date(x.last_seen_at).getTime()<120000?"online":x.last_seen_at);setPresence(pmap);

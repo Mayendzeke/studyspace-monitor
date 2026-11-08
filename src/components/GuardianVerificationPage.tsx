@@ -145,7 +145,7 @@ export default function GuardianVerificationPage() {
             <div><span className="eyebrow">IN-PERSON CONSENT RECORD</span><h2>{selected.full_name}</h2><small>{selected.student_id} · Date of birth {new Date(selected.date_of_birth + "T00:00:00").toLocaleDateString()} · Age {selected.age}</small></div>
             <span className="guardian-pending-tag">Dashboard locked</span>
           </div>
-          <p className="guardian-consent-instruction">Complete this form only while the parent or legal guardian is physically present. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent.</p>
+          <p className="guardian-consent-instruction">Complete this form only while the parent or legal guardian is physically present. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full read-only terms are available in the <a href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">StudySpace Student App</a>; on its First-time enrolment screen, entering the learner’s date of birth displays the terms without allowing a minor to accept them online.</p>
           <form onSubmit={event => void approve(event)}>
             <div className="guardian-form-grid">
               <label>Guardian’s full name<input required minLength={2} maxLength={120} value={guardianFullName} onChange={event => setGuardianFullName(event.target.value)} autoComplete="name" placeholder="Full name of parent or guardian"/></label>

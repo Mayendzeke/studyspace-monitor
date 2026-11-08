@@ -92,7 +92,7 @@ export default function TeacherWeeklyTimetable() {
   const levels=[...new Set(learners.map(x=>x.education_level).filter(Boolean))].sort();
   const courses=[...new Set(learners.filter(x=>!draft.education_level||x.education_level===draft.education_level).map(x=>x.course).filter(Boolean))].sort();
   const grades=[...new Set(learners.filter(x=>(!draft.education_level||x.education_level===draft.education_level)&&(!draft.course||x.course===draft.course)).map(x=>x.grade).filter(Boolean))].sort();
-  const eligible=useMemo(()=>learners.filter(x=>(!draft.education_level||x.education_level===draft.education_level)&&(!draft.course||x.course===draft.course)&&(!draft.grade||x.grade===draft.grade)),[learners,draft.education_level,draft.course,draft.grade]);
+  const eligible=useMemo(()=>learners.filter(x=>(!draft.education_level||x.education_level===draft.education_level)&&(!draft.course||x.course===draft.course)&&(!draft.grade||x.grade===draft.grade)&&(!draft.curriculum||x.curriculum===draft.curriculum)),[learners,draft.education_level,draft.course,draft.grade,draft.curriculum]);
   const visible=eligible.filter(x=>[nameOf(x),x.full_name,x.student_id,x.grade,x.course].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase()));
   const times=[...new Set(entries.map(x=>hhmm(x.starts_at)))].sort((a,b)=>mins(a)-mins(b));
   const today=new Date().getDay(), todayText=new Date().toLocaleDateString([],{weekday:"long",day:"numeric",month:"long",year:"numeric"});

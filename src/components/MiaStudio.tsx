@@ -8,7 +8,9 @@ type AcademicProfile = { id: string; education_level: string | null; grade: stri
 type SubjectRow = { learner_id: string; name: string }
 type MiaActivity = 'lesson' | 'assessment' | 'schedule' | 'worksheet' | 'teaching' | 'support' | 'research'
 type LessonHandoff = { title: string; subject: string; level: string; grade: string; course: string; curriculum: string; duration: number; content: string }
+type HomeworkHandoff = { level: string; grade: string; course: string; subject: string; curriculum: string; topic: string; instructions: string; dueDate?: string }
 const lessonHandoffKey = 'studyspace-monitor-mia-lesson-handoff-v1'
+const miaHomeworkHandoffKey = 'studyspace-monitor-homework-handoff-v1'
 type GuidedDraft = {
   level: string
   grade: string
@@ -103,6 +105,7 @@ export default function MiaStudio() {
   const [gradeManual, setGradeManual] = useState(false)
   const [courseManual, setCourseManual] = useState(false)
   const [lessonHandoff, setLessonHandoff] = useState<LessonHandoff | null>(null)
+  const [homeworkHandoff, setHomeworkHandoff] = useState<HomeworkHandoff | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -149,7 +152,7 @@ export default function MiaStudio() {
     }
   }
 
-  const sendMessage = async (value: string, includeHistory = true, lessonContext?: Omit<LessonHandoff, 'content'>) => {
+  const sendMessage = async (value: string, includeHistory = true, lessonContext?: Omit<LessonHandoff, 'content'>, homeworkContext?: HomeworkHandoff) => {
     const clean = value.trim()
     if (!clean || busy || !supabase || !userId) return
     setError('')
@@ -173,6 +176,7 @@ export default function MiaStudio() {
       const completed = [...next, ...notice, { id: crypto.randomUUID(), role: 'assistant' as const, content: data.reply }]
       saveMessages(completed)
       if (lessonContext) setLessonHandoff({ ...lessonContext, content: data.reply })
+      if (homeworkContext) setHomeworkHandoff({ ...homeworkContext, instructions: (homeworkContext.instructions + '\n\nMIA-generated teaching material to use as the source for the interactive questions:\n' + data.reply).slice(0, 2000) })
       setRemaining(typeof data.remainingDailyRequests === 'number' ? data.remainingDailyRequests : null)
     } catch (reason) {
       setError(await edgeError(reason))
@@ -247,15 +251,22 @@ export default function MiaStudio() {
   const submitGuide = () => {
     if (!activeGuide || !guided.topic.trim()) return
     if (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) return
+    if ((activeGuide === 'assessment' || activeGuide === 'worksheet') && (!guided.level || !guided.grade || !guided.subject.trim())) return
     if (activeGuide === 'research' && (!/college|university|tertiary/i.test(guided.level) || !guided.subject.trim())) return
     const prompt = buildGuidedRequest()
     const lessonContext = activeGuide === 'lesson' ? {
       title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
       course: guided.course, curriculum: guided.curriculum, duration: Number(guided.duration) || 45,
     } : undefined
+    const homeworkContext = activeGuide === 'assessment' || activeGuide === 'worksheet' ? {
+      title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
+      course: guided.course, curriculum: guided.curriculum, topic: guided.topic.trim(),
+      instructions: 'MIA ' + (activeGuide === 'assessment' ? guided.assessmentType : guided.worksheetType) + ' · ' + guided.marks + ' marks · ' + guided.questionCount + ' requested questions. Use this generated material as source guidance when creating an interactive question set.',
+    } : undefined
     setLessonHandoff(null)
+    setHomeworkHandoff(null)
     setActiveGuide(null)
-    void sendMessage(prompt, false, lessonContext)
+    void sendMessage(prompt, false, lessonContext, homeworkContext)
   }
 
   const openLessonInClassroom = () => {
@@ -266,6 +277,17 @@ export default function MiaStudio() {
       window.dispatchEvent(new CustomEvent('studyspace-open-classroom-studio'))
     } catch {
       setError('The lesson draft could not be handed to Classroom Studio. Check browser storage and try again.')
+    }
+  }
+
+  const openHomeworkInClassroom = () => {
+    if (!homeworkHandoff) return
+    try {
+      localStorage.setItem(miaHomeworkHandoffKey, JSON.stringify({ ...homeworkHandoff, createdAt: new Date().toISOString() }))
+      setHomeworkHandoff(null)
+      window.dispatchEvent(new CustomEvent('studyspace-open-homework-builder'))
+    } catch {
+      setError('The MIA assessment could not be handed to the interactive homework builder. Check browser storage and try again.')
     }
   }
 
@@ -327,6 +349,7 @@ export default function MiaStudio() {
         </div>
 
         {lessonHandoff && <div className="mia-lesson-handoff"><div><strong><BookOpen size={16}/> Your lesson draft is ready</strong><p>MIA has prepared the lesson content. Open it in Classroom Studio to edit, save locally or publish it to selected learners.</p></div><button type="button" className="primary-button" onClick={openLessonInClassroom}>Create in Classroom Studio <span aria-hidden="true">→</span></button></div>}
+        {homeworkHandoff && <div className="mia-lesson-handoff"><div><strong><ClipboardCheck size={16}/> Your interactive assessment draft is ready</strong><p>Convert MIA's generated material into a question-by-question student form. You can edit questions, set recipients and due dates, review the answer key, then publish it through StudySpace Homework.</p></div><button type="button" className="primary-button" onClick={openHomeworkInClassroom}>Build interactive homework <span aria-hidden="true">→</span></button></div>}
         {error && <p className="mia-error" role="alert">{error}</p>}
         {profileNotice && <p className="mia-profile-notice" role="status">{profileNotice}</p>}
         <form className="mia-compose" onSubmit={send}>

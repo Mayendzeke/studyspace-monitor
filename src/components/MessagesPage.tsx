@@ -60,6 +60,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     if(!supabase||!userId)return;
     const channel=supabase.channel("monitor-direct-messages-"+userId)
       .on("postgres_changes",{event:"*",schema:"public",table:"direct_messages"},()=>void loadMessages().catch(e=>setError(e.message||"New messages could not be refreshed.")))
+      .on("postgres_changes",{event:"*",schema:"public",table:"direct_message_user_deletions",filter:"user_id=eq."+userId},()=>void loadMessages().catch(e=>setError(e.message||"Message visibility could not be refreshed.")))
       .on("postgres_changes",{event:"*",schema:"public",table:"studyspace_user_presence"},payload=>{const row=payload.new as {user_id:string;last_seen_at:string};if(row?.user_id)setPresence(v=>({...v,[row.user_id]:Date.now()-new Date(row.last_seen_at).getTime()<120000?"online":row.last_seen_at}));})
       .subscribe();
     return()=>{void supabase?.removeChannel(channel);};

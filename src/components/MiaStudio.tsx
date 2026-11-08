@@ -377,7 +377,7 @@ export default function MiaStudio() {
           </section>
         </div>
       )}
-    </>}
+      </>
     </section>
   )
 }

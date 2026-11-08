@@ -28,6 +28,13 @@ const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
   try { const value = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(value) ? value : [] } catch { return [] }
 }
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    operation.then(value => { window.clearTimeout(timer); resolve(value) }, error => { window.clearTimeout(timer); reject(error) })
+  })
+}
+
 async function describeEdgeFunctionError(reason: unknown, fallback: string): Promise<string> {
   const context = reason && typeof reason === "object" && "context" in reason
     ? (reason as { context?: unknown }).context
@@ -52,6 +59,7 @@ async function describeEdgeFunctionError(reason: unknown, fallback: string): Pro
 }
 
 const standardEducationLevels = ['Primary school', 'Secondary school', 'High school / Sixth form', 'College', 'University', 'Other']
+const standardCurricula = ['Eswatini National Curriculum', 'Cambridge Primary', 'Cambridge Lower Secondary', 'Cambridge IGCSE', 'Cambridge International AS & A Level', 'South African CAPS', 'International Baccalaureate (IB)', 'Pearson Edexcel', 'Other / not specified']
 const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', course: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
@@ -71,6 +79,7 @@ export default function ClassroomStudio() {
   const [registeredSubjectRows, setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
   const [courseFilter, setCourseFilter] = useState('')
   const [subjectManual, setSubjectManual] = useState(false)
+  const [curriculumManual, setCurriculumManual] = useState(false)
   const [selectedLearners, setSelectedLearners] = useState<string[]>([])
   const [teacherMessages, setTeacherMessages] = useState<{id:string;sender_id:string;message:string;created_at:string}[]>([])
   const [chatNotice, setChatNotice] = useState('')
@@ -219,7 +228,9 @@ export default function ClassroomStudio() {
     : levelLearners;
   const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   const scopedLearners = courseLearners.filter(item => !draft.grade || item.grade === draft.grade);
-  const curriculumOptions = Array.from(new Set(scopedLearners.map(item => item.curriculum?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
+  const curriculumOptions = Array.from(new Set([...standardCurricula, ...learners.map(item => item.curriculum?.trim() || ''), ...scopedLearners.map(item => item.curriculum?.trim() || '')].filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const gradeDefaults: Record<string, string[]> = { 'Primary school': ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7'], 'Secondary school': ['Form 1','Form 2','Form 3'], 'High school / Sixth form': ['Form 4','Form 5','Lower Sixth','Upper Sixth'], College: ['Year 1','Year 2','Year 3','Year 4'], University: ['Year 1','Year 2','Year 3','Year 4','Postgraduate'] };
+  const availableGradeOptions = gradeOptions.length ? gradeOptions : (gradeDefaults[draft.level] || []);
   const gradeFieldLabel = draft.level === 'Primary school' ? 'Grade / class'
     : draft.level === 'Secondary school' ? 'Form / grade'
     : draft.level === 'High school / Sixth form' ? 'Form / sixth form year'
@@ -239,7 +250,7 @@ export default function ClassroomStudio() {
     setAiConnection('checking');
     setAiConnectionMessage('Checking provider credentials and model availability…');
     try {
-      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } });
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } }), 35000, 'The AI connection test timed out after 35 seconds. Check the connection and try again.');
       if (error) throw error;
       if (!data?.success || data?.verified !== true) throw new Error(data?.error || 'The AI connection could not be verified.');
       setAiConnection('ready');
@@ -255,10 +266,10 @@ export default function ClassroomStudio() {
     if (!supabase) { setNotice('Connect Supabase before using AI lesson recaps.'); return }
     setAiBusy(true); setNotice('Preparing a concise lesson recap…')
     try {
-      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      } })
+      } }), 45000, 'AI lesson recap timed out after 45 seconds. Your lesson has not been lost; please retry.');
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
       update({
@@ -283,10 +294,10 @@ export default function ClassroomStudio() {
     if (!hasLessonContext) { setNotice('Add at least a lesson title, subject, grade, curriculum, objective or source note. MIΛ can create a short introductory draft from limited context.'); return; }
     setAiBusy(true); setNotice('Generating editable lesson objectives and checkpoints…');
     try {
-      const { data, error } = await supabase.functions.invoke('generate-lesson-recap', { body: {
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      }});
+      }}), 45000, 'AI lesson planning timed out after 45 seconds. Your form is still available; please retry.');
       if (error) throw error;
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return lesson structure.');
       const recap = data.recap as LessonRecap & { learningObjectives?: string[] };
@@ -372,6 +383,7 @@ export default function ClassroomStudio() {
   }
   const load = (plan: LessonPlan) => {
     setDraft(plan);
+    setCurriculumManual(!!plan.curriculum && !standardCurricula.includes(plan.curriculum) && !learners.some(item => item.curriculum === plan.curriculum));
     setCourseFilter(plan.course || '');
     setSelectedLearners([]);
     setSubjectManual(!!plan.subject && !subjectOptions.includes(plan.subject));
@@ -392,11 +404,11 @@ export default function ClassroomStudio() {
         <div className="panel-heading"><div><h2>Lesson builder</h2><p>Keep each session simple and purposeful.</p></div><BookOpen size={19}/></div>
         <div className="classroom-form-grid">
           <label>Lesson title<input value={draft.title} onChange={e=>update({title:e.target.value})} placeholder="e.g. Linear equations"/></label>
-          <label>1. Education level<select value={draft.level} onChange={e=>{setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);update({level:e.target.value,grade:'',subject:'',curriculum:'',course:''})}}><option value="">Choose a level from registered learners</option>{levelOptions.map(item=><option key={item}>{item}</option>)}</select></label>
+          <label>1. Education level<select value={draft.level} onChange={e=>{setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);setCurriculumManual(false);update({level:e.target.value,grade:'',subject:'',curriculum:'',course:''})}}><option value="">Choose a level from registered learners</option>{levelOptions.map(item=><option key={item}>{item}</option>)}</select></label>
           {isTertiaryLevel && (courseOptions.length > 0
             ? <label>2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setSelectedLearners([]);setSubjectManual(false);update({grade:'',subject:'',course:e.target.value})}}><option value="">All courses / programmes</option>{courseOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
             : isTertiaryLevel && <p className="classroom-filter-note">No course or programme has been recorded for active {draft.level.toLowerCase()} learners yet. You can still filter by their registered year of study.</p>)}
-          <label>{isTertiaryLevel ? '3.' : '2.'} {gradeFieldLabel}<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level}><option value="">All grades / years</option>{gradeOptions.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+          <label>{isTertiaryLevel ? '3.' : '2.'} {gradeFieldLabel}<select value={draft.grade} onChange={e=>{setSelectedLearners([]);setSubjectManual(false);update({grade:e.target.value,subject:''})}} disabled={!draft.level}><option value="">All grades / years</option>{availableGradeOptions.map(item=><option key={item} value={item}>{item}</option>)}<option value="__other__">Other / enter manually</option></select></label>
           <label>{isTertiaryLevel ? '4.' : '3.'} Subject / module<select value={subjectManual || (draft.subject && !scopedSubjectOptions.includes(draft.subject)) ? '__other__' : draft.subject}
               onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectManual(true);update({subject:''})}else{setSubjectManual(false);update({subject:value})}}} disabled={!draft.level}>
               <option value="">Choose from this level and year</option>
@@ -404,7 +416,8 @@ export default function ClassroomStudio() {
               <option value="__other__">Other / enter manually</option>
             </select></label>
           {(subjectManual || (!!draft.subject && !scopedSubjectOptions.includes(draft.subject))) && <label>Enter subject / module<input value={draft.subject} onChange={e=>update({subject:e.target.value})} placeholder="Type the subject or module"/></label>}
-          <label>Curriculum / syllabus<input list="classroom-curriculum-options" value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="Select or type a curriculum"/><datalist id="classroom-curriculum-options">{curriculumOptions.map(item=><option key={item} value={item}/>)}</datalist></label>
+          <label>Curriculum / syllabus<select value={curriculumManual || (draft.curriculum && !curriculumOptions.includes(draft.curriculum)) ? '__other__' : draft.curriculum} onChange={e=>{const manual=e.target.value==='__other__';setCurriculumManual(manual);update({curriculum:manual?'':e.target.value})}}><option value="">Choose a curriculum / syllabus</option>{curriculumOptions.filter(item=>item!=='Other / not specified').map(item=><option key={item} value={item}>{item}</option>)}<option value="Other / not specified">Other / not specified</option><option value="__other__">Other / enter manually</option></select></label>
+           {(curriculumManual || (!!draft.curriculum && !curriculumOptions.includes(draft.curriculum))) && <label>Enter curriculum / syllabus<input value={draft.curriculum} onChange={e=>update({curriculum:e.target.value})} placeholder="Type the exact syllabus or examination board"/></label>}
           <label>Date<input type="date" value={draft.date} onChange={e=>update({date:e.target.value})}/></label>
           <label>Lesson length (minutes)<input type="number" min="10" max="240" value={draft.duration} onChange={e=>update({duration:Math.max(10,Math.min(240,Number(e.target.value)||45))})}/></label>
         </div>
@@ -424,7 +437,7 @@ export default function ClassroomStudio() {
         <div className="classroom-teacher-chat"><div className="classroom-chat-title"><MessageCircle size={16}/> Live class chat{chatNotice&&<small className="classroom-chat-notice" role="status">{chatNotice}</small>}</div><div className="classroom-chat-list">{teacherMessages.length?teacherMessages.map(item=><article key={item.id}><strong>{item.sender_id===adminId?'You':(learners.find(learner=>learner.id===item.sender_id)?.preferred_name||learners.find(learner=>learner.id===item.sender_id)?.full_name||'Unknown learner')}</strong><p>{item.message}</p><small>{new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</small></article>):<p>No messages yet. Learner messages will appear here.</p>}</div><form onSubmit={sendTeacherMessage}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} maxLength={4000} placeholder="Reply to your class…"/><button className="primary-button" type="submit" disabled={!chatDraft.trim()}><Send size={15}/> Send</button></form></div>
         {boardImage&&<div className="classroom-board-preview"><strong>Shared worksheet / whiteboard</strong><img src={boardImage} alt="Latest shared classroom whiteboard"/></div>}
       </div>}</section>
-        <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
+        <div className="classroom-actions"><button className="primary-button" onClick={save}><Save size={16}/> Save lesson plan</button><button className="subtle-button" onClick={exportPlan}>Export local plans</button><button className="subtle-button" onClick={()=>{setDraft(blank());setCourseFilter('');setSelectedLearners([]);setSubjectManual(false);setCurriculumManual(false);setSelected(null);setNotice('New lesson started.')}}><Plus size={15}/> New lesson</button></div>
         {notice&&<p className="inline-message" role="status">{notice}</p>}
       </section>
       <aside className="panel classroom-side">

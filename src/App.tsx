@@ -269,7 +269,7 @@ function App() {
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
           {page === 'Timetable' && <TeacherWeeklyTimetable />}
-          {page === 'Messages' && <MessagesPage />}
+          {page === 'Messages' && <MessagesPage onOpenHomework={() => setPage('Classroom Studio')} />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIA' && <MiaStudio />}

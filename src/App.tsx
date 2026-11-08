@@ -19,7 +19,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
-  Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download,
+  Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert,
 } from 'lucide-react'
 
 type Page = 'Overview' | 'Learners' | 'Timetable' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'

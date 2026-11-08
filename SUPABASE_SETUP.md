@@ -73,6 +73,8 @@ The current migration sequence is:
 36. `supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql`
 37. `supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql`
 38. `supabase/migrations/20261108115000_studyspace_age_gate_guardian_verification.sql`
+39. `supabase/migrations/20261108130000_studyspace_guardian_invitation_links.sql`
+40. `supabase/migrations/20261108133000_studyspace_eswatini_age_calculation.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 
@@ -106,6 +108,7 @@ Deploy these functions to the same Supabase project:
 - `student-sign-in`
 - `manage-learner-account`
 - `manage-guardian-verification`
+- `guardian-consent`
 - `generate-lesson-recap`
 - `submit-exercise-attempt`
 - `jaas-token`
@@ -116,7 +119,7 @@ The Monitor MIA and lesson-recap functions remain gateway-JWT protected and acce
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 
-Gateway JWT verification is enabled for protected functions, including `jaas-token`. The JaaS endpoint validates the signed-in user's active Studyspace profile, requires AAL2 MFA for the class-creating administrator, and only issues a room-scoped 15-minute JWT to the administrator who created a live session or a learner assigned to that session. The private key is loaded and used only inside the Edge Function. The JaaS endpoint includes an administrator-only signing health check; a successful signing check does not replace an actual meeting join test. Gateway JWT verification is disabled only for the public enrolment and student sign-in endpoints (`enrol-learner` and `student-sign-in`). The public enrolment and sign-in functions apply server-side throttling.
+Gateway JWT verification is enabled for protected functions, including `jaas-token`. The JaaS endpoint validates the signed-in user's active Studyspace profile, requires AAL2 MFA for the class-creating administrator, and only issues a room-scoped 15-minute JWT to the administrator who created a live session or a learner assigned to that session. The private key is loaded and used only inside the Edge Function. The JaaS endpoint includes an administrator-only signing health check; a successful signing check does not replace an actual meeting join test. Gateway JWT verification is disabled for the public enrolment, student sign-in and guardian-consent endpoints (`enrol-learner`, `student-sign-in` and `guardian-consent`). The public enrolment and sign-in functions apply server-side throttling. The guardian-consent endpoint accepts only single-use, expiring high-entropy links for parent/guardian consent, and only allows link issuance after authenticating the pending learner with their Student ID and password. It never creates a learner session or grants dashboard access.
 
 The `manage-learner-account` function is also protected by gateway JWT verification and validates the active administrator profile plus AAL2 MFA on every request. It supports learner profile updates (name, country, school/institution, education level, grade, curriculum and academic year), account enable/disable, one-time temporary password rotation and permanent deletion. Permanent deletion requires a second confirmation phrase containing the learner's Student ID, suspends Auth access first, removes the learner's private personal-file objects, marks redeemed PINs revoked/non-reusable while detaching the learner reference, and then deletes the Auth user. Related learner-owned database records are removed through their foreign-key cascade rules. Existing browser/device offline caches cannot be erased remotely and may need to be cleared on those devices separately.
 

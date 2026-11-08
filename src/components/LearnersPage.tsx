@@ -36,6 +36,17 @@ type ProfileForm = Pick<
   "education_level" | "grade" | "curriculum" | "academic_year"
 > & { subscription_tier: string; subscription_expires_at: string };
 
+type GuardianRecord = {
+  guardian_full_name: string;
+  relationship: string;
+  relationship_details: string;
+  guardian_phone: string;
+  consent_given: boolean;
+  terms_version: string;
+  terms_accepted_at: string;
+  verified_at: string;
+};
+
 type ManageAction = "disable" | "enable" | "reset_password";
 
 const SUBSCRIPTION_PLANS = [
@@ -113,6 +124,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [viewTarget, setViewTarget] = useState<Learner | null>(null);
   const [viewSubjects, setViewSubjects] = useState<string[]>([]);
   const [viewSubjectsLoading, setViewSubjectsLoading] = useState(false);
+  const [guardianRecord, setGuardianRecord] = useState<GuardianRecord | null>(null);
 
   useEffect(() => {
     const modalOpen = Boolean(editTarget || deleteTarget || viewTarget)
@@ -142,12 +154,21 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     if (!supabase) return;
     setViewTarget(learner);
     setViewSubjects([]);
+    setGuardianRecord(null);
     setViewSubjectsLoading(true);
     setError("");
     const { data, error: subjectError } = await supabase.from("student_subjects")
       .select("name").eq("learner_id", learner.id).order("name");
     if (subjectError) setError("Student details opened, but subjects could not be loaded: " + subjectError.message);
     else setViewSubjects(Array.from(new Set((data ?? []).map(row => String(row.name ?? "").trim()).filter(Boolean))));
+    const { data: guardianData, error: guardianError } = await supabase.functions.invoke("manage-guardian-verification", {
+      body: { action: "get_record", learnerId: learner.id },
+    });
+    if (guardianError || !guardianData?.success) {
+      setError(current => current || "Student details opened, but the guardian verification record could not be loaded.");
+    } else {
+      setGuardianRecord(guardianData.record as GuardianRecord | null);
+    }
     setViewSubjectsLoading(false);
   }
 
@@ -480,6 +501,17 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <strong>Registered subjects</strong>
               {viewSubjectsLoading ? <small>Loading subjects…</small> : viewSubjects.length ? <div>{viewSubjects.map(subject => <span key={subject}>{subject}</span>)}</div> : <small>No registered subjects were found.</small>}
             </section>
+            {guardianRecord && <section className="learner-view-subjects guardian-record-view">
+              <strong>Guardian verification record</strong>
+              <div className="guardian-record-grid">
+                <span>Guardian</span><b>{guardianRecord.guardian_full_name}</b>
+                <span>Relationship</span><b>{guardianRecord.relationship === "legal_guardian" ? "Legal guardian" : guardianRecord.relationship.charAt(0).toUpperCase() + guardianRecord.relationship.slice(1)}{guardianRecord.relationship_details ? " · " + guardianRecord.relationship_details : ""}</b>
+                <span>Contact</span><b>{guardianRecord.guardian_phone}</b>
+                <span>Consent</span><b>{guardianRecord.consent_given ? "Given in person" : "Not recorded"}</b>
+                <span>Terms version</span><b>{guardianRecord.terms_version}</b>
+                <span>Verified</span><b>{new Date(guardianRecord.verified_at).toLocaleString()}</b>
+              </div>
+            </section>}
             <div className="learner-view-timetables">
               <TimetableManager learnerId={viewTarget.id} kind="school" title="School timetable" subjects={viewSubjects}/>
               <TimetableManager learnerId={viewTarget.id} kind="personal" title="Personal study timetable" subjects={viewSubjects}/>

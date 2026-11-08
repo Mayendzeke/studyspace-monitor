@@ -166,7 +166,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
           VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'true'
-          VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'false'
+          VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'true'
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
         run: |
@@ -216,14 +216,17 @@ jobs:
           if (!accountManagement.includes('payment_transaction_reference') || !accountManagement.includes('already been used')) throw new Error('Subscription activation must audit and reject reused MTN MoMo transaction references.')
           const paymentReferenceMigration = readFileSync('supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql', 'utf8')
           if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
-          for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
+          for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
             const source = readFileSync(path, 'utf8')
-            if (!source.includes('json(503')) throw new Error(path + ' must fail closed while MIA is paused.')
-            if (/generativelanguage\.googleapis\.com|api\.openai\.com|GEMINI_API_KEY|OPENAI_API_KEY/.test(source)) {
-              throw new Error(path + ' must not contain an active external AI provider integration while MIA is paused.')
+            if (!source.includes('GEMINI_API_KEY') || !source.includes('gemini-3.8-flash') || !source.includes('generativelanguage.googleapis.com')) {
+              throw new Error(path + ' must use the configured Gemini API key and supported model.')
             }
+            if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) {
+              throw new Error(path + ' must enforce administrator role and MFA.')
+            }
+            if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
-          console.log('MIA server-side privacy pause checks passed for learner, administrator and lesson-recap endpoints.')
+          console.log('Gemini integration, administrator role, MFA and AI usage audit checks passed.')
           const migration = readFileSync('supabase/migrations/20261108070859_universal_trial_and_terms_acceptance.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')

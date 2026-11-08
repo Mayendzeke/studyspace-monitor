@@ -19,6 +19,7 @@ type HomeworkQuestion = {
   explanation: string;
   markingGuide: string;
 };
+type ClassroomGroup = { id:string; title:string; subject_name:string; education_level:string; grade:string; curriculum:string; starts_at:string|null; };
 type Learner = {
   id: string;
   full_name: string;
@@ -69,6 +70,10 @@ const toQuestion = (raw: Record<string, unknown>, fallbackPoints: number, topic:
 
 export default function HomeworkBuilder() {
   const [learners, setLearners] = useState<Learner[]>([]);
+  const [groups, setGroups] = useState<ClassroomGroup[]>([]);
+  const [groupId, setGroupId] = useState("");
+  const [groupLearnerIds, setGroupLearnerIds] = useState<string[]>([]);
+  const [groupLoading, setGroupLoading] = useState(false);
   const [loadingLearners, setLoadingLearners] = useState(true);
   const [level, setLevel] = useState("");
   const [grade, setGrade] = useState("");
@@ -95,9 +100,10 @@ export default function HomeworkBuilder() {
     let alive = true;
     const load = async () => {
       if (!supabase) { setError("StudySpace is not connected."); setLoadingLearners(false); return; }
-      const { data, error: loadError } = await supabase.from("profiles")
-        .select("id,full_name,preferred_name,student_id,education_level,grade,curriculum,course,account_status")
-        .eq("role", "learner").eq("account_status", "active").order("preferred_name");
+      const [{ data, error: loadError }, { data: groupRows, error: groupError }] = await Promise.all([
+        supabase.from("profiles").select("id,full_name,preferred_name,student_id,education_level,grade,curriculum,course,account_status").eq("role", "learner").eq("account_status", "active").order("preferred_name"),
+        supabase.from("class_sessions").select("id,title,subject_name,education_level,grade,curriculum,starts_at").order("created_at", { ascending: false }).limit(100),
+      ]);
       if (!alive) return;
       if (loadError) setError("The active learner list could not be loaded: " + loadError.message);
       else {
@@ -111,19 +117,37 @@ export default function HomeworkBuilder() {
           setCourse(first.course || "");
         }
       }
+      if (groupError) setError(current => current || "Classroom groups could not be loaded: " + groupError.message);
+      else setGroups((groupRows || []) as ClassroomGroup[]);
       setLoadingLearners(false);
     };
     void load();
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    const loadGroupMembers = async () => {
+      if (!supabase || !groupId) { setGroupLearnerIds([]); setGroupLoading(false); return; }
+      setGroupLoading(true);
+      const { data, error: memberError } = await supabase.from("class_session_members").select("learner_id").eq("session_id", groupId);
+      if (!alive) return;
+      if (memberError) setError("The selected classroom roster could not be loaded: " + memberError.message);
+      else setGroupLearnerIds((data || []).map(row => String(row.learner_id)));
+      setGroupLoading(false);
+    };
+    void loadGroupMembers();
+    return () => { alive = false; };
+  }, [groupId]);
+
   const gradeOptions = useMemo(() => [...new Set(learners.filter(x => !level || x.education_level === level).map(x => x.grade || "").filter(Boolean))].sort(), [learners, level]);
   const courseOptions = useMemo(() => [...new Set(learners.filter(x => !level || x.education_level === level).map(x => x.course || "").filter(Boolean))].sort(), [learners, level]);
   const matchingLearners = useMemo(() => learners.filter(x =>
     (!level || x.education_level === level) &&
     (!grade || x.grade === grade) &&
-    (!course || x.course === course)
-  ), [learners, level, grade, course]);
+    (!course || x.course === course) &&
+    (!groupId || groupLearnerIds.includes(x.id))
+  ), [learners, level, grade, course, groupId, groupLearnerIds]);
   const recipients = recipientMode === "group" ? matchingLearners : matchingLearners.filter(x => selectedIds.includes(x.id));
 
   const generate = async () => {
@@ -249,6 +273,18 @@ export default function HomeworkBuilder() {
     {error && <div className="homework-message error" role="alert">{error}</div>}
     {notice && <div className="homework-message success" role="status">{notice}</div>}
     <div className="homework-grid">
+      <label>Classroom group / session<select value={groupId} onChange={e => {
+        const next = e.target.value;
+        const group = groups.find(item => item.id === next);
+        setGroupId(next); setSelectedIds([]);
+        if (group) {
+          setLevel(group.education_level || "");
+          setGrade(group.grade || "");
+          setCurriculum(group.curriculum || "");
+          setCourse("");
+          if (group.subject_name && !subject.trim()) setSubject(group.subject_name);
+        }
+      }}><option value="">Choose a class roster or use grade filters</option>{groups.map(group => <option key={group.id} value={group.id}>{group.title}{group.subject_name ? " · " + group.subject_name : ""}{group.starts_at ? " · " + new Date(group.starts_at).toLocaleDateString() : ""}</option>)}</select></label>
       <label>Education level<select value={level} onChange={e=>{setLevel(e.target.value);setGrade("");setCourse("");setSelectedIds([])}}><option value="">Choose level</option>{[...new Set([...levels,...learners.map(x=>x.education_level||"").filter(Boolean)])].map(x=><option key={x}>{x}</option>)}</select></label>
       <label>Grade / year<select value={grade} onChange={e=>{setGrade(e.target.value);setSelectedIds([])}}><option value="">Choose grade / year</option>{gradeOptions.map(x=><option key={x}>{x}</option>)}</select></label>
       {courseOptions.length>0 && <label>Course / programme<select value={course} onChange={e=>{setCourse(e.target.value);setSelectedIds([])}}><option value="">All courses</option>{courseOptions.map(x=><option key={x}>{x}</option>)}</select></label>}
@@ -264,7 +300,7 @@ export default function HomeworkBuilder() {
     <label className="homework-instructions">Instructions for learners<textarea rows={3} maxLength={2000} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
     <div className="homework-generate-row">
       <button className="primary-button" type="button" disabled={generating || loadingLearners} onClick={()=>void generate()}><Sparkles size={16}/>{generating?"Generating with MIA…":"Generate with MIA"}</button>
-      <span>{loadingLearners?"Loading active learner list…":matchingLearners.length+" active learner(s) match the selected class filters."}</span>
+      <span>{loadingLearners?"Loading active learner list…":groupLoading?"Loading classroom roster…":matchingLearners.length+" active learner(s) "+(groupId?"in this classroom roster":"match the selected grade/course filters")+"."}</span>
     </div>
     <div className="homework-recipients">
       <div className="homework-subheading"><strong><Users size={16}/> Recipients</strong><span>{recipients.length} selected</span></div>

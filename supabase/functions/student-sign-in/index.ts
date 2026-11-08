@@ -59,6 +59,13 @@ Deno.serve(async request => {
   const { data: profile } = await admin.from("profiles").select("id,role,account_status,subscription_tier,subscription_expires_at").eq("student_id", studentId).maybeSingle();
   // Authentication remains available after a trial or paid plan expires.
   // The Student App then restricts the workspace and presents subscription renewal.
+  if (profile?.role === "learner" && profile.account_status === "pending_guardian_verification") {
+    await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "signin", was_successful: false });
+    return json(403, {
+      error: "Your account is registered but is still pending guardian verification. Send your guardian invitation link to your parent or legal guardian, or ask a StudySpace representative to record consent in person. You will be able to sign in after StudySpace approves the verification.",
+      guardian_verification_pending: true,
+    });
+  }
   if (!profile || profile.role !== "learner" || profile.account_status !== "active") {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "signin", was_successful: false });
     return json(401, { error: "Student ID or password is incorrect." });

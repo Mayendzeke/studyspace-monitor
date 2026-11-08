@@ -703,6 +703,9 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordNotice, setPasswordNotice] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState('');
+  const [sessionError, setSessionError] = useState('');
 
   async function changeAdminPassword() {
     if (!supabase || passwordBusy) return;
@@ -721,6 +724,22 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       setPasswordError(reason instanceof Error ? reason.message : 'Your password could not be updated. Try again.');
     } finally {
       setPasswordBusy(false);
+    }
+  }
+
+  async function signOutOtherAdminSessions() {
+    if (!supabase || sessionBusy) return;
+    setSessionBusy(true);
+    setSessionError('');
+    setSessionNotice('');
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      setSessionNotice('Other signed-in Monitor sessions have been revoked. This device remains signed in and MFA stays required.');
+    } catch (reason) {
+      setSessionError(reason instanceof Error ? reason.message : 'Other sessions could not be revoked. Try again.');
+    } finally {
+      setSessionBusy(false);
     }
   }
 
@@ -765,6 +784,9 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       {passwordError && <p className="inline-message error-message" role="alert">{passwordError}</p>}
       {passwordNotice && <p className="inline-message" role="status">{passwordNotice}</p>}
       <div className="setting-row"><div><strong>Change administrator password</strong><span>Use a unique password that you do not reuse on another service.</span></div><button type="button" className="primary-button" onClick={() => void changeAdminPassword()} disabled={!supabaseConfigured || passwordBusy || !newPassword || !confirmPassword}>{passwordBusy ? 'Updating…' : 'Update password'}</button></div>
+      {sessionError && <p className="inline-message error-message" role="alert">{sessionError}</p>}
+      {sessionNotice && <p className="inline-message" role="status">{sessionNotice}</p>}
+      <div className="setting-row"><div><strong>Other signed-in devices</strong><span>Revoke other Monitor browser sessions without signing out this device.</span></div><button type="button" className="secondary-button" onClick={() => void signOutOtherAdminSessions()} disabled={!supabaseConfigured || sessionBusy}><LockKeyhole size={15}/>{sessionBusy ? 'Revoking…' : 'Sign out other devices'}</button></div>
     </div>
 
     <div className="panel settings-card">
@@ -789,7 +811,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="settings-divider"/>
       <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Public learner enrolment</strong><p>New public enrolment remains closed while business registration and legal readiness are pending. Enabling a front-end switch would not override the server-side enrolment block.</p></div><span className="connection-pill"><i/> Closed</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Public learner enrolment</strong><p>Public and invitation enrolment remain closed while the server-side invitation route and legal readiness are pending. Enabling a front-end switch would not override the server-side enrolment block.</p></div><span className="connection-pill"><i/> Closed</span></div>
     </div>
 
     <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Deliver Student IDs, one-time PINs and reset passwords directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>

@@ -43,6 +43,7 @@ export default function GuardianVerificationPage() {
   const [relationshipDetails, setRelationshipDetails] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
+  const [forceInPerson, setForceInPerson] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -84,6 +85,7 @@ export default function GuardianVerificationPage() {
     setRelationshipDetails(learner.guardianSubmission?.relationship_details ?? "");
     setGuardianPhone(learner.guardianSubmission?.guardian_phone ?? "");
     setGuardianConsent(false);
+    setForceInPerson(false);
     setError("");
     setNotice("");
   }
@@ -127,7 +129,8 @@ export default function GuardianVerificationPage() {
     setSaving(true);
     setError("");
     setNotice("");
-    const onlineSubmission = selected.guardianSubmission?.verification_source === "guardian_link"
+    const onlineSubmission = !forceInPerson
+      && selected.guardianSubmission?.verification_source === "guardian_link"
       && selected.guardianSubmission.approval_status === "pending";
     const { data, error: invokeError } = await supabase.functions.invoke("manage-guardian-verification", {
       body: onlineSubmission
@@ -154,6 +157,7 @@ export default function GuardianVerificationPage() {
     setGuardianPhone("");
     setRelationshipDetails("");
     setGuardianConsent(false);
+    setForceInPerson(false);
     await refresh();
     setSaving(false);
   }
@@ -202,32 +206,35 @@ export default function GuardianVerificationPage() {
       {selected && (
         <section className="panel guardian-consent-panel">
           <div className="guardian-queue-heading">
-            <div><span className="eyebrow">{selected.guardianSubmission?.verification_source === "guardian_link" ? "ONLINE GUARDIAN SUBMISSION" : "IN-PERSON CONSENT RECORD"}</span><h2>{selected.full_name}</h2><small>{selected.student_id} · Date of birth {new Date(selected.date_of_birth + "T00:00:00").toLocaleDateString()} · Age {selected.age}</small></div>
+            <div><span className="eyebrow">{selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "ONLINE GUARDIAN SUBMISSION" : "IN-PERSON CONSENT RECORD"}</span><h2>{selected.full_name}</h2><small>{selected.student_id} · Date of birth {new Date(selected.date_of_birth + "T00:00:00").toLocaleDateString()} · Age {selected.age}</small></div>
             <span className="guardian-pending-tag">Dashboard locked</span>
           </div>
-          {selected.guardianSubmission?.verification_source === "guardian_link" ? (
-            <p className="guardian-consent-instruction">The parent or legal guardian has submitted these details online. The learner is still locked. Review the submission and independently confirm the guardian’s authority and consent with them before approval. An online link submission is not, by itself, proof of identity or guardian authority.</p>
+          {selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? (
+            <>
+              <p className="guardian-consent-instruction">The parent or legal guardian has submitted these details online. The learner is still locked. Review the submission and independently confirm the guardian’s authority and consent before approval. An online link submission is not, by itself, proof of identity or guardian authority.</p>
+              <button type="button" className="subtle-button guardian-switch-inperson" onClick={() => { setForceInPerson(true); setGuardianConsent(false); }}>Guardian is here — complete verification in person</button>
+            </>
           ) : (
-            <p className="guardian-consent-instruction">Use this route when the parent or legal guardian is physically with you. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full terms are available in the <a href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">StudySpace Student App</a>.</p>
+            <p className="guardian-consent-instruction">Use this route only when the parent or legal guardian is physically with you. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full terms are available in the <a href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">StudySpace Student App</a>. This route will replace any earlier unapproved online submission with the details you confirm in person.</p>
           )}
           <form onSubmit={event => void approve(event)}>
             <div className="guardian-form-grid">
-              <label>Guardian’s full name<input required minLength={2} maxLength={120} readOnly={selected.guardianSubmission?.verification_source === "guardian_link"} value={guardianFullName} onChange={event => setGuardianFullName(event.target.value)} autoComplete="name" placeholder="Full name of parent or guardian"/></label>
-              <label>Relationship to learner<select disabled={selected.guardianSubmission?.verification_source === "guardian_link"} value={relationship} onChange={event => setRelationship(event.target.value)}>{RELATIONSHIPS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label>Guardian’s full name<input required minLength={2} maxLength={120} readOnly={selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson} value={guardianFullName} onChange={event => setGuardianFullName(event.target.value)} autoComplete="name" placeholder="Full name of parent or guardian"/></label>
+              <label>Relationship to learner<select disabled={selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson} value={relationship} onChange={event => setRelationship(event.target.value)}>{RELATIONSHIPS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
               {relationship === "other" && <label>Describe relationship<input readOnly={selected.guardianSubmission?.verification_source === "guardian_link"} required minLength={2} maxLength={100} value={relationshipDetails} onChange={event => setRelationshipDetails(event.target.value)} placeholder="e.g. aunt, uncle, foster carer"/></label>}
               <label>Guardian contact number<input readOnly={selected.guardianSubmission?.verification_source === "guardian_link"} required type="tel" maxLength={30} value={guardianPhone} onChange={event => setGuardianPhone(event.target.value)} placeholder="e.g. +268 7XXX XXXX"/></label>
             </div>
             <div className="guardian-consent-statement">
               <ShieldCheck size={20}/>
-              <div><strong>{selected.guardianSubmission?.verification_source === "guardian_link" ? "Guardian online consent submission" : "Guardian consent and representative confirmation"}</strong><p>{selected.guardianSubmission?.verification_source === "guardian_link" ? "The guardian has submitted consent using the one-time link. You must now review the details and independently confirm the guardian’s authority and consent before activation." : "The guardian confirms that they have authority to act for this learner, have reviewed and understood the current StudySpace Terms and Conditions and Privacy Notice, agree to the processing needed to provide the learner’s account and services, and consent to the learner’s StudySpace account being activated. The representative confirms that this agreement was given in person."}</p></div>
+              <div><strong>{selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "Guardian online consent submission" : "Guardian consent and representative confirmation"}</strong><p>{selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "The guardian has submitted consent using the one-time link. You must now review the details and independently confirm the guardian’s authority and consent before activation." : "The guardian confirms that they have authority to act for this learner, have reviewed and understood the current StudySpace Terms and Conditions and Privacy Notice, agree to the processing needed to provide the learner’s account and services, and consent to the learner’s StudySpace account being activated. The representative confirms that this agreement was given in person."}</p></div>
             </div>
             <label className="guardian-consent-check">
               <input type="checkbox" checked={guardianConsent} onChange={event => setGuardianConsent(event.target.checked)}/>
-              <span>{selected.guardianSubmission?.verification_source === "guardian_link" ? "I have reviewed the online submission and independently confirmed the guardian’s details, authority and consent before approving this learner’s account." : "I confirm the guardian is present and has personally given the consent described above. I am recording the guardian’s decision accurately."}</span>
+              <span>{selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "I have reviewed the online submission and independently confirmed the guardian’s details, authority and consent before approving this learner’s account." : "I confirm the guardian is present and has personally given the consent described above. I am recording the guardian’s decision accurately."}</span>
             </label>
             <div className="guardian-form-actions">
               <button type="button" className="subtle-button" disabled={saving} onClick={() => setSelected(null)}>Cancel</button>
-              <button type="submit" className="primary-button" disabled={saving || !guardianConsent || guardianFullName.trim().length < 2 || guardianPhone.trim().length < 7 || (relationship === "other" && relationshipDetails.trim().length < 2)}><Users size={15}/>{saving ? "Recording consent…" : selected.guardianSubmission?.verification_source === "guardian_link" ? "Approve guardian consent & activate" : "Record consent & activate account"}</button>
+              <button type="submit" className="primary-button" disabled={saving || !guardianConsent || guardianFullName.trim().length < 2 || guardianPhone.trim().length < 7 || (relationship === "other" && relationshipDetails.trim().length < 2)}><Users size={15}/>{saving ? "Recording consent…" : selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "Approve guardian consent & activate" : "Record consent & activate account"}</button>
             </div>
             <p className="guardian-privacy-note">The guardian’s contact details and consent record are stored in a restricted verification record. Learners cannot view, change or approve this record. No identity-document upload is required. A submitted link is not identity proof; confirm the guardian’s details and authority before approving.</p>
           </form>

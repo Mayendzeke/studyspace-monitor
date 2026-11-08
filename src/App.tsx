@@ -266,7 +266,7 @@ function App() {
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
-          {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} theme={theme} onThemeChange={setTheme} />}
+          {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} theme={theme} onThemeChange={setTheme} onOpenTimetable={() => navigate('Timetable')} />}
 
         </div>
       </main>
@@ -681,10 +681,11 @@ function PinPage() {
 }
 
 
-function SettingsPage({ supabaseConfigured, theme, onThemeChange }: {
+function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetable }: {
   supabaseConfigured: boolean;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
+  onOpenTimetable: () => void;
 }) {
   const [checking, setChecking] = useState(false);
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[]>([]);
@@ -735,7 +736,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange }: {
       <div className="panel-heading"><div><h2>Connected applications</h2><p>Student and Monitor are two interfaces to the same StudySpace backend.</p></div><BookOpen size={19}/></div>
       <div className="settings-row"><div className="settings-symbol"><GraduationCap size={19}/></div><div><strong>StudySpace Student</strong><p>Open the learner-facing planner to inspect the student experience, assignments and study timetable.</p></div><a className="secondary-button" href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">Open Student app <ArrowUpRight size={14}/></a></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><CalendarDays size={19}/></div><div><strong>Central timetable</strong><p>Manage a learner's school and personal timetable from one Monitor workspace without opening their learner profile.</p></div><button type="button" className="secondary-button" onClick={() => window.dispatchEvent(new CustomEvent("studyspace-open-admin-timetable"))}>Open timetable <ArrowUpRight size={14}/></button></div>
+      <div className="settings-row"><div className="settings-symbol"><CalendarDays size={19}/></div><div><strong>Central timetable</strong><p>Manage a learner's school and personal timetable from one Monitor workspace without opening their learner profile.</p></div><button type="button" className="secondary-button" onClick={onOpenTimetable}>Open timetable <ArrowUpRight size={14}/></button></div>
     </div>
 
     <div className="panel settings-card">

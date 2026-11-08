@@ -46,8 +46,8 @@ export default function StudyspaceGroupsPanel(){
   if(m.error)throw m.error;if(r.error)throw r.error;
   const rows=(m.data||[]) as Msg[];setMsgs(old=>[...old.filter(x=>x.group_id!==id),...rows]);setReceipts((r.data||[]) as R[]);
   const other=rows.filter(x=>x.sender_id!==uid);if(other.length){const now=new Date().toISOString();const {error:e}=await supabase.from("studyspace_group_message_receipts").upsert(other.map(x=>({message_id:x.id,learner_id:uid,delivered_at:now,read_at:now})),{onConflict:"message_id,learner_id"});if(e)throw e;}
-  const ids=((gm.data||[]) as {learner_id:string}[]).map(x=>x.learner_id);
-  if(ids.length){const {data}=await supabase.from("studyspace_user_presence").select("user_id,last_seen_at").in("user_id",ids);const map:Record<string,string>={};(data||[]).forEach((x:any)=>map[x.user_id]=Date.now()-new Date(x.last_seen_at).getTime()<120000?"online":x.last_seen_at);setPresence(map);}
+  const people=(gm.data||[]) as Person[];setRoster(people);
+  const map:Record<string,string>={};people.forEach(x=>{if(x.last_seen_at)map[x.user_id]=Date.now()-new Date(x.last_seen_at).getTime()<120000?"online":x.last_seen_at;});setPresence(map);
  };
  useEffect(()=>{void refresh();},[]);
  useEffect(()=>{

@@ -85,7 +85,7 @@ Deno.serve(async request => {
   const acceptedByName = String(body.acceptedByName ?? "").trim();
   const acceptanceRole = String(body.acceptanceRole ?? "");
   if (isAdult) {
-    if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v3") {
+    if (body.termsAccepted !== true || body.termsVersion !== "2026-11-08-v5") {
       return json(400, { error: "Read and personally accept the current StudySpace Terms and Conditions before creating your account." });
     }
     if (acceptedByName !== fullName || acceptanceRole !== "adult_learner") {

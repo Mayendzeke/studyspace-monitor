@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const files = readdirSync("supabase/migrations").filter((name) => name.endsWith(".sql"));
 const required = [
@@ -48,11 +48,10 @@ test("all Realtime publication migrations are present and idempotent", () => {
   for (const [file, table] of realtimeMigrations) {
     assert.ok(files.includes(file), "Missing Realtime migration source: " + file);
     const sql = readFileSync("supabase/migrations/" + file, "utf8");
-    assert.match(sql, /if\\s+not\\s+exists/i, file + " must guard against duplicate publication entries.");
+    assert.match(sql, /\\bif\\s+not\\s+exists\\b/i, file + " must guard against duplicate publication entries.");
     assert.match(sql, /pg_publication_tables/i, file + " must inspect the current publication.");
-    assert.match(
-      sql,
-      new RegExp("alter\\\\s+publication\\\\s+supabase_realtime\\\\s+add\\\\s+table\\\\s+public\\\\." + table + "\\\\b", "i"),
+    assert.ok(
+      sql.toLowerCase().includes("alter publication supabase_realtime add table public." + table),
       file + " must publish public." + table + ".",
     );
   }

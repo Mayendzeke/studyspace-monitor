@@ -2,10 +2,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MODEL = "gemini-3.8-flash";
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") ?? "";
+const allowedOrigins = new Set(["https://mayendzeke.github.io", ...APP_ORIGIN.split(",").map(value => { try { return new URL(value.trim()).origin; } catch { return ""; } }).filter(Boolean)]);
+function originAllowed(origin: string) { return !origin || allowedOrigins.has(origin); }
 const headers = {
-  "Access-Control-Allow-Origin": APP_ORIGIN || "null",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
   "Content-Type": "application/json",
   "Cache-Control": "no-store",
   "Vary": "Origin",
@@ -40,7 +43,9 @@ async function authorizeAdmin(request: Request) {
 async function generate(prompt: string) {
   const key = Deno.env.get("GEMINI_API_KEY")?.trim();
   if (!key) throw new Error("The Gemini API key is not configured in Supabase Edge Function secrets (GEMINI_API_KEY).");
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
+  let response: Response;
+  try {
+    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -53,7 +58,12 @@ async function generate(prompt: string) {
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
       ],
     }),
-  });
+    signal: AbortSignal.timeout(25000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Gemini did not respond within 25 seconds. Please retry.");
+    throw error;
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = typeof payload?.error?.message === "string" ? payload.error.message : "Gemini returned HTTP " + response.status + ".";
@@ -64,9 +74,9 @@ async function generate(prompt: string) {
   return text;
 }
 Deno.serve(async (request: Request) => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers });
+  if (request.method === "OPTIONS") return new Response("ok", { status: 204, headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
-  if (!APP_ORIGIN || request.headers.get("Origin") !== APP_ORIGIN) return json(403, { error: "This StudySpace origin is not allowed." });
+  if (!originAllowed(request.headers.get("Origin") ?? "")) return json(403, { error: "This StudySpace origin is not allowed." });
   try {
     const auth = await authorizeAdmin(request);
     let body: { message?: unknown; history?: unknown };

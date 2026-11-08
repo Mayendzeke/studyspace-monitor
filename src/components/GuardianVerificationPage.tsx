@@ -13,6 +13,7 @@ type GuardianSubmission = {
   verification_source: "in_person" | "guardian_link";
   approval_status: "pending" | "approved" | "rejected";
   verified_at: string | null;
+  testimonial_marketing_consent: boolean;
 };
 
 type PendingLearner = {
@@ -26,7 +27,7 @@ type PendingLearner = {
   guardianSubmission: GuardianSubmission | null;
 };
 
-const TERMS_VERSION = "2026-11-07-v3";
+const TERMS_VERSION = "2026-11-08-v6";
 const RELATIONSHIPS = [
   { value: "mother", label: "Mother" },
   { value: "father", label: "Father" },
@@ -43,6 +44,7 @@ export default function GuardianVerificationPage() {
   const [relationshipDetails, setRelationshipDetails] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
+  const [testimonialMarketingConsent, setTestimonialMarketingConsent] = useState(false);
   const [forceInPerson, setForceInPerson] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,6 +87,7 @@ export default function GuardianVerificationPage() {
     setRelationshipDetails(learner.guardianSubmission?.relationship_details ?? "");
     setGuardianPhone(learner.guardianSubmission?.guardian_phone ?? "");
     setGuardianConsent(false);
+    setTestimonialMarketingConsent(learner.guardianSubmission?.testimonial_marketing_consent ?? false);
     setForceInPerson(false);
     setError("");
     setNotice("");
@@ -144,6 +147,7 @@ export default function GuardianVerificationPage() {
             guardianPhone: guardianPhone.trim(),
             guardianConsent,
             termsVersion: TERMS_VERSION,
+            testimonialMarketingConsent,
           },
     });
     if (invokeError || !data?.success) {
@@ -157,6 +161,7 @@ export default function GuardianVerificationPage() {
     setGuardianPhone("");
     setRelationshipDetails("");
     setGuardianConsent(false);
+    setTestimonialMarketingConsent(false);
     setForceInPerson(false);
     await refresh();
     setSaving(false);
@@ -232,6 +237,9 @@ export default function GuardianVerificationPage() {
               <input type="checkbox" checked={guardianConsent} onChange={event => setGuardianConsent(event.target.checked)}/>
               <span>{selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "I have reviewed the online submission and independently confirmed the guardian’s details, authority and consent before approving this learner’s account." : "I confirm the guardian is present and has personally given the consent described above. I am recording the guardian’s decision accurately."}</span>
             </label>
+            {selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson
+              ? <p className="guardian-privacy-note">Marketing permission: {selected.guardianSubmission.testimonial_marketing_consent ? "The guardian opted in to limited use of testimonial words and preferred name." : "The guardian did not give marketing permission."}</p>
+              : <label className="testimonial-consent"><input type="checkbox" checked={testimonialMarketingConsent} onChange={event => setTestimonialMarketingConsent(event.target.checked)}/><span><strong>Optional: guardian authorises limited testimonial marketing.</strong><small>Only testimonial words and the learner’s preferred name may appear in promotional images. No student ID, contact details or profile photo. This is voluntary and does not affect account activation.</small></span></label>}
             <div className="guardian-form-actions">
               <button type="button" className="subtle-button" disabled={saving} onClick={() => setSelected(null)}>Cancel</button>
               <button type="submit" className="primary-button" disabled={saving || !guardianConsent || guardianFullName.trim().length < 2 || guardianPhone.trim().length < 7 || (relationship === "other" && relationshipDetails.trim().length < 2)}><Users size={15}/>{saving ? "Recording consent…" : selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? "Approve guardian consent & activate" : "Record consent & activate account"}</button>

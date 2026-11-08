@@ -296,8 +296,10 @@ Deno.serve(async (request) => {
   }
 
   if (action === "enable") {
-    if (learner.account_status !== "disabled" && learner.account_status !== "pending") {
-      return json(409, { error: "Only a disabled or pending learner account can be activated." });
+    if (learner.account_status !== "disabled") {
+      return json(409, { error: learner.account_status === "pending_guardian_verification"
+        ? "This learner is awaiting in-person guardian consent. Complete the Guardian verification workflow before activating the account."
+        : "Only a previously disabled learner account can be re-enabled. New registrations must complete their required enrolment checks." });
     }
     const { error } = await admin.auth.admin.updateUserById(learnerId, { ban_duration: "none" });
     if (error) return json(500, { error: "Supabase could not re-enable this account." });

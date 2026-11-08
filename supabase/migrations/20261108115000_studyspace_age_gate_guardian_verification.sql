@@ -28,6 +28,9 @@ create table if not exists public.guardian_verifications (
   created_at timestamptz not null default now()
 );
 
+create index if not exists guardian_verifications_verified_by_idx
+  on public.guardian_verifications (verified_by);
+
 alter table public.guardian_verifications enable row level security;
 revoke all on public.guardian_verifications from public, anon, authenticated;
 grant all on public.guardian_verifications to service_role;

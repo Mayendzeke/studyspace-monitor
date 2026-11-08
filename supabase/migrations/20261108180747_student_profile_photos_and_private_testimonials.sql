@@ -127,7 +127,7 @@ begin
   update public.profiles
   set
     preferred_name = left(coalesce(p_preferred_name, ''), 80),
-    institution = left(coalesce(p_institution, ''), 80),
+    institution = left(coalesce(p_institution, ''), 160),
     education_level = left(coalesce(p_education_level, ''), 80),
     grade = left(coalesce(p_grade, ''), 80),
     curriculum = left(coalesce(p_curriculum, ''), 120),

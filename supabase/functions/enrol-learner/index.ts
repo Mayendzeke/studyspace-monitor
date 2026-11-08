@@ -39,7 +39,12 @@ Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   const PUBLIC_ENROLMENT_ENABLED = false;
-  if (!PUBLIC_ENROLMENT_ENABLED) return json(503, { error: "New learner enrolment is temporarily closed while StudySpace completes the required data-controller registration and legal launch requirements." });
+  const PRIVATE_INVITATION_REDEMPTION_ENABLED = true;
+  // Public self-registration remains closed. Account creation below is still
+  // restricted to an administrator-issued, valid, unexpired, single-use PIN.
+  if (!PUBLIC_ENROLMENT_ENABLED && !PRIVATE_INVITATION_REDEMPTION_ENABLED) {
+    return json(503, { error: "New learner enrolment is closed. Ask the administrator for an invitation." });
+  }
   const origin = request.headers.get("Origin");
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
   const url = Deno.env.get("SUPABASE_URL"), anonKey = getPublishableKey();

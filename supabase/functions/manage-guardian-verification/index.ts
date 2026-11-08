@@ -154,7 +154,6 @@ Deno.serve(async request => {
     const { data: approved, error: approvalError } = await admin.rpc("approve_studyspace_guardian_link_consent", {
       p_learner_id: learnerId,
       p_verified_by: authData.user.id,
-    p_testimonial_marketing_consent: testimonialMarketingConsent,
     });
     if (approvalError || approved !== true) {
       return json(409, { error: approvalError?.message || "The guardian submission could not be approved." });
@@ -189,6 +188,7 @@ Deno.serve(async request => {
     p_guardian_consent: true,
     p_terms_version: termsVersion,
     p_verified_by: authData.user.id,
+    p_testimonial_marketing_consent: testimonialMarketingConsent,
   });
   if (activationError || activated !== true) {
     return json(activationError ? 409 : 500, {

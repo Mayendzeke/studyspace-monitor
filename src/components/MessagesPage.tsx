@@ -57,6 +57,7 @@ export default function MessagesPage(){
     return()=>{void supabase?.removeChannel(channel);};
   },[userId]);
   const visibleContacts=useMemo(()=>contacts.filter(c=>(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query]);
+  const draftWords=draft.trim()?draft.trim().split(/\\s+/).length:0;
   const thread=messages.filter(m=>(m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId));
   const selectedContact=contacts.find(c=>c.contact_id===selected);
   const unreadByContact=new Map<string,number>();
@@ -88,7 +89,7 @@ export default function MessagesPage(){
     if(!supabase||!userId||!selected||sending)return;
     const body=draft.trim();
     if(!body&&!file)return;
-    if(body.length>2000){setError("Messages are limited to 2,000 characters.");return;}
+    if(body.length>2000){setError("Messages are limited to 2,000 characters.");return;}\n    if(body&&body.split(/\\s+/).length>350){setError("Messages are limited to 350 words.");return;}
     if(file&&(file.size>5*1024*1024||!allowedTypes.includes(file.type))){setError("Attachments must be a PDF, JPG, PNG, WebP or TXT file up to 5 MB.");return;}
     setSending(true);setError("");setNotice("");
     let path:string|null=null;
@@ -145,7 +146,7 @@ export default function MessagesPage(){
           </div>
           <form className="monitor-message-composer" onSubmit={send}>
             {file&&<div className="monitor-message-file"><FileText size={14}/><span>{file.name} · {formatBytes(file.size)}</span><button type="button" onClick={()=>{setFile(null);if(fileRef.current)fileRef.current.value="";}} aria-label="Remove attachment">×</button></div>}
-            <div className="monitor-message-compose-row"><button type="button" className="icon-button" aria-label="Attach file" onClick={()=>fileRef.current?.click()}><Paperclip size={17}/></button><input ref={fileRef} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={e=>setFile(e.target.files?.[0]||null)}/><textarea value={draft} maxLength={2000} rows={2} onChange={e=>setDraft(e.target.value)} placeholder="Write a message…" aria-label="Message text"/><button type="submit" className="primary-button" disabled={sending||(!draft.trim()&&!file)}><Send size={15}/>{sending?"Sending…":"Send"}</button></div><div className="monitor-message-limits"><span>Up to 2,000 characters · Attachments up to 5 MB</span><span>{draft.length}/2,000</span></div>
+            <div className="monitor-message-compose-row"><button type="button" className="icon-button" aria-label="Attach file" onClick={()=>fileRef.current?.click()}><Paperclip size={17}/></button><input ref={fileRef} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={e=>setFile(e.target.files?.[0]||null)}/><textarea value={draft} maxLength={2000} rows={2} onChange={e=>setDraft(e.target.value)} placeholder="Write a message…" aria-label="Message text"/><button type="submit" className="primary-button" disabled={sending||(!draft.trim()&&!file)||draftWords>350||draft.length>2000}><Send size={15}/>{sending?"Sending…":"Send"}</button></div><div className="monitor-message-limits"><span>Up to 350 words / 2,000 characters · Attachments up to 5 MB</span><span>{draftWords}/350 words · {draft.length}/2,000</span></div>
           </form>
         </>:<div className="monitor-message-empty"><MessageCircle size={28}/><strong>{loading?"Opening your inbox…":"Select a learner"}</strong><span>Choose a learner from the list to view or start a conversation.</span></div>}
       </section>

@@ -122,11 +122,25 @@ Deno.serve(async request => {
     return json(200, { success: true, guardianUrl: shareUrl.toString(), expiresInDays: 14 });
   }
 
+  if (action === "get_testimonial_marketing_consents") {
+    const learnerIds = Array.isArray(body.learnerIds)
+      ? [...new Set(body.learnerIds.filter(value => typeof value === "string" && UUID_PATTERN.test(value)))]
+      : [];
+    if (!learnerIds.length || learnerIds.length > 120) {
+      return json(400, { error: "Provide between 1 and 120 valid learner IDs." });
+    }
+    const { data, error } = await admin.from("guardian_verifications")
+      .select("learner_id,testimonial_marketing_consent,approval_status")
+      .in("learner_id", learnerIds);
+    if (error) return json(503, { error: "Guardian marketing permissions could not be loaded." });
+    return json(200, { success: true, consents: data ?? [] });
+  }
+
   if (action === "get_record") {
     const learnerId = String(body.learnerId ?? "");
     if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
     const { data, error } = await admin.from("guardian_verifications")
-      .select("guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at")
+      .select("guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at,testimonial_marketing_consent")
       .eq("learner_id", learnerId)
       .maybeSingle();
     if (error) return json(503, { error: "The guardian verification record could not be loaded." });
@@ -140,6 +154,7 @@ Deno.serve(async request => {
     const { data: approved, error: approvalError } = await admin.rpc("approve_studyspace_guardian_link_consent", {
       p_learner_id: learnerId,
       p_verified_by: authData.user.id,
+    p_testimonial_marketing_consent: testimonialMarketingConsent,
     });
     if (approvalError || approved !== true) {
       return json(409, { error: approvalError?.message || "The guardian submission could not be approved." });
@@ -155,6 +170,7 @@ Deno.serve(async request => {
   const guardianPhone = String(body.guardianPhone ?? "").trim();
   const guardianConsent = body.guardianConsent === true;
   const termsVersion = String(body.termsVersion ?? "");
+  const testimonialMarketingConsent = body.testimonialMarketingConsent === true;
 
   if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "Select a valid learner account." });
   if (guardianFullName.length < 2 || guardianFullName.length > 120) return json(400, { error: "Enter the guardian’s full name." });

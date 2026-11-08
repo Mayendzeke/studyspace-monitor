@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const MODEL = "gemini-3.8-flash";
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") ?? "";
-const headers = { "Access-Control-Allow-Origin": APP_ORIGIN || "null", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json", "Cache-Control": "no-store", "Vary": "Origin" };
+const allowedOrigins = new Set(["https://mayendzeke.github.io", ...APP_ORIGIN.split(",").map(value => { try { return new URL(value.trim()).origin; } catch { return ""; } }).filter(Boolean)]);
+const headers = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Max-Age": "86400", "Content-Type": "application/json", "Cache-Control": "no-store" };
+function originAllowed(origin: string) { return !origin || allowedOrigins.has(origin); }
 const json = (status: number, body: Record<string, unknown>) => new Response(JSON.stringify(body), { status, headers });
 function namedKey(name: string) { try { return JSON.parse(Deno.env.get(name) ?? "{}")?.default ?? ""; } catch { return ""; } }
 function publicKey() { return namedKey("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || ""; }
@@ -25,8 +27,11 @@ async function authorize(request: Request) {
 async function callGemini(prompt: string) {
   const key = Deno.env.get("GEMINI_API_KEY")?.trim();
   if (!key) throw new Error("GEMINI_API_KEY is missing from Supabase Edge Function secrets.");
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
+  let response: Response;
+  try {
+    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
     method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    signal: AbortSignal.timeout(25000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.3, maxOutputTokens: 4096, responseMimeType: "application/json" },
@@ -36,8 +41,11 @@ async function callGemini(prompt: string) {
         { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }
       ]
-    })
-  });
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Gemini did not respond within 25 seconds. Please retry.");
+    throw error;
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(payload?.error?.message || "Gemini request failed with HTTP " + response.status).slice(0, 450));
   const text = payload?.candidates?.[0]?.content?.parts?.map((p: {text?: string}) => p.text ?? "").join("").trim();
@@ -45,9 +53,9 @@ async function callGemini(prompt: string) {
   return text;
 }
 Deno.serve(async request => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers });
+  if (request.method === "OPTIONS") return new Response("ok", { status: 204, headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
-  if (!APP_ORIGIN || request.headers.get("Origin") !== APP_ORIGIN) return json(403, { error: "This StudySpace origin is not allowed." });
+  if (!originAllowed(request.headers.get("Origin") ?? "")) return json(403, { error: "This StudySpace origin is not allowed." });
   try {
     const auth = await authorize(request);
     let body: Record<string, unknown>;

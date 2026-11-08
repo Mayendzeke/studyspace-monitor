@@ -41,6 +41,7 @@ const formats: { value: Format; label: string }[] = [
 ];
 const levels = ["Primary school", "Secondary school", "High school / Sixth form", "College", "University", "Other"];
 const uuid = () => crypto.randomUUID();
+const homeworkHandoffKey = "studyspace-monitor-homework-handoff-v1";
 const shuffle = <T,>(items: T[]) => {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
@@ -95,6 +96,42 @@ export default function HomeworkBuilder() {
   const [publishing, setPublishing] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const applyHandoff = () => {
+      try {
+        const raw = localStorage.getItem(homeworkHandoffKey);
+        if (!raw) return;
+        const handoff = JSON.parse(raw) as {
+          level?: string; grade?: string; course?: string; subject?: string; curriculum?: string;
+          topic?: string; instructions?: string; dueDate?: string; learnerIds?: string[];
+        };
+        if (handoff.level) setLevel(handoff.level);
+        if (handoff.grade) setGrade(handoff.grade);
+        if (handoff.course !== undefined) setCourse(handoff.course || "");
+        if (handoff.subject) setSubject(handoff.subject);
+        if (handoff.curriculum) setCurriculum(handoff.curriculum);
+        if (handoff.topic) setTopic(handoff.topic);
+        if (handoff.instructions) setInstructions(handoff.instructions.slice(0, 2000));
+        if (handoff.dueDate) setDueDate(handoff.dueDate);
+        if (Array.isArray(handoff.learnerIds) && handoff.learnerIds.length) {
+          setRecipientMode("selected");
+          setSelectedIds(handoff.learnerIds);
+        }
+        setGroupId("");
+        setQuestions([]);
+        setReviewed(false);
+        setNotice("Classroom context loaded. Check the subject, grade, topic and recipients, then generate interactive questions with MIA.");
+        localStorage.removeItem(homeworkHandoffKey);
+        document.querySelector(".homework-builder")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch {
+        setError("The prepared homework details could not be loaded. Please enter the class details manually.");
+      }
+    };
+    applyHandoff();
+    window.addEventListener("studyspace-prefill-homework-builder", applyHandoff);
+    return () => window.removeEventListener("studyspace-prefill-homework-builder", applyHandoff);
+  }, []);
 
   useEffect(() => {
     let alive = true;

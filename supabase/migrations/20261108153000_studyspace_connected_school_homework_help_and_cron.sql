@@ -127,7 +127,7 @@ begin
   values (extensions.digest(v_token, 'sha256'));
   perform vault.create_secret(v_token, 'studyspace_homework_cron_token');
   perform vault.create_secret('https://tibcoottzstnqkfpwabk.supabase.co', 'studyspace_homework_project_url');
-  perform vault.create_secret('[PUBLISHABLE_KEY_STORED_IN_VAULT_AT_MIGRATION_TIME]', 'studyspace_homework_publishable_key');
+  perform vault.create_secret('sb_publishable_wqNRB4M60as8Ubj_XBUreA_WnpcBIx2', 'studyspace_homework_publishable_key');
 end
 $block$;
 

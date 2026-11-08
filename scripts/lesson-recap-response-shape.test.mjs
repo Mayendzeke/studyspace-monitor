@@ -7,7 +7,7 @@ const source = readFileSync("supabase/functions/generate-lesson-recap/index.ts",
 test("lesson recap handles Cloudflare response bodies and content variants", () => {
   assert.match(source, /const responseText = await response\.text\(\)/, "Read the raw provider body before parsing it.");
   assert.match(source, /JSON\.parse\(responseText\)/, "Parse the provider response body explicitly.");
-  assert.match(source, /Array\.isArray\(content\)/, "Support structured content-part arrays.");
+  assert.match(source, /Array\\.isArray\\(rawContent\\)/, "Support structured content-part arrays.");
   const newlineSeparatorSlashes = source.slice(source.indexOf("Array.isArray(rawContent)")).match(/\.join\("(\\+)n"\)/)?.[1]?.length;
   assert.equal(newlineSeparatorSlashes, 1, "Join provider text parts with one escaped newline.");
   assert.match(source, /typeof choice\?\.text === ["']string["']/, "Support the legacy completion text field.");

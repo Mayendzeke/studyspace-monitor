@@ -32,6 +32,8 @@ jobs:
         run: node --test scripts/homework-fallback-auth-config.test.mjs
       - name: Verify Monitor MIA response content variants
         run: node --test scripts/mia-monitor-response-shape.test.mjs
+      - name: Verify lesson recap response content variants
+        run: node --test scripts/lesson-recap-response-shape.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

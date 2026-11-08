@@ -398,6 +398,15 @@ function AcademicProgressPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  type AssessmentDetail = { id:string; title:string; subject_name:string; score:number; total_points:number; submitted_at:string; marked_at:string|null; teacher_feedback:string };
+  type MemoryDetail = { strengths:unknown; difficulties:unknown; goals:unknown; recent_topics:unknown; updated_at:string } | null;
+  type RecordEvent = { id:string; event_type:string; score:number|null; max_score:number|null; duration_minutes:number|null; created_at:string; metadata:unknown };
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [assessmentRecords, setAssessmentRecords] = useState<AssessmentDetail[]>([]);
+  const [recordEvents, setRecordEvents] = useState<RecordEvent[]>([]);
+  const [learningMemory, setLearningMemory] = useState<MemoryDetail>(null);
+  const [recordLoading, setRecordLoading] = useState(false);
+  const [recordError, setRecordError] = useState('');
 
   const refresh = async () => {
     if (!supabase) {
@@ -474,6 +483,43 @@ function AcademicProgressPage() {
 
   useEffect(()=>{void refresh();},[]);
 
+  const loadLearnerRecord = async (learnerId:string) => {
+    if (!supabase) return;
+    setSelectedRecordId(learnerId);
+    setRecordLoading(true);
+    setRecordError('');
+    try {
+      const [assignmentRows, attemptRows, eventRows, memoryRow] = await Promise.all([
+        supabase.from('exercise_assignments').select('id,exercise_set_id').eq('learner_id',learnerId),
+        supabase.from('exercise_attempts').select('id,assignment_id,score,total_points,submitted_at,marked_at,teacher_feedback').eq('learner_id',learnerId).order('submitted_at',{ascending:false}).limit(100),
+        supabase.from('progress_events').select('id,event_type,score,max_score,duration_minutes,created_at,metadata').eq('learner_id',learnerId).order('created_at',{ascending:false}).limit(50),
+        supabase.from('mia_learning_memory').select('strengths,difficulties,goals,recent_topics,updated_at').eq('learner_id',learnerId).maybeSingle(),
+      ]);
+      const failed=[assignmentRows.error,attemptRows.error,eventRows.error,memoryRow.error].find(Boolean);
+      if(failed) throw failed;
+      const assignmentMap=new Map(((assignmentRows.data??[]) as {id:string;exercise_set_id:string}[]).map(x=>[x.id,x.exercise_set_id]));
+      const exerciseSetIds=[...new Set([...assignmentMap.values()])];
+      const exerciseSets=exerciseSetIds.length
+        ? await supabase.from('exercise_sets').select('id,title,subject_name').in('id',exerciseSetIds)
+        : {data:[],error:null};
+      if(exerciseSets.error) throw exerciseSets.error;
+      const sets=new Map(((exerciseSets.data??[]) as {id:string;title:string;subject_name:string}[]).map(x=>[x.id,x]));
+      const rows=((attemptRows.data??[]) as {id:string;assignment_id:string;score:number;total_points:number;submitted_at:string;marked_at:string|null;teacher_feedback:string}[])
+        .map(x=>{
+          const set=sets.get(assignmentMap.get(x.assignment_id)||'');
+          return {id:x.id,title:set?.title||'Assessment',subject_name:set?.subject_name||'General',score:Number(x.score)||0,total_points:Number(x.total_points)||0,submitted_at:x.submitted_at,marked_at:x.marked_at,teacher_feedback:x.teacher_feedback||''};
+        });
+      setAssessmentRecords(rows);
+      setRecordEvents((eventRows.data??[]) as RecordEvent[]);
+      setLearningMemory((memoryRow.data??null) as MemoryDetail);
+    } catch(reason) {
+      setRecordError(reason instanceof Error?reason.message:'The learner record could not be loaded.');
+      setAssessmentRecords([]);
+      setRecordEvents([]);
+      setLearningMemory(null);
+    } finally { setRecordLoading(false); }
+  };
+
   const visible=learners.filter(item=>{
     const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.grade,item.learner.curriculum].join(' ').toLocaleLowerCase();
     return value.includes(search.trim().toLocaleLowerCase());
@@ -506,11 +552,56 @@ function AcademicProgressPage() {
           <div className="learner-avatar">{(item.learner.preferred_name||item.learner.full_name||'S').slice(0,1).toUpperCase()}</div>
           <div className="learner-identity"><strong>{item.learner.preferred_name||item.learner.full_name||'Learner'}</strong><span>{item.learner.student_id||'No Student ID'} · {item.learner.grade||'Grade not set'} · {item.learner.curriculum||'Curriculum not set'}</span><small>{item.subjects.size} subjects · {item.assignments} assigned · {item.submissions} submitted</small></div>
           <span className="pin-status">{percent===null?'No score yet':percent+'% average'}</span>
-          <div className="learner-actions"><span className="subtle-note">{Math.floor(item.studyMinutes/60)}h {item.studyMinutes%60}m study</span><small>{item.lastActivity?new Date(item.lastActivity).toLocaleDateString():'No activity yet'}</small></div>
+          <div className="learner-actions"><span className="subtle-note">{Math.floor(item.studyMinutes/60)}h {item.studyMinutes%60}m study</span><small>{item.lastActivity?new Date(item.lastActivity).toLocaleDateString():'No activity yet'}</small><button type="button" className="subtle-button" onClick={()=>void loadLearnerRecord(item.learner.id)}>View records</button></div>
         </article>;
       }):<div className="classroom-empty"><Activity size={25}/><strong>{search?'No matching learners':'No learner activity yet'}</strong><span>{search?'Try another search term.':'Learner study sessions and completed assessments will appear here as they use Studyspace.'}</span></div>}
     </section>
     <p className="subtle-note">Scores include submitted teacher assignments and self-practice tests. Written responses awaiting teacher marking may not yet have a final score.</p>
+    {selectedRecordId && <section className="panel monitor-progress-records">
+      {(() => {
+        const selected=learners.find(x=>x.learner.id===selectedRecordId)?.learner;
+        const points=assessmentRecords.slice().reverse().map((x,i)=>{
+          const value=x.total_points>0?Math.max(0,Math.min(100,x.score/x.total_points*100)):0;
+          return {value,x:24+(assessmentRecords.length===1?236:i*472/(assessmentRecords.length-1)),y:178-value*1.48};
+        });
+        const line=points.map(p=>p.x+","+p.y).join(" ");
+        const arrayText=(value:unknown):string[]=>Array.isArray(value)?value.map(x=>typeof x==="string"?x:JSON.stringify(x)).filter(Boolean).slice(0,8):[];
+        return <>
+          <div className="panel-heading"><div><h2>Student academic record</h2><p>{selected?.preferred_name||selected?.full_name||'Selected learner'} · {selected?.student_id||'No Student ID'} · {selected?.grade||'Grade not set'}</p></div><div><button type="button" className="subtle-button" onClick={()=>void loadLearnerRecord(selectedRecordId)} disabled={recordLoading}><RefreshCw size={14}/> Refresh</button><button type="button" className="icon-button" aria-label="Close student record" onClick={()=>setSelectedRecordId(null)}><X size={15}/></button></div></div>
+          {recordError&&<p className="inline-message error-message" role="alert">{recordError}</p>}
+          {recordLoading?<div className="classroom-empty">Loading this learner’s records…</div>:<>
+            <div className="monitor-record-stat-row">
+              <article><span>TESTS MARKED</span><strong>{assessmentRecords.length}</strong></article>
+              <article><span>AVERAGE RESULT</span><strong>{assessmentRecords.length?Math.round(assessmentRecords.reduce((n,x)=>n+(x.total_points?x.score/x.total_points*100:0),0)/assessmentRecords.length)+'%':'—'}</strong></article>
+              <article><span>PROGRESS EVENTS</span><strong>{recordEvents.length}</strong></article>
+            </div>
+            <div className="monitor-record-chart">
+              <div><strong>Assessment history</strong><span>Score percentage by submitted assessment</span></div>
+              {assessmentRecords.length?<svg viewBox="0 0 520 205" role="img" aria-label="Learner assessment scores from zero to one hundred percent">
+                {[0,25,50,75,100].map(v=><g key={v}><line x1="24" x2="496" y1={178-v*1.48} y2={178-v*1.48}/><text x="2" y={182-v*1.48}>{v}</text></g>)}
+                <polyline points={line} fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4"><title>{Math.round(p.value)}%</title></circle>)}
+              </svg>:<p>No assessment scores are recorded yet.</p>}
+            </div>
+            <div className="monitor-record-assessments">
+              <strong>Past tests and marked work</strong>
+              {assessmentRecords.length?assessmentRecords.map(x=><article key={x.id}><div><strong>{x.title}</strong><span>{x.subject_name} · {x.submitted_at?new Date(x.submitted_at).toLocaleDateString():'Date not recorded'}</span>{x.teacher_feedback&&<small>Teacher feedback: {x.teacher_feedback}</small>}</div><b>{x.total_points?Math.round(x.score/x.total_points*100)+'%':'Awaiting score'}</b></article>):<p>No past test records yet.</p>}
+            </div>
+            <div className="monitor-record-mia">
+              <strong><Sparkles size={15}/> MIA learning observations</strong>
+              <div className="monitor-record-mia-grid">
+                <article><b>Strengths</b>{arrayText(learningMemory?.strengths).length?<ul>{arrayText(learningMemory?.strengths).map((x,i)=><li key={i}>{x}</li>)}</ul>:<p>No strengths have been recorded yet.</p>}</article>
+                <article><b>Areas to focus on</b>{arrayText(learningMemory?.difficulties).length?<ul>{arrayText(learningMemory?.difficulties).map((x,i)=><li key={i}>{x}</li>)}</ul>:<p>No focus areas have been recorded yet.</p>}</article>
+              </div>
+              {arrayText(learningMemory?.goals).length>0&&<p><b>Goals:</b> {arrayText(learningMemory?.goals).join(' · ')}</p>}
+              {arrayText(learningMemory?.recent_topics).length>0&&<p><b>Recent topics:</b> {arrayText(learningMemory?.recent_topics).join(' · ')}</p>}
+              <small>{learningMemory?.updated_at?'MIA notes last updated '+new Date(learningMemory.updated_at).toLocaleString():'MIA has not saved a learning summary for this learner yet.'}</small>
+            </div>
+            <div className="monitor-record-events"><strong>Other learning records</strong>{recordEvents.length?recordEvents.slice(0,12).map(x=><article key={x.id}><span>{x.event_type.replaceAll('_',' ')}</span><time>{new Date(x.created_at).toLocaleString()}</time>{x.score!==null&&x.max_score? <b>{x.score}/{x.max_score}</b>:null}</article>):<p>No other learning records recorded yet.</p>}</div>
+          </>}
+        </>;
+      })()}
+    </section>}
   </div>;
 }
 

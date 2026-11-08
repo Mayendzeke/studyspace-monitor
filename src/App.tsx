@@ -6,6 +6,8 @@ import AssessmentReviewQueue from './components/AssessmentReviewQueue'
 import LearnersPage from './components/LearnersPage'
 import TeacherWeeklyTimetable from './components/TeacherWeeklyTimetable'
 import MessagesPage from './components/MessagesPage'
+import NotificationPreferencesPanel from './components/NotificationPreferencesPanel'
+import StudyspaceNotificationListener from './components/StudyspaceNotificationListener'
 import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
 import MiaStudio from './components/MiaStudio'
@@ -247,6 +249,7 @@ function App() {
         </div>
       </aside>
 
+      <StudyspaceNotificationListener />
       <main className="main-area">
         <header className="topbar">
           <div className="topbar-left">
@@ -872,6 +875,8 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
         <button type="button" className={theme === "dark" ? "chosen" : ""} aria-pressed={theme === "dark"} onClick={() => onThemeChange("dark")}><Moon size={15}/> Dark</button>
       </div>
     </div>
+
+    <NotificationPreferencesPanel />
 
     <div className="panel settings-card">
       <div className="panel-heading"><div><h2>Administrator security</h2><p>Change the password for the account that controls StudySpace Monitor. MFA remains mandatory.</p></div><LockKeyhole size={19}/></div>

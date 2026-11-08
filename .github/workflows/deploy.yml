@@ -194,14 +194,17 @@ jobs:
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
           if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
           if (!classroom.includes("extractSection('Learning objectives')") || !classroom.includes("extractSection('Homework')")) throw new Error('MIA lesson sections are not mapped into editable Classroom Studio fields.')
-          const termsVersion = '2026-11-07-v3'
-          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts']) {
+          const termsVersion = '2026-11-08-v5'
+          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts', 'supabase/functions/enrol-learner/index.ts', 'supabase/functions/mia-assistant/index.ts', 'supabase/functions/manage-guardian-verification/index.ts', 'supabase/functions/guardian-consent/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
             if (source.includes('2026-11-07-v1')) throw new Error(path + ' still contains a stale StudySpace terms-version check.')
           }
           const enrolment = readFileSync('supabase/functions/enrol-learner/index.ts', 'utf8')
           if (!enrolment.includes(termsVersion)) throw new Error('Learner enrolment does not record the current StudySpace terms version.')
+          const guardianVerification = readFileSync('supabase/functions/manage-guardian-verification/index.ts', 'utf8')
+          const guardianConsent = readFileSync('supabase/functions/guardian-consent/index.ts', 'utf8')
+          if (!guardianVerification.includes(termsVersion) || !guardianConsent.includes(termsVersion)) throw new Error('Guardian consent and activation must enforce the current StudySpace terms version.')
           const capacityMigration = readFileSync('supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql', 'utf8')
           if (!capacityMigration.includes("interval '48 hours'")) throw new Error('The learner trial must last exactly 48 hours.')
           if (!enrolment.includes('complete_studyspace_enrolment')) throw new Error('Learner enrolment must start its 48-hour trial through the database transaction.')
@@ -233,10 +236,16 @@ jobs:
             if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
           console.log('Cloudflare Workers AI integration, learner terms/access, administrator MFA and AI usage audit checks passed.')
-          const migration = readFileSync('supabase/migrations/20261108070859_universal_trial_and_terms_acceptance.sql', 'utf8')
+          const migration = readFileSync('supabase/migrations/20261108150000_studyspace_terms_v5_backend_alignment.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
-          if (!migration.includes("terms_version = '2026-11-07-v3'")) throw new Error('Database access must require the current Terms version.')
+          if (!migration.includes("terms_version = '2026-11-08-v5'")) throw new Error('Database access must require the current Terms version.')
+          const homeworkBuilder = readFileSync('src/components/HomeworkBuilder.tsx', 'utf8')
+          const homeworkFunction = readFileSync('supabase/functions/generate-homework/index.ts', 'utf8')
+          if (!homeworkBuilder.includes('save_studyspace_exercise_draft') || !homeworkBuilder.includes('exercise_assignments') || !homeworkBuilder.includes('reviewed')) throw new Error('MIA Homework must save reviewed assignments to the connected assessment schema.')
+          if (!homeworkFunction.includes('aal2') || !homeworkFunction.includes('@cf/google/gemma-4-26b-a4b-it') || !homeworkFunction.includes('markingGuide')) throw new Error('MIA Homework generation must use protected administrator access and Cloudflare Gemma.')
+          if (homeworkFunction.includes('generativelanguage.googleapis.com') || homeworkFunction.includes('GEMINI_API_KEY')) throw new Error('MIA Homework must not use the retired Gemini provider.')
+          console.log('Connected MIA Homework generation and reviewed-assignment source checks passed.')
           console.log('Database trial-start, invoker-security and current-terms guards passed.')
           console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')

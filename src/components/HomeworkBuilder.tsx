@@ -179,21 +179,25 @@ export default function HomeworkBuilder() {
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Administrator sign-in has expired. Sign in again.");
-      const questionRows = questions.map((q, index) => ({
-        id: q.id,
-        position: index + 1,
-        question_type: q.type,
-        prompt: q.prompt.trim(),
-        content: q.type === "multiple_choice"
-          ? { options: q.options, topic: q.topic, difficulty: q.difficulty }
-          : q.type === "matching"
-            ? { pairs: q.pairs.map(pair => ({ left: pair.left, right: pair.right })) .map((pair, i, arr) => ({ left: pair.left, right: shuffle(arr.map(x => x.right))[i] })) , topic: q.topic, difficulty: q.difficulty }
-            : { topic: q.topic, difficulty: q.difficulty },
-        explanation: "",
-        points: q.points,
-        topic: q.topic,
-        difficulty: q.difficulty,
-      }));
+      const questionRows = questions.map((q, index) => {
+        let content: Record<string, unknown> = { topic: q.topic, difficulty: q.difficulty };
+        if (q.type === "multiple_choice") content = { ...content, options: q.options };
+        if (q.type === "matching") {
+          const shuffledRight = shuffle(q.pairs.map(pair => pair.right));
+          content = { ...content, pairs: q.pairs.map((pair, pairIndex) => ({ left: pair.left, right: shuffledRight[pairIndex] })) };
+        }
+        return {
+          id: q.id,
+          position: index + 1,
+          question_type: q.type,
+          prompt: q.prompt.trim(),
+          content,
+          explanation: "",
+          points: q.points,
+          topic: q.topic,
+          difficulty: q.difficulty,
+        };
+      });
       const answerRows = questions.map(q => ({
         question_id: q.id,
         answer_key: q.type === "matching"

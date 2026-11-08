@@ -12,7 +12,8 @@ type Learner = {
   student_id: string | null;
   full_name: string;
   preferred_name: string;
-  account_status: "active" | "disabled" | "pending" | string;
+  account_status: "active" | "disabled" | "pending" | "pending_guardian_verification" | string;
+  date_of_birth: string | null;
   created_at: string;
   updated_at: string;
   country: string;
@@ -158,7 +159,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
+      .select("id,student_id,full_name,preferred_name,account_status,date_of_birth,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -183,6 +184,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     active: learners.filter(item => item.account_status === "active").length,
     disabled: learners.filter(item => item.account_status === "disabled").length,
     pending: learners.filter(item => item.account_status === "pending").length,
+    pendingGuardian: learners.filter(item => item.account_status === "pending_guardian_verification").length,
   }), [learners]);
 
   const visible = useMemo(() => {
@@ -376,6 +378,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
         <button type="button" className={statusFilter === "pending" ? "learner-summary-card selected" : "learner-summary-card"} onClick={() => setStatusFilter("pending")}>
           <span>Pending</span><strong>{counts.pending}</strong><small>Not yet activated</small>
         </button>
+        <button type="button" className={statusFilter === "pending_guardian_verification" ? "learner-summary-card selected" : "learner-summary-card"} onClick={() => setStatusFilter("pending_guardian_verification")}>
+          <span>Guardian verification</span><strong>{counts.pendingGuardian}</strong><small>Awaiting in-person consent</small>
+        </button>
       </div>
 
       <div className="panel learners-toolbar">
@@ -397,6 +402,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
             <option value="active">Active</option>
             <option value="disabled">Disabled</option>
             <option value="pending">Pending</option>
+            <option value="pending_guardian_verification">Guardian verification</option>
           </select>
         </label>
       </div>
@@ -423,7 +429,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <strong>{learnerName(learner)}</strong>
               <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"}{learner.course ? " · " + learner.course : ""} · {learner.curriculum || "Curriculum not set"}</span>
               <small><Building2 size={12}/> {learner.institution || "School not set"} · {learner.education_level || "Level not set"} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
-              <small>Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
+              <small>{learner.date_of_birth ? "Date of birth " + new Date(learner.date_of_birth + "T00:00:00").toLocaleDateString() : "Date of birth not recorded"} · Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
               <small>{learner.subscription_tier
                 ? "Paid plan: " + learner.subscription_tier + (learner.subscription_expires_at ? " · expires " + new Date(learner.subscription_expires_at).toLocaleString() : " · no expiry")
                 : learner.trial_expires_at
@@ -437,8 +443,10 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <button type="button" className="text-button" disabled={!!busyId || learner.account_status !== "active"} onClick={() => void manage(learner, "reset_password")}><KeyRound size={13}/> Reset password</button>
               {learner.account_status === "active" ? (
                 <button type="button" className="text-button danger-text" disabled={!!busyId} onClick={() => void manage(learner, "disable")}>Disable</button>
-              ) : (
+              ) : learner.account_status === "disabled" ? (
                 <button type="button" className="text-button" disabled={!!busyId} onClick={() => void manage(learner, "enable")}>Enable</button>
+              ) : (
+                <span className="learner-pending-action">{learner.account_status === "pending_guardian_verification" ? "Guardian verification required" : "Registration pending"}</span>
               )}
               <button type="button" className="text-button danger-text" disabled={!!busyId} onClick={() => { setDeleteTarget(learner); setDeleteConfirmation(""); setError(""); }}>
                 <Trash2 size={13}/> Delete

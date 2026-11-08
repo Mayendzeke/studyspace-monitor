@@ -48,6 +48,9 @@ Deno.serve(async request => {
     studentId?: string;
     pin?: string;
     password?: string;
+    fullName?: string;
+    preferredName?: string;
+    dateOfBirth?: string;
     termsAccepted?: boolean;
     termsVersion?: string;
     acceptedByName?: string;
@@ -60,16 +63,33 @@ Deno.serve(async request => {
   if (!/^STU-[A-Z0-9]{8}$/.test(studentId) || !/^\d{8}$/.test(pin)) return json(400, { error: "Check the Student ID and 8-digit enrolment PIN." });
   if (password.length < 10 || password.length > 128) return json(400, { error: "Choose a password between 10 and 128 characters." });
 
+  const fullName = String(body.fullName ?? "").trim().replace(/\\s+/g, " ");
+  const preferredName = String(body.preferredName ?? "").trim().replace(/\\s+/g, " ");
+  const dateOfBirth = String(body.dateOfBirth ?? "");
+  if (fullName.length < 2 || fullName.length > 120) return json(400, { error: "Enter the learner’s full name." });
+  if (preferredName.length > 80) return json(400, { error: "The preferred name is too long." });
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
+  const birthDate = new Date(dateOfBirth + "T00:00:00.000Z");
+  if (Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== dateOfBirth || birthDate.getTime() > Date.now()) {
+    return json(400, { error: "Enter a valid date of birth." });
+  }
+  const today = new Date();
+  let learnerAge = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const monthDelta = today.getUTCMonth() - birthDate.getUTCMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < birthDate.getUTCDate())) learnerAge--;
+  const isAdult = learnerAge >= 18;
+
   const acceptedByName = String(body.acceptedByName ?? "").trim();
   const acceptanceRole = String(body.acceptanceRole ?? "");
-  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v3") {
-    return json(400, { error: "Read and accept the current StudySpace Terms and Conditions before creating your account." });
-  }
-  if (acceptedByName.length < 2 || acceptedByName.length > 120) {
-    return json(400, { error: "Enter the full name of the person accepting the Terms and Conditions." });
-  }
-  if (!["adult_learner", "parent_guardian"].includes(acceptanceRole)) {
-    return json(400, { error: "Confirm whether acceptance is by an adult learner or a parent/legal guardian." });
+  if (isAdult) {
+    if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v3") {
+      return json(400, { error: "Read and personally accept the current StudySpace Terms and Conditions before creating your account." });
+    }
+    if (acceptedByName !== fullName || acceptanceRole !== "adult_learner") {
+      return json(400, { error: "The adult learner must accept the Terms and Conditions in their own full name." });
+    }
+  } else if (body.termsAccepted === true || acceptedByName || acceptanceRole) {
+    return json(400, { error: "Guardian consent for learners under 18 must be completed in person through StudySpace Monitor." });
   }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
@@ -101,7 +121,7 @@ Deno.serve(async request => {
   const email = studentId.toLowerCase() + "@students.studyspace.invalid";
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
-    user_metadata: { student_id: studentId },
+    user_metadata: { student_id: studentId, full_name: fullName, preferred_name: preferredName || fullName, date_of_birth: dateOfBirth },
   });
   if (createError || !created.user) {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: false });
@@ -121,20 +141,31 @@ Deno.serve(async request => {
   const { data: completed, error: completionError } = await admin.rpc("complete_studyspace_enrolment", {
     p_learner_id: created.user.id,
     p_student_id: studentId,
-    p_accepted_by_name: acceptedByName,
-    p_acceptance_role: acceptanceRole,
+    p_full_name: fullName,
+    p_preferred_name: preferredName || fullName,
+    p_date_of_birth: dateOfBirth,
+    p_accepted_by_name: isAdult ? acceptedByName : null,
+    p_acceptance_role: isAdult ? "adult_learner" : null,
   });
-  if (completionError || completed !== true) {
+  if (completionError || !["active", "pending_guardian_verification"].includes(String(completed))) {
     await admin.from("enrolment_pins")
       .update({ redeemed_by: null, redeemed_at: null })
       .eq("id", invitation.id)
       .eq("redeemed_by", created.user.id);
     await admin.auth.admin.deleteUser(created.user.id);
-    if (!completionError && completed === false) {
+    if (!completionError && completed === "capacity_reached") {
       return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
     }
     return json(500, { error: "The account could not be completed. The invitation has been released; please try again or contact Study Space." });
   }
   await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: true });
-  return json(200, { success: true, studentId, message: "Account created. Sign in with your Student ID and password." });
+  if (completed === "pending_guardian_verification") {
+    return json(200, {
+      success: true,
+      studentId,
+      accountStatus: "pending_guardian_verification",
+      message: "Registration is complete. A parent or legal guardian must complete in-person verification with a StudySpace representative before this account can be opened.",
+    });
+  }
+  return json(200, { success: true, studentId, accountStatus: "active", message: "Account created. Sign in with your Student ID and password." });
 });

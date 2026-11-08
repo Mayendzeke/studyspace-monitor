@@ -66,7 +66,7 @@ async function generate(prompt: string) {
   const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
   const raw = choice?.message?.content;
   const text = typeof raw === "string" ? raw.trim()
-    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\\n").trim()
+    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
     : typeof choice?.text === "string" ? choice.text.trim() : "";
   if (!text) throw new Error("MIA received an empty response from its AI provider.");
   return text;

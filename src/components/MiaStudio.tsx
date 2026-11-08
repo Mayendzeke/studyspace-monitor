@@ -30,7 +30,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant, using Gemini with Gemma as an automatic backup. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Cloudflare Workers AI · Gemma 4. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },

@@ -57,7 +57,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     return()=>{void supabase?.removeChannel(channel);};
   },[userId]);
   const visibleContacts=useMemo(()=>contacts.filter(c=>(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query]);
-  const draftWords=draft.trim()?draft.trim().split(/\\s+/).length:0;
+  const draftWords=draft.trim()?draft.trim().split(/\s+/).length:0;
   const thread=messages.filter(m=>(m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId));
   const selectedContact=contacts.find(c=>c.contact_id===selected);
   const unreadByContact=new Map<string,number>();

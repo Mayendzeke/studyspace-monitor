@@ -153,7 +153,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
             const unread=unreadByContact.get(c.contact_id)||0;
             return <button type="button" key={c.contact_id} className={"monitor-contact-item"+(selected===c.contact_id?" is-active":"")} onClick={()=>setSelected(c.contact_id)}>
               <span className="monitor-contact-avatar">{c.display_name.trim().slice(0,1).toUpperCase()}</span>
-              <span className="monitor-contact-copy"><strong>{c.display_name} <i className={presence[c.contact_id]==="online"?"ss-presence-dot is-online":"ss-presence-dot"} title={presenceLabel(c.contact_id)}/></strong><small>{last?.body||last?.attachment_name||c.grade||"Start a private conversation"}</small></span>
+              <span className="monitor-contact-copy"><strong>{c.display_name} <i className={presence[c.contact_id]==="online"?"ss-presence-dot is-online":"ss-presence-dot"} title={presenceLabel(c.contact_id)}/></strong><small>{last?.body||last?.attachment_name||c.grade||"Start a private conversation"}</small><small className="monitor-presence-meta">{presenceLabel(c.contact_id)}</small></span>
               {unread>0&&<i className="monitor-contact-unread">{unread>9?"9+":unread}</i>}
             </button>;
           })}

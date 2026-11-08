@@ -209,11 +209,16 @@ jobs:
             throw new Error('The Monitor PWA manifest has an unexpected app name, start URL or scope.')
           }
           if (!Array.isArray(manifest.icons) || !manifest.icons.length) throw new Error('The PWA manifest has no app icons.')
+          const pngIcons = manifest.icons.filter(icon => icon.type === 'image/png')
+          for (const size of ['192x192', '512x512']) {
+            if (!pngIcons.some(icon => icon.sizes === size)) throw new Error('The Monitor manifest is missing its ' + size + ' PNG icon.')
+          }
           for (const icon of manifest.icons) {
             const relative = String(icon.src).replace('/studyspace-monitor/', '')
             if (!existsSync(join('dist', relative))) throw new Error('A declared PWA icon is missing from the build: ' + icon.src)
           }
           if (!files.includes('sw.js')) throw new Error('The offline service worker was not generated.')
+          if (!readFileSync('src/main.tsx', 'utf8').includes('registerSW({ immediate: true })')) throw new Error('The Monitor app does not register its PWA service worker.')
           const app = readFileSync('src/App.tsx', 'utf8')
           const mia = readFileSync('src/components/MiaStudio.tsx', 'utf8')
           const classroom = readFileSync('src/components/ClassroomStudio.tsx', 'utf8')

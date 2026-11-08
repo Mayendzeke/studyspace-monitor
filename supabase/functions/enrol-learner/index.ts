@@ -70,10 +70,13 @@ Deno.serve(async request => {
   if (preferredName.length > 80) return json(400, { error: "The preferred name is too long." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
   const birthDate = new Date(dateOfBirth + "T00:00:00.000Z");
-  if (Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== dateOfBirth || birthDate.getTime() > Date.now()) {
+  const localToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  if (Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== dateOfBirth || dateOfBirth > localToday) {
     return json(400, { error: "Enter a valid date of birth." });
   }
-  const today = new Date();
+  const today = new Date(localToday + "T00:00:00.000Z");
   let learnerAge = today.getUTCFullYear() - birthDate.getUTCFullYear();
   const monthDelta = today.getUTCMonth() - birthDate.getUTCMonth();
   if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < birthDate.getUTCDate())) learnerAge--;
@@ -160,29 +163,11 @@ Deno.serve(async request => {
   }
   await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: true });
   if (completed === "pending_guardian_verification") {
-    const randomToken = crypto.getRandomValues(new Uint8Array(32));
-    const guardianToken = Array.from(randomToken, byte => byte.toString(16).padStart(2, "0")).join("");
-    const guardianTokenHash = await digest(guardianToken);
-    const { error: inviteError } = await admin.from("guardian_verification_invites").insert({
-      learner_id: created.user.id,
-      token_hash: guardianTokenHash,
-      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    });
-    const studentAppUrl = Deno.env.get("STUDENT_APP_URL") ?? "https://mayendzeke.github.io/planner/";
-    let guardianUrl: string | null = null;
-    if (!inviteError) {
-      const shareUrl = new URL(studentAppUrl);
-      shareUrl.searchParams.set("guardian_consent", guardianToken);
-      guardianUrl = shareUrl.toString();
-    }
     return json(200, {
       success: true,
       studentId,
       accountStatus: "pending_guardian_verification",
-      guardianUrl,
-      message: inviteError
-        ? "Registration is complete. Your account is locked while guardian verification is pending. A StudySpace representative can record guardian consent in person or generate a fresh guardian link in Monitor."
-        : "Registration is complete. Copy the guardian invitation link and send it to your parent or legal guardian. The account will remain locked until StudySpace approves the consent.",
+      message: "Registration is complete. Your account is locked while guardian verification is pending. You can request a private guardian link now, or a StudySpace representative can record the guardian’s consent in person.",
     });
   }
   return json(200, { success: true, studentId, accountStatus: "active", message: "Account created. Sign in with your Student ID and password." });

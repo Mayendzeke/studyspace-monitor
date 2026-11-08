@@ -63,9 +63,13 @@ async function generate(prompt: string) {
     const detail = Array.isArray(payload?.errors) ? payload.errors.map((item: any) => item?.message || "").filter(Boolean).join("; ") : "";
     throw new Error((detail || "Cloudflare Workers AI returned HTTP " + response.status + ".").slice(0, 450));
   }
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) throw new Error("MIA received an empty response from its AI provider.");
-  return content.trim();
+  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
+  const raw = choice?.message?.content;
+  const text = typeof raw === "string" ? raw.trim()
+    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
+    : typeof choice?.text === "string" ? choice.text.trim() : "";
+  if (!text) throw new Error("MIA received an empty response from its AI provider.");
+  return text;
 }
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });

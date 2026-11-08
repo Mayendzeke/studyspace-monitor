@@ -42,3 +42,12 @@ verify_jwt = true
 
 [functions.guardian-consent]
 verify_jwt = false
+
+[functions.generate-homework]
+verify_jwt = true
+
+[functions.process-homework-fallbacks]
+verify_jwt = false
+
+[functions.reply-homework-help]
+verify_jwt = true

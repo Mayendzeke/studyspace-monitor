@@ -28,6 +28,14 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Verify scheduled homework fallback authentication configuration
+        run: node --test scripts/homework-fallback-auth-config.test.mjs
+      - name: Verify Monitor MIA response content variants
+        run: node --test scripts/mia-monitor-response-shape.test.mjs
+      - name: Verify lesson recap response content variants
+        run: node --test scripts/lesson-recap-response-shape.test.mjs
+      - name: Verify migration source matches the applied ledger
+        run: node --test scripts/migration-ledger-source.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true
@@ -283,7 +291,7 @@ jobs:
             if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
           console.log('Cloudflare Workers AI integration, learner terms/access, administrator MFA and AI usage audit checks passed.')
-          const migration = readFileSync('supabase/migrations/20261108162000_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
+          const migration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
           if (!migration.includes("terms_version = '2026-11-08-v6'")) throw new Error('Database access must require the current Terms version.')
@@ -292,9 +300,9 @@ jobs:
           const homeworkInbox = readFileSync('src/components/HomeworkHelpInbox.tsx', 'utf8')
           const homeworkReply = readFileSync('supabase/functions/reply-homework-help/index.ts', 'utf8')
           const homeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
-          const homeworkMigration = readFileSync('supabase/migrations/20261108153000_studyspace_connected_school_homework_help_and_cron.sql', 'utf8')
-          const homeworkHardening = readFileSync('supabase/migrations/20261108160000_studyspace_harden_homework_uploads_and_timer.sql', 'utf8')
-          const termsMigration = readFileSync('supabase/migrations/20261108162000_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
+          const homeworkMigration = readFileSync('supabase/migrations/20261108134824_studyspace_connected_school_homework_help_and_cron.sql', 'utf8')
+          const homeworkHardening = readFileSync('supabase/migrations/20261108135554_studyspace_harden_homework_uploads_and_timer.sql', 'utf8')
+          const termsMigration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!homeworkBuilder.includes('save_studyspace_exercise_draft') || !homeworkBuilder.includes('exercise_assignments') || !homeworkBuilder.includes('reviewed')) throw new Error('MIA Homework must save reviewed assignments to the connected assessment schema.')
           if (!homeworkFunction.includes('aal2') || !homeworkFunction.includes('@cf/google/gemma-4-26b-a4b-it') || !homeworkFunction.includes('markingGuide')) throw new Error('MIA Homework generation must use protected administrator access and Cloudflare Gemma.')
           if (homeworkFunction.includes('generativelanguage.googleapis.com') || homeworkFunction.includes('GEMINI_API_KEY')) throw new Error('MIA Homework must not use the retired Gemini provider.')

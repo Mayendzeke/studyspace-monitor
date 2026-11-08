@@ -129,11 +129,37 @@ Deno.serve(async request => {
     if (!learnerIds.length || learnerIds.length > 120) {
       return json(400, { error: "Provide between 1 and 120 valid learner IDs." });
     }
-    const { data, error } = await admin.from("guardian_verifications")
-      .select("learner_id,testimonial_marketing_consent,approval_status")
-      .in("learner_id", learnerIds);
-    if (error) return json(503, { error: "Guardian marketing permissions could not be loaded." });
-    return json(200, { success: true, consents: data ?? [] });
+    const [profilesResult, guardiansResult] = await Promise.all([
+      admin.from("profiles").select("id,date_of_birth").eq("role", "learner").in("id", learnerIds),
+      admin.from("guardian_verifications").select("learner_id,testimonial_marketing_consent,approval_status").in("learner_id", learnerIds),
+    ]);
+    if (profilesResult.error || guardiansResult.error) {
+      return json(503, { error: "Learner ages or guardian marketing permissions could not be verified." });
+    }
+    const guardianByLearner = new Map((guardiansResult.data ?? []).map(row => [row.learner_id, row]));
+    const localToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+    const today = new Date(localToday + "T00:00:00.000Z");
+    const consents = (profilesResult.data ?? []).map(profile => {
+      const guardian = guardianByLearner.get(profile.id);
+      let isMinor: boolean | null = null;
+      if (profile.date_of_birth) {
+        const dob = new Date(String(profile.date_of_birth) + "T00:00:00.000Z");
+        if (!Number.isNaN(dob.getTime()) && dob <= today) {
+          let age = today.getUTCFullYear() - dob.getUTCFullYear();
+          if (today.getUTCMonth() < dob.getUTCMonth() || (today.getUTCMonth() === dob.getUTCMonth() && today.getUTCDate() < dob.getUTCDate())) age--;
+          if (age >= 0) isMinor = age < 18;
+        }
+      }
+      return {
+        learner_id: profile.id,
+        is_minor: isMinor,
+        testimonial_marketing_consent: guardian?.testimonial_marketing_consent === true,
+        approval_status: guardian?.approval_status ?? null,
+      };
+    });
+    return json(200, { success: true, consents });
   }
 
   if (action === "get_record") {

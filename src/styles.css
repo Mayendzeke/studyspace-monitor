@@ -1443,3 +1443,20 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 
 .ss-group-mute{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border,rgba(127,140,180,.28));background:rgba(110,125,185,.08);cursor:pointer;color:var(--text,inherit);font:inherit;font-size:11px;padding:7px 10px;white-space:nowrap;}
 .ss-group-mute:disabled{opacity:.55;cursor:wait;}
+
+
+/* Shared direct/group message controls */
+.ss-message-actions{position:relative;display:inline-block;align-self:flex-end;margin-inline-start:auto;z-index:2}
+.ss-message-actions summary{list-style:none;cursor:pointer;display:grid;place-items:center;width:28px;height:25px;border:1px solid var(--border,rgba(130,150,190,.22));border-radius:8px;color:var(--muted,#8391a8);font-size:19px;line-height:1;background:var(--panel,rgba(90,110,145,.08))}
+.ss-message-actions summary::-webkit-details-marker{display:none}
+.ss-message-actions[open] summary{color:var(--text,#e9efff);border-color:var(--accent,var(--mint,#75d6bd))}
+.ss-message-actions>div{position:absolute;right:0;bottom:calc(100% + 5px);min-width:165px;padding:5px;display:grid;gap:3px;border:1px solid var(--border,rgba(130,150,190,.24));border-radius:10px;background:var(--panel-strong,#142039);box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.ss-message-actions button{border:0;border-radius:7px;padding:8px 10px;text-align:left;color:var(--text,#e9efff);background:transparent;font-size:11px}
+.ss-message-actions button:hover{background:var(--panel,rgba(130,150,190,.15))}
+.ss-message-edit{display:grid;gap:7px;min-width:min(310px,68vw)}
+.ss-message-edit textarea{width:100%;min-height:72px;resize:vertical;border:1px solid var(--border,rgba(130,150,190,.25));border-radius:9px;padding:9px;background:var(--bg2,#0e1729);color:var(--text,#e9efff);font:inherit;font-size:12px}
+.ss-message-edit>div{display:flex;gap:7px;justify-content:flex-end}
+.ss-message-edit button{border:1px solid var(--border,rgba(130,150,190,.25));border-radius:7px;padding:6px 10px;color:var(--text,#e9efff);background:var(--panel,rgba(130,150,190,.1));font-size:10px}
+.ss-message-edit button:first-child{background:var(--mint,#79e2c4);color:#102c2c;border-color:transparent}
+.ss-message-unsent{font-style:italic;opacity:.72}
+.ss-message-edited{display:inline-block;margin-left:5px;font-size:9px;font-style:italic;opacity:.65}

@@ -75,6 +75,7 @@ The current migration sequence is:
 38. `supabase/migrations/20261108115000_studyspace_age_gate_guardian_verification.sql`
 39. `supabase/migrations/20261108130000_studyspace_guardian_invitation_links.sql`
 40. `supabase/migrations/20261108133000_studyspace_eswatini_age_calculation.sql`
+41. `supabase/migrations/20261108140000_studyspace_in_person_guardian_override.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 

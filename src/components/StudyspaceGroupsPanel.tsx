@@ -7,7 +7,8 @@ type Msg={id:string;group_id:string;sender_id:string;body:string;attachment_path
 type P={contact_id:string;display_name:string;grade:string;contact_type:string};
 type R={message_id:string;learner_id:string;delivered_at:string|null;read_at:string|null};
 type E={id:string;title:string;subject_name:string;education_level:string;grade:string;day_of_week:number;starts_at:string};
-type I={id:string;group_id:string;inviter_id:string;invitee_id:string;status:string};\ntype Person={user_id:string;display_name:string;grade:string;last_seen_at:string|null};
+type I={id:string;group_id:string;inviter_id:string;invitee_id:string;status:string};
+type Person={user_id:string;display_name:string;grade:string;last_seen_at:string|null};
 const allowed=["image/jpeg","image/png","image/webp","application/pdf","text/plain"];
 const ext=(f:File)=>({"image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf","text/plain":"txt"} as Record<string,string>)[f.type]||"";
 export default function StudyspaceGroupsPanel(){

@@ -54,7 +54,7 @@ async function callGemini(prompt: string) {
   return text;
 }
 Deno.serve(async request => {
-  if (request.method === "OPTIONS") return new Response("ok", { status: 204, headers });
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   if (!originAllowed(request.headers.get("Origin") ?? "")) return json(403, { error: "This StudySpace origin is not allowed." });
   try {

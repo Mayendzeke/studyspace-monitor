@@ -98,8 +98,13 @@ function App() {
 
   useEffect(() => {
     const openClassroom = () => { setPage('Classroom Studio'); setMobileOpen(false) }
+    const openHomework = () => { setPage('Classroom Studio'); setMobileOpen(false) }
     window.addEventListener('studyspace-open-classroom-studio', openClassroom)
-    return () => window.removeEventListener('studyspace-open-classroom-studio', openClassroom)
+    window.addEventListener('studyspace-open-homework-builder', openHomework)
+    return () => {
+      window.removeEventListener('studyspace-open-classroom-studio', openClassroom)
+      window.removeEventListener('studyspace-open-homework-builder', openHomework)
+    }
   }, [])
 
   useEffect(() => {

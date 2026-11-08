@@ -1148,3 +1148,42 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .guardian-link-panel input{width:100%;min-width:0;padding:.7rem;border:1px solid var(--border,#dce2ec);border-radius:10px;background:var(--surface,#fff);color:inherit;font-size:.82rem}
 .guardian-form-grid input[readonly],.guardian-form-grid select:disabled{opacity:.8;cursor:not-allowed}
 @media(max-width:720px){.guardian-queue-row{flex-direction:column}.guardian-create-link{align-self:stretch}}
+
+
+.homework-builder{margin-top:24px;padding:24px;min-width:0}
+.homework-builder .panel-heading h2{display:flex;align-items:center;gap:9px}
+.homework-privacy-note{margin:16px 0;padding:13px 15px;border:1px solid rgba(113,100,216,.24);border-radius:12px;background:rgba(113,100,216,.07);font-size:13px;line-height:1.55}
+.homework-privacy-note strong{display:block;margin-bottom:3px}
+.homework-grid,.homework-question-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.homework-builder label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--text)}
+.homework-builder input:not([type=checkbox]):not([type=radio]),.homework-builder select,.homework-builder textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-strong);color:var(--text);font:inherit;font-size:13px;outline:none}
+.homework-builder textarea{resize:vertical;line-height:1.5}
+.homework-instructions{margin-top:14px}
+.homework-generate-row,.homework-subheading,.homework-publish-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.homework-generate-row{margin-top:14px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.homework-generate-row>span,.homework-subheading>span,.homework-publish-row>span{font-size:12px;color:var(--muted)}
+.homework-recipients{padding:17px 0;border-bottom:1px solid var(--border)}
+.homework-subheading{margin-bottom:12px}
+.homework-subheading strong{display:flex;align-items:center;gap:7px;font-size:14px}
+.homework-recipient-mode{display:flex;gap:18px;flex-wrap:wrap}
+.homework-recipient-mode label,.homework-learner-list label,.homework-review-confirm{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;font-weight:500!important}
+.homework-builder input[type=checkbox],.homework-builder input[type=radio]{width:16px;height:16px;accent-color:var(--purple)}
+.homework-learner-list{max-height:190px;overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px;padding:12px;border:1px solid var(--border);border-radius:12px}
+.homework-learner-list label{font-size:12px}
+.homework-learner-list small{display:block;color:var(--muted)}
+.homework-review{padding-top:18px}
+.homework-question{padding:15px;margin:14px 0;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.homework-question-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px}
+.homework-question>label{margin:10px 0}
+.homework-question-fields{grid-template-columns:repeat(3,minmax(0,1fr));margin:10px 0}
+.homework-remove{border:0;background:transparent;color:var(--danger);padding:5px}
+.homework-review-confirm{margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:11px;font-size:12px}
+.homework-publish-row{padding-top:14px;border-top:1px solid var(--border)}
+.homework-publish-row>span{display:flex;align-items:center;gap:6px}
+.homework-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:32px 12px;text-align:center;color:var(--muted)}
+.homework-empty strong{color:var(--text);font-size:13px}
+.homework-empty span{font-size:12px}
+.homework-message{margin:12px 0;padding:11px 13px;border-radius:10px;font-size:12px;line-height:1.5}
+.homework-message.error{background:rgba(180,35,58,.08);color:var(--danger)}
+.homework-message.success{background:rgba(38,134,110,.08);color:var(--mint)}
+@media(max-width:640px){.homework-grid,.homework-question-fields,.homework-learner-list{grid-template-columns:1fr}.homework-builder{padding:16px}.homework-publish-row>*{width:100%}}

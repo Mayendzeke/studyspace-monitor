@@ -28,7 +28,6 @@ Deno.serve(async request => {
   const allowedOrigin = Deno.env.get("APP_ORIGIN");
   const requestOrigin = request.headers.get("Origin");
   if (!allowedOrigin || !requestOrigin || requestOrigin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
-  if (Deno.env.get("STUDYSPACE_PUBLIC_ENROLMENT_ENABLED") !== "true") return json(503, { error: "New learner invitations are paused until Study Space completes its required data-protection registration." });
 
   const authorization = request.headers.get("Authorization");
   const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
@@ -51,11 +50,15 @@ Deno.serve(async request => {
   // The learner trial is a separate 48-hour period beginning after successful enrolment.
   try { await request.json(); } catch { /* Empty request bodies are valid. */ }
 
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data: capacityAvailable, error: capacityError } = await admin.rpc("studyspace_enrolment_capacity_available");
+  if (capacityError) return json(503, { error: "Enrolment capacity could not be verified. Please try again shortly." });
+  if (capacityAvailable !== true) return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
+
   const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
   const studentId = "STU-" + Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => (byte % 36).toString(36)).join("").toUpperCase();
   const pinHash = await pinDigest(pin, pinPepper);
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { error: insertError } = await admin.from("enrolment_pins").insert({
     pin_hash: pinHash,
     student_id: studentId,

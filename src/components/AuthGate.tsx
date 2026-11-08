@@ -1,17 +1,28 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Activity, GraduationCap, LockKeyhole, ShieldCheck } from 'lucide-react'
+import { Activity, GraduationCap, LockKeyhole, ShieldCheck, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-type Props = { mode: 'unconfigured' | 'signin' | 'recovery'; error: string; onError: (message: string) => void }
+type Props = { mode: 'unconfigured' | 'signin' | 'recovery'; error: string; onError: (message: string) => void; installAvailable: boolean; onInstall: () => void }
 
-export default function AuthGate({ mode, error, onError }: Props) {
+export default function AuthGate({ mode, error, onError, installAvailable, onInstall }: Props) {
   const [screen, setScreen] = useState<'signin' | 'reset' | 'update'>(() => mode === 'recovery' ? 'update' : 'signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [showInstallHelp, setShowInstallHelp] = useState(false)
+  const installControl = <div className="auth-install">
+    <button type="button" className="auth-link" onClick={() => installAvailable ? onInstall() : setShowInstallHelp(value => !value)}>
+      <Download size={15}/> {installAvailable ? 'Install StudySpace Monitor' : 'Add Monitor to this device'}
+    </button>
+    {showInstallHelp && <div className="auth-footnote" role="status">
+      <strong>Install StudySpace Monitor</strong>
+      <p><b>Android:</b> open this page in Chrome, tap the three-dot menu (⋮), then choose <b>Install app</b>. If it offers <b>Add to Home screen</b> instead, use that.</p>
+      <p><b>iPhone:</b> open in Safari, tap Share, then <b>Add to Home Screen</b>.</p>
+    </div>}
+  </div>
 
   useEffect(() => {
     if (!supabase) return
@@ -56,6 +67,7 @@ export default function AuthGate({ mode, error, onError }: Props) {
 
   if (mode === 'unconfigured') return <div className="auth-screen"><section className="auth-card">
     <div className="auth-brand"><div className="brand-mark"><GraduationCap size={23}/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
+    {installControl}
     <div className="auth-lock-icon"><LockKeyhole size={25}/></div>
     <h1>Administrator access is locked</h1>
     <p>Supabase authentication must be configured before the Monitor dashboard can open. This prevents an unprotected public administrator console.</p>

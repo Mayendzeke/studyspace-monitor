@@ -30,7 +30,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "MIA is temporarily paused while Study Space verifies an AI provider and data-processing arrangement suitable for its school-age learning service. Your prompts are not currently sent to an AI provider. The Monitor and learner-management tools remain available.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Google Gemini. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
@@ -80,7 +80,7 @@ async function edgeError(reason: unknown): Promise<string> {
 const unique = (values: (string | null | undefined)[]) => Array.from(new Set(values.map(value => value?.trim()).filter((value): value is string => !!value))).sort((a, b) => a.localeCompare(b))
 
 export default function MiaStudio() {
-  const adminMiaEnabled = import.meta.env.VITE_STUDYSPACE_ADMIN_MIA_ENABLED === 'true';
+  const adminMiaEnabled = true;
   const [userId, setUserId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([welcome])
   const [draft, setDraft] = useState('')
@@ -378,7 +378,7 @@ export default function MiaStudio() {
           </section>
         </div>
       )}
-    </> : <div className="mia-paused-panel glass-panel" role="status"><div className="mia-brand-mark"><Sparkles size={25}/></div><h2>MIA is temporarily paused</h2><p>Study Space is verifying an AI provider and data-processing arrangement suitable for its school-age learning service. Your prompts, lesson notes and attachments are not currently sent to an external AI provider. The Monitor, learner records, subscriptions and classroom administration remain available.</p></div>}
+    </>}
     </section>
   )
 }

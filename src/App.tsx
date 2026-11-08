@@ -4,7 +4,8 @@ import HomeworkBuilder from './components/HomeworkBuilder'
 import HomeworkHelpInbox from './components/HomeworkHelpInbox'
 import AssessmentReviewQueue from './components/AssessmentReviewQueue'
 import LearnersPage from './components/LearnersPage'
-import AdminTimetablePage from './components/AdminTimetablePage'
+import TeacherWeeklyTimetable from './components/TeacherWeeklyTimetable'
+import MessagesPage from './components/MessagesPage'
 import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
 import MiaStudio from './components/MiaStudio'
@@ -20,10 +21,10 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
-  Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert,
+  Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -32,6 +33,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'MIA', icon: Sparkles },
   { label: 'Learners', icon: Users },
   { label: 'Timetable', icon: CalendarDays },
+  { label: 'Messages', icon: MessageCircle },
   { label: 'Guardian verification', icon: ShieldCheck },
   { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
@@ -257,6 +259,7 @@ function App() {
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
+            <button type="button" className="icon-button" aria-label="Open messages" title="Messages" onClick={() => setPage('Messages')}><MessageCircle size={17}/></button>
             <NotificationCenter />
             <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LockKeyhole size={16} /></button>
           </div>
@@ -265,7 +268,8 @@ function App() {
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
-          {page === 'Timetable' && <AdminTimetablePage />}
+          {page === 'Timetable' && <TeacherWeeklyTimetable />}
+          {page === 'Messages' && <MessagesPage />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIA' && <MiaStudio />}

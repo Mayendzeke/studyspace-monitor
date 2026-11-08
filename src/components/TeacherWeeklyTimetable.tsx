@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, Plus, Minus, RefreshCw, Users, Pencil, Trash2, X, Save, FileText, Search, CheckCircle2, AlertCircle, MapPin, ZoomIn, Video } from "lucide-react";
+import { CalendarDays, Plus, Minus, RefreshCw, Users, Pencil, Trash2, X, Save, FileText, Search, CheckCircle2, AlertCircle, MapPin, ZoomIn, Video } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import LiveClassroomCall from "./LiveClassroomCall";
 

@@ -116,9 +116,12 @@ Deno.serve(async request => {
       return json(409, { error: "This learner's account is no longer awaiting guardian verification." });
     }
     const dob = new Date(String(learner.date_of_birth) + "T00:00:00.000Z");
-    const now = new Date();
-    let age = now.getUTCFullYear() - dob.getUTCFullYear();
-    if (now.getUTCMonth() < dob.getUTCMonth() || (now.getUTCMonth() === dob.getUTCMonth() && now.getUTCDate() < dob.getUTCDate())) age--;
+    const localToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+    const today = new Date(localToday + "T00:00:00.000Z");
+    let age = today.getUTCFullYear() - dob.getUTCFullYear();
+    if (today.getUTCMonth() < dob.getUTCMonth() || (today.getUTCMonth() === dob.getUTCMonth() && today.getUTCDate() < dob.getUTCDate())) age--;
     if (age < 0 || age >= 18) return json(409, { error: "This invitation is not eligible for guardian consent." });
     return json(200, {
       success: true,

@@ -44,7 +44,9 @@ type GuardianRecord = {
   consent_given: boolean;
   terms_version: string;
   terms_accepted_at: string;
-  verified_at: string;
+  verification_source: "in_person" | "guardian_link";
+  approval_status: "pending" | "approved" | "rejected";
+  verified_at: string | null;
 };
 
 type ManageAction = "disable" | "enable" | "reset_password";
@@ -507,9 +509,10 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <span>Guardian</span><b>{guardianRecord.guardian_full_name}</b>
                 <span>Relationship</span><b>{guardianRecord.relationship === "legal_guardian" ? "Legal guardian" : guardianRecord.relationship.charAt(0).toUpperCase() + guardianRecord.relationship.slice(1)}{guardianRecord.relationship_details ? " · " + guardianRecord.relationship_details : ""}</b>
                 <span>Contact</span><b>{guardianRecord.guardian_phone}</b>
-                <span>Consent</span><b>{guardianRecord.consent_given ? "Given in person" : "Not recorded"}</b>
+                <span>Consent</span><b>{guardianRecord.consent_given ? (guardianRecord.verification_source === "guardian_link" ? "Submitted online" : "Given in person") : "Not recorded"}</b>
+                <span>Approval status</span><b>{guardianRecord.approval_status === "approved" ? "Approved" : guardianRecord.approval_status === "pending" ? "Awaiting administrator review" : "Rejected"}</b>
                 <span>Terms version</span><b>{guardianRecord.terms_version}</b>
-                <span>Verified</span><b>{new Date(guardianRecord.verified_at).toLocaleString()}</b>
+                <span>Verified</span><b>{guardianRecord.verified_at ? new Date(guardianRecord.verified_at).toLocaleString() : "Not yet verified"}</b>
               </div>
             </section>}
             <div className="learner-view-timetables">

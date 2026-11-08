@@ -216,17 +216,23 @@ jobs:
           if (!accountManagement.includes('payment_transaction_reference') || !accountManagement.includes('already been used')) throw new Error('Subscription activation must audit and reject reused MTN MoMo transaction references.')
           const paymentReferenceMigration = readFileSync('supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql', 'utf8')
           if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
+          const learnerAI = readFileSync('supabase/functions/mia-assistant/index.ts', 'utf8')
+          if (!learnerAI.includes('CLOUDFLARE_ACCOUNT_ID') || !learnerAI.includes('CLOUDFLARE_API_TOKEN')) throw new Error('Learner MIΛ must use protected Cloudflare Workers AI credentials.')
+          if (!learnerAI.includes('CURRENT_TERMS_VERSION') || !learnerAI.includes('trial_expires_at') || !learnerAI.includes('subscription_expires_at')) throw new Error('Learner MIΛ must enforce current terms and active trial/paid access.')
+          if (!learnerAI.includes('image_url') || !learnerAI.includes('usage_status')) throw new Error('Learner MIΛ image processing or usage-status contract is missing.')
+          for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
+            const source = readFileSync(path, 'utf8')
+            if (!source.includes('CLOUDFLARE_ACCOUNT_ID') || !source.includes('CLOUDFLARE_API_TOKEN') || !source.includes('@cf/google/gemma-4-26b-a4b-it')) {
+              throw new Error(path + ' must use the configured Cloudflare Workers AI model and protected credentials.')
+            }
+            if (/generativelanguage\\.googleapis\\.com|GEMINI_API_KEY|gemini-3\\.8-flash/.test(source)) throw new Error(path + ' must not retain the retired Gemini API connection.')
+          }
           for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
             const source = readFileSync(path, 'utf8')
-            if (!source.includes('GEMINI_API_KEY') || !source.includes('gemini-3.8-flash') || !source.includes('generativelanguage.googleapis.com')) {
-              throw new Error(path + ' must use the configured Gemini API key and supported model.')
-            }
-            if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) {
-              throw new Error(path + ' must enforce administrator role and MFA.')
-            }
+            if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) throw new Error(path + ' must enforce administrator role and MFA.')
             if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
-          console.log('Gemini integration, administrator role, MFA and AI usage audit checks passed.')
+          console.log('Cloudflare Workers AI integration, learner terms/access, administrator MFA and AI usage audit checks passed.')
           const migration = readFileSync('supabase/migrations/20261108070859_universal_trial_and_terms_acceptance.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')

@@ -91,7 +91,7 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 
 Keep both peppers private. Do not put them in GitHub, browser environment variables, frontend bundles, or chat.
 
-The learner-facing MIA assistant, Monitor MIA assistant and AI lesson-recap endpoint are intentionally paused and currently fail closed with HTTP 503. They do not call an external model or send learner messages or attachments to an AI provider. Do not add provider secrets or enable these features until a provider whose terms permit school-age use has been selected and the complete workflow has been reviewed and tested.
+The learner-facing The administrator-facing MIA assistant and Classroom Studio lesson-recap/lesson-structure tools use Google Gemini through Supabase Edge Functions. The model is `gemini-3.8-flash`; the server reads `GEMINI_API_KEY` only from Supabase Edge Function secrets. Never put this key in GitHub, frontend environment variables, source code, browser storage or chat. Both endpoints require a valid JWT, an active administrator profile and AAL2 MFA, restrict requests to the configured StudySpace origin, enforce an 80-request daily per-administrator limit and write a usage audit event. The learner-facing `mia-assistant` endpoint remains disabled until the student AI data-processing and age-appropriate safeguards are separately reviewed.
 
 ## 4. Deploy Edge Functions
 
@@ -108,7 +108,7 @@ Deploy these functions to the same Supabase project:
 - `mia-assistant` — learner-facing MIΛ learning companion
 - `mia-monitor-assistant` — administrator-facing MIA teaching and StudySpace assistant
 
-Both MIA functions remain gateway-JWT protected, but they currently return HTTP 503 without generating text while provider approval is pending. The Monitor UI feature flag is off. No external model requests are made and learner text or attachments are not forwarded to a provider. Keep the role-separated access controls when re-enabling: the learner endpoint must accept only an active learner, while the Monitor endpoint must accept only an active administrator with AAL2 MFA.
+The Monitor MIA and lesson-recap functions remain gateway-JWT protected and accept only active administrators with AAL2 MFA. Gemini requests are made server-side using `GEMINI_API_KEY`. The student-facing `mia-assistant` endpoint remains closed and must not be used by the learner planner until the separate learner-data and age-appropriate safety review is completed. Keep these administrator and learner authorization paths separate.
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 

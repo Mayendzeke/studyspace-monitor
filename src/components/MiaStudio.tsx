@@ -30,7 +30,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Google Gemini. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Cloudflare Workers AI · Gemma 4. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
@@ -162,7 +162,7 @@ export default function MiaStudio() {
     try {
       const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
         body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
-      }), 45000, 'MIA did not respond within 45 seconds. Your message has been restored so you can retry.');
+      }), 70000, 'MIA did not respond within 70 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'MIA did not return a usable response.')

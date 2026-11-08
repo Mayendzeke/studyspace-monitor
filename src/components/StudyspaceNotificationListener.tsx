@@ -50,6 +50,7 @@ export default function StudyspaceNotificationListener() {
           row.body?.trim() || (row.attachment_name ? "Attachment: " + row.attachment_name : "Open your study groups to view the message."),
           "studyspace-group-" + row.id,
           import.meta.env.BASE_URL + "studyspace-monitor.svg",
+          row.group_id,
         );
       })
       .on("postgres_changes", {

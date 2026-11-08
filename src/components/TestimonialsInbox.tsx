@@ -22,20 +22,10 @@ type LearnerProfile = {
   institution: string | null;
   course: string | null;
   avatar_path: string | null;
-  date_of_birth: string | null;
 };
 
 const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || 'S';
-type GuardianMarketingConsent = { testimonial_marketing_consent: boolean; approval_status: string };
-function learnerAge(dateOfBirth: string | null): number | null {
-  if (!dateOfBirth) return null;
-  const today = new Date();
-  const dob = new Date(dateOfBirth + "T00:00:00");
-  if (Number.isNaN(dob.getTime()) || dob > today) return null;
-  let age = today.getFullYear() - dob.getFullYear();
-  if (today.getMonth() < dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-  return age;
-}
+type GuardianMarketingConsent = { is_minor: boolean | null; testimonial_marketing_consent: boolean; approval_status: string | null };
 function wrapCanvasText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string[] {
   const lines: string[] = [];
   const paragraphs = value.replace(/\r/g, "").split("\n");
@@ -98,7 +88,7 @@ export default function TestimonialsInbox() {
       if (ids.length) {
         const { data: profileRows, error: profileError } = await supabase
           .from('profiles')
-          .select('id,full_name,preferred_name,student_id,education_level,grade,institution,course,avatar_path,date_of_birth')
+          .select('id,full_name,preferred_name,student_id,education_level,grade,institution,course,avatar_path')
           .in('id', ids);
         if (profileError) throw profileError;
         const byId: Record<string, LearnerProfile> = {};
@@ -113,7 +103,7 @@ export default function TestimonialsInbox() {
           setGuardianMarketingConsents(guardianMap);
         } else {
           setGuardianMarketingConsents({});
-          setError(guardianData?.error || guardianError?.message || 'Guardian marketing permissions could not be verified. PNG export for under-18 learners remains disabled until they can be checked.');
+          setError(guardianData?.error || guardianError?.message || 'Learner ages and guardian marketing permissions could not be verified. PNG export is disabled until they can be checked.');
         }
         const signed = await Promise.all(Object.values(byId).filter(profile => profile.avatar_path).map(async profile => {
           const { data: signedData } = await supabase!.storage.from('studyspace-avatars').createSignedUrl(profile.avatar_path!, 3600);
@@ -171,12 +161,10 @@ export default function TestimonialsInbox() {
 
   function canExportMarketingImage(item: Testimonial): boolean {
     const learner = profiles[item.learner_id];
-    if (!learner || !item.testimonial_marketing_consent) return false;
-    const age = learnerAge(learner.date_of_birth);
-    if (age === null) return false;
-    if (age >= 18) return true;
-    const guardian = guardianMarketingConsents[item.learner_id];
-    return guardian?.approval_status === 'approved' && guardian.testimonial_marketing_consent === true;
+    const consent = guardianMarketingConsents[item.learner_id];
+    if (!learner || !item.testimonial_marketing_consent || !consent || consent.is_minor === null) return false;
+    if (consent.is_minor === false) return true;
+    return consent.approval_status === 'approved' && consent.testimonial_marketing_consent === true;
   }
 
   async function downloadTestimonialImage(item: Testimonial) {

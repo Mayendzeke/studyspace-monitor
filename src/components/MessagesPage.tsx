@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, CheckCheck, AlertCircle } from "lucide-react";
+import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, CheckCheck, AlertCircle, Users } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
-type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null};
+type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null;delivered_at:string|null};
 
 const allowedTypes=["image/jpeg","image/png","image/webp","application/pdf","text/plain"];
 const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf","text/plain":"txt" } as Record<string,string>)[file.type]||"";
@@ -12,6 +12,7 @@ const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/w
 export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void}){
   const [userId,setUserId]=useState("");
   const [mailbox,setMailbox]=useState<"inbox"|"sent"|"groups">("inbox");
+  const [presence,setPresence]=useState<Record<string,string>>({});
   const [contacts,setContacts]=useState<Contact[]>([]);
   const [messages,setMessages]=useState<Message[]>([]);
   const [selected,setSelected]=useState("");
@@ -28,9 +29,9 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
 
   const loadMessages=async()=>{
     if(!supabase||!userId)return;
-    const {data,error:e}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("created_at",{ascending:true}).limit(400);
+    const {data,error:e}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("created_at",{ascending:true}).limit(400);
     if(e)throw e;
-    setMessages((data??[]) as Message[]);
+    const rows=(data??[]) as Message[];setMessages(rows);const undelivered=rows.filter(m=>m.recipient_id===userId&&!m.delivered_at);if(undelivered.length)void supabase.from("direct_messages").update({delivered_at:new Date().toISOString()}).in("id",undelivered.map(m=>m.id));
   };
   const refresh=async()=>{
     if(!supabase)return;
@@ -46,7 +47,8 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       setSelected(current=>current&&rows.some(x=>x.contact_id===current)?current:(rows[0]?.contact_id??""));
       const {data:messageData,error:messageError}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at").or("sender_id.eq."+data.user.id+",recipient_id.eq."+data.user.id).order("created_at",{ascending:true}).limit(400);
       if(messageError)throw messageError;
-      setMessages((messageData??[]) as Message[]);
+      const rows=(messageData??[]) as Message[];setMessages(rows);const undelivered=rows.filter(m=>m.recipient_id===data.user.id&&!m.delivered_at);if(undelivered.length)void supabase.from("direct_messages").update({delivered_at:new Date().toISOString()}).in("id",undelivered.map(m=>m.id));
+      const {data:presenceRows}=await supabase.from("studyspace_user_presence").select("user_id,last_seen_at").in("user_id",rows.map(x=>x.contact_id));const pmap:Record<string,string>={};(presenceRows??[]).forEach((x:any)=>pmap[x.user_id]=Date.now()-new Date(x.last_seen_at).getTime()<120000?"online":x.last_seen_at);setPresence(pmap);
     }catch(reason){setError(reason instanceof Error?reason.message:"Messages could not be loaded.");}
     finally{setLoading(false);}
   };
@@ -55,6 +57,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     if(!supabase||!userId)return;
     const channel=supabase.channel("monitor-direct-messages-"+userId)
       .on("postgres_changes",{event:"*",schema:"public",table:"direct_messages"},()=>void loadMessages().catch(e=>setError(e.message||"New messages could not be refreshed.")))
+      .on("postgres_changes",{event:"*",schema:"public",table:"studyspace_user_presence"},payload=>{const row=payload.new as {user_id:string;last_seen_at:string};if(row?.user_id)setPresence(v=>({...v,[row.user_id]:Date.now()-new Date(row.last_seen_at).getTime()<120000?"online":row.last_seen_at}));})
       .subscribe();
     return()=>{void supabase?.removeChannel(channel);};
   },[userId]);
@@ -62,6 +65,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
   const draftWords=draft.trim()?draft.trim().split(/\s+/).length:0;
   const thread=messages.filter(m=>(m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId));
   const selectedContact=contacts.find(c=>c.contact_id===selected);
+  const presenceLabel=(id:string)=>presence[id]==="online"?"Online":presence[id]?"Last seen "+new Date(presence[id]).toLocaleString():"Offline";
   const unreadByContact=new Map<string,number>();
   messages.filter(m=>m.recipient_id===userId&&!m.read_at).forEach(m=>unreadByContact.set(m.sender_id,(unreadByContact.get(m.sender_id)||0)+1));
   useEffect(()=>{
@@ -140,7 +144,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
             const unread=unreadByContact.get(c.contact_id)||0;
             return <button type="button" key={c.contact_id} className={"monitor-contact-item"+(selected===c.contact_id?" is-active":"")} onClick={()=>setSelected(c.contact_id)}>
               <span className="monitor-contact-avatar">{c.display_name.trim().slice(0,1).toUpperCase()}</span>
-              <span className="monitor-contact-copy"><strong>{c.display_name}</strong><small>{last?.body||last?.attachment_name||c.grade||"Start a private conversation"}</small></span>
+              <span className="monitor-contact-copy"><strong>{c.display_name} <i className={presence[c.contact_id]==="online"?"ss-presence-dot is-online":"ss-presence-dot"} title={presenceLabel(c.contact_id)}/></strong><small>{last?.body||last?.attachment_name||c.grade||"Start a private conversation"}</small></span>
               {unread>0&&<i className="monitor-contact-unread">{unread>9?"9+":unread}</i>}
             </button>;
           })}
@@ -148,9 +152,9 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
         </div>
       </aside>
       <section className="monitor-conversation">
-        {selectedContact?<><header className="monitor-conversation-head"><div><span className="monitor-contact-avatar">{selectedContact.display_name.trim().slice(0,1).toUpperCase()}</span><div><strong>{selectedContact.display_name}</strong><small>{selectedContact.grade||"Studyspace learner"} · Private direct messages</small></div></div><span className="monitor-secure-label"><Check size={13}/> Private</span></header>
+        {selectedContact?<><header className="monitor-conversation-head"><div><span className="monitor-contact-avatar">{selectedContact.display_name.trim().slice(0,1).toUpperCase()}</span><div><strong>{selectedContact.display_name}</strong><small>{selectedContact.grade||"Studyspace learner"} · {presenceLabel(selectedContact.contact_id)} · Private direct messages</small></div></div><span className="monitor-secure-label"><Check size={13}/> Private</span></header>
           <div className="monitor-message-list">
-            {loading&&!thread.length?<p className="monitor-message-empty">Loading conversation…</p>:thread.length?thread.map(m=><article key={m.id} className={"monitor-message-bubble"+(m.sender_id===userId?" is-outgoing":"")}><div>{m.body&&<p>{m.body}</p>}{m.attachment_path&&<a className="monitor-message-attachment" href={signedUrls[m.id]||"#"} target="_blank" rel="noreferrer" onClick={e=>{if(!signedUrls[m.id])e.preventDefault();}}><FileText size={16}/><span>{m.attachment_name||"Attachment"}<small>{formatBytes(m.attachment_size)}</small></span></a>}</div><time>{new Date(m.created_at).toLocaleString([], {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{m.sender_id===userId&&<CheckCheck size={13}/>}</time></article>):<div className="monitor-message-empty"><MessageCircle size={25}/><strong>No messages yet</strong><span>Start a private conversation with {selectedContact.display_name}.</span></div>}
+            {loading&&!thread.length?<p className="monitor-message-empty">Loading conversation…</p>:thread.length?thread.map(m=><article key={m.id} className={"monitor-message-bubble"+(m.sender_id===userId?" is-outgoing":"")}><div>{m.body&&<p>{m.body}</p>}{m.attachment_path&&<a className="monitor-message-attachment" href={signedUrls[m.id]||"#"} target="_blank" rel="noreferrer" onClick={e=>{if(!signedUrls[m.id])e.preventDefault();}}><FileText size={16}/><span>{m.attachment_name||"Attachment"}<small>{formatBytes(m.attachment_size)}</small></span></a>}</div><time>{new Date(m.created_at).toLocaleString([], {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{m.sender_id===userId&&<small className="monitor-message-status">{m.read_at?"Seen":m.delivered_at?"Delivered":"Sent"}</small>}</time></article>):<div className="monitor-message-empty"><MessageCircle size={25}/><strong>No messages yet</strong><span>Start a private conversation with {selectedContact.display_name}.</span></div>}
             <div ref={bottomRef}/>
           </div>
           <form className="monitor-message-composer" onSubmit={send}>

@@ -48,7 +48,7 @@ test("all Realtime publication migrations are present and idempotent", () => {
   for (const [file, table] of realtimeMigrations) {
     assert.ok(files.includes(file), "Missing Realtime migration source: " + file);
     const sql = readFileSync("supabase/migrations/" + file, "utf8");
-    assert.match(sql, /\\bif\\s+not\\s+exists\\b/i, file + " must guard against duplicate publication entries.");
+    assert.match(sql, /\bif\s+not\s+exists\b/i, file + " must guard against duplicate publication entries.");
     assert.match(sql, /pg_publication_tables/i, file + " must inspect the current publication.");
     assert.ok(
       sql.toLowerCase().includes("alter publication supabase_realtime add table public." + table),

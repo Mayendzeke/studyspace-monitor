@@ -217,7 +217,7 @@ export default function GuardianVerificationPage() {
           {selected.guardianSubmission?.verification_source === "guardian_link" && !forceInPerson ? (
             <>
               <p className="guardian-consent-instruction">The parent or legal guardian has submitted these details online. The learner is still locked. Review the submission and independently confirm the guardian’s authority and consent before approval. An online link submission is not, by itself, proof of identity or guardian authority.</p>
-              <button type="button" className="subtle-button guardian-switch-inperson" onClick={() => { setForceInPerson(true); setGuardianConsent(false); }}>Guardian is here — complete verification in person</button>
+              <button type="button" className="subtle-button guardian-switch-inperson" onClick={() => { setForceInPerson(true); setGuardianConsent(false); setTestimonialMarketingConsent(false); }}>Guardian is here — complete verification in person</button>
             </>
           ) : (
             <p className="guardian-consent-instruction">Use this route only when the parent or legal guardian is physically with you. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full terms are available in the <a href="https://mayendzeke.github.io/planner/?studyspace_terms=1" target="_blank" rel="noreferrer">StudySpace Student App</a>. This route will replace any earlier unapproved online submission with the details you confirm in person.</p>

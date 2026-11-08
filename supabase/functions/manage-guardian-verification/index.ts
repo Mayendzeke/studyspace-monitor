@@ -83,6 +83,17 @@ Deno.serve(async request => {
     return json(200, { success: true, learners });
   }
 
+  if (action === "get_record") {
+    const learnerId = String(body.learnerId ?? "");
+    if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
+    const { data, error } = await admin.from("guardian_verifications")
+      .select("guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verified_at")
+      .eq("learner_id", learnerId)
+      .maybeSingle();
+    if (error) return json(503, { error: "The guardian verification record could not be loaded." });
+    return json(200, { success: true, record: data ?? null });
+  }
+
   if (action !== "approve") return json(400, { error: "Unsupported guardian verification action." });
   const learnerId = String(body.learnerId ?? "");
   const guardianFullName = String(body.guardianFullName ?? "").trim().replace(/\s+/g, " ");

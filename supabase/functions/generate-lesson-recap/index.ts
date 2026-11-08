@@ -78,7 +78,7 @@ async function callCloudflare(prompt: string, maxTokens = 2800) {
       typeof part === "string" ? part
         : part && typeof part === "object" && part.type === "text" && typeof part.text === "string" ? part.text
         : ""
-    ).filter(Boolean).join("\\n").trim();
+    ).filter(Boolean).join("\n").trim();
   }
   if (!content && typeof choice?.text === "string") content = choice.text.trim();
   if (!content) {

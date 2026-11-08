@@ -4,6 +4,10 @@ import { supabase } from "../lib/supabase";
 import SharedStudyTimetable from "./SharedStudyTimetable";
 import TimetableManager from "./TimetableManager";
 
+type TimetableEntry = { id: string; learner_id: string; timetable_kind: "school" | "personal"; subject_name: string; title: string; day_of_week: number; starts_at: string; ends_at: string; location: string; notes: string; };
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 type Learner = {
   id: string;
   student_id: string | null;
@@ -16,6 +20,9 @@ type Learner = {
 
 export default function AdminTimetablePage() {
   const [learners, setLearners] = useState<Learner[]>([]);
+  const [entries, setEntries] = useState<TimetableEntry[]>([]);
+  const [kindFilter, setKindFilter] = useState<"all" | "school" | "personal">("all");
+  const [scheduleError, setScheduleError] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"school" | "personal">("school");
@@ -33,11 +40,23 @@ export default function AdminTimetablePage() {
     if (loadError) {
       setError("Learner records could not be loaded. Check administrator access and database policies.");
       setLearners([]);
+      setEntries([]);
     } else {
       const next = (data || []) as Learner[];
       setLearners(next);
       if (!selectedId && next.length) setSelectedId(next[0].id);
       if (selectedId && !next.some(item => item.id === selectedId)) setSelectedId(next[0]?.id || "");
+      if (!next.length) {
+        setEntries([]);
+      } else {
+        const { data: timetableRows, error: timetableError } = await supabase.from("student_timetable_entries")
+          .select("id,learner_id,timetable_kind,subject_name,title,day_of_week,starts_at,ends_at,location,notes")
+          .in("learner_id", next.map(item => item.id))
+          .order("day_of_week").order("starts_at");
+        if (timetableError) throw timetableError;
+        setEntries((timetableRows || []) as TimetableEntry[]);
+      }
+      setScheduleError("");
       setUpdatedAt(new Date().toISOString());
     }
     setLoading(false);
@@ -50,6 +69,12 @@ export default function AdminTimetablePage() {
   ].join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const selected = learners.find(item => item.id === selectedId);
   const displayName = (item: Learner) => item.preferred_name || item.full_name || "Learner";
+  const learnerById = new Map(learners.map(item => [item.id, item]));
+  const visibleEntries = entries.filter(entry => {
+    const learner = learnerById.get(entry.learner_id);
+    return (kindFilter === "all" || entry.timetable_kind === kindFilter)
+      && [learner?.full_name, learner?.preferred_name, learner?.student_id, entry.subject_name, entry.title].join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  });
 
   return <div className="subpage">
     <div className="welcome-row">
@@ -58,6 +83,33 @@ export default function AdminTimetablePage() {
     </div>
 
     <SharedStudyTimetable />
+
+    <section className="panel timetable-admin-overview">
+      <div className="panel-heading"><div><h2>All learner timetables</h2><p>{entries.length} school and personal timetable entries across {learners.length} learner account(s). Manage takes you directly to the selected learner's editor.</p></div><CalendarDays size={19}/></div>
+      <div className="theme-options" role="group" aria-label="Filter timetable entries">
+        <button type="button" className={kindFilter === "all" ? "chosen" : ""} onClick={() => setKindFilter("all")}>All timetables</button>
+        <button type="button" className={kindFilter === "school" ? "chosen" : ""} onClick={() => setKindFilter("school")}>School</button>
+        <button type="button" className={kindFilter === "personal" ? "chosen" : ""} onClick={() => setKindFilter("personal")}>Personal study</button>
+      </div>
+      {scheduleError && <p className="inline-message error-message" role="alert">{scheduleError}</p>}
+      {loading ? <div className="classroom-empty">Loading all learner timetables…</div> :
+        !visibleEntries.length ? <div className="classroom-empty"><CalendarDays size={22}/><strong>No timetable entries in this view</strong><span>Choose another filter or add lessons using the learner editor below.</span></div> :
+        <div className="teacher-week-grid-scroll"><table className="teacher-week-grid admin-timetable-overview-table">
+          <thead><tr><th>LEARNER</th><th>TYPE</th><th>DAY</th><th>TIME</th><th>SUBJECT / ACTIVITY</th><th>LOCATION</th><th>ACTION</th></tr></thead>
+          <tbody>{visibleEntries.map(entry => {
+            const learner = learnerById.get(entry.learner_id);
+            return <tr key={entry.id}>
+              <td><strong>{learner ? displayName(learner) : "Learner"}</strong><small>{learner?.student_id || "No Student ID"}</small></td>
+              <td>{entry.timetable_kind === "school" ? "School" : "Personal"}</td>
+              <td>{DAYS[entry.day_of_week] || "Day not set"}</td>
+              <td>{entry.starts_at.slice(0,5)}–{entry.ends_at.slice(0,5)}</td>
+              <td>{entry.subject_name || entry.title || "Untitled entry"}</td>
+              <td>{entry.location || "—"}</td>
+              <td><button type="button" className="subtle-button" onClick={() => { setSelectedId(entry.learner_id); setKind(entry.timetable_kind); }}>Manage</button></td>
+            </tr>;
+          })}</tbody>
+        </table></div>}
+    </section>
 
     <section className="panel timetable-admin-selector">
       <div className="panel-heading"><div><h2>Manage an individual timetable</h2><p>{learners.length} learner account(s) · {updatedAt ? "Updated " + new Date(updatedAt).toLocaleTimeString() : "Not yet refreshed"}</p></div><Users size={19}/></div>

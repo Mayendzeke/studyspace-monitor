@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Image, Check, CheckCheck, AlertCircle } from "lucide-react";
+import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, CheckCheck, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
@@ -24,14 +24,6 @@ export default function MessagesPage(){
   const bottomRef=useRef<HTMLDivElement>(null);
   const fileRef=useRef<HTMLInputElement>(null);
 
-  const loadContacts=async()=>{
-    if(!supabase)return;
-    const {data,error:e}=await supabase.rpc("get_studyspace_message_contacts");
-    if(e)throw e;
-    const rows=(data??[]) as Contact[];
-    setContacts(rows);
-    setSelected(current=>current&&rows.some(x=>x.contact_id===current)?current:(rows[0]?.contact_id??""));
-  };
   const loadMessages=async()=>{
     if(!supabase||!userId)return;
     const {data,error:e}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("created_at",{ascending:true}).limit(400);
@@ -116,6 +108,7 @@ export default function MessagesPage(){
       if(insertError)throw insertError;
       setDraft("");setFile(null);if(fileRef.current)fileRef.current.value="";
       await loadMessages();
+      setNotice("Message sent.");
     }catch(reason){
       if(path)await supabase.storage.from("studyspace-direct-messages").remove([path]);
       setError(reason instanceof Error?reason.message:"Message could not be sent.");

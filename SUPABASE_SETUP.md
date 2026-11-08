@@ -20,6 +20,8 @@ The GitHub integration watches commits to the production branch. When Deploy to 
 
 Migration 006 is a corrective, forward-only repair for the two production columns `student_subjects.period_ids` and `exercise_assignments.available_at`. It uses `ADD COLUMN IF NOT EXISTS`, preserving existing rows and values. It also normalizes learner assessment-read policies so scheduled assessments remain hidden until release, restores authenticated table privileges for administrators to manage answer keys through Content Studio, and keeps answer-key access restricted by the AAL2 administrator-only RLS policy. It is safe to apply if the columns or policies are already present.
 
+The age-gated enrolment migration stores each learner's date of birth and introduces the `pending_guardian_verification` account state. The public enrolment function calculates age server-side: learners aged 18 or older accept the current terms personally and receive an active account; learners under 18 remain blocked from sign-in and dashboard access until an authorised AAL2 administrator records the guardian's name, relationship, contact number and in-person consent through the Monitor's Guardian verification page. Guardian verification records are restricted to the service role and are not directly readable or writable by learner clients. The learner's 48-hour trial starts only after the adult registration or guardian approval succeeds. The legacy PIN-redemption RPC is restricted to adult accounts with a recorded date of birth so it cannot bypass guardian verification.
+
 The university/course profile migration creates the `profiles.course` field and keeps both the legacy eight-argument and current course-aware learner profile RPC signatures. It must precede the single-learner profile RPC migration.
 
 The universal trial migration starts the 48-hour trial only after successful PIN redemption, records acceptance of the current terms, and enforces that terms and a valid paid plan or trial are required for learner access. The payment-reference migration prevents a reused MTN MoMo transaction reference from activating a second subscription. The enrolment-capacity migration serializes successful enrolments and enforces the 100-learner ceiling at the database layer.
@@ -70,6 +72,7 @@ The current migration sequence is:
 35. `supabase/migrations/20261108070859_universal_trial_and_terms_acceptance.sql`
 36. `supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql`
 37. `supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql`
+38. `supabase/migrations/20261108115000_studyspace_age_gate_guardian_verification.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 
@@ -102,6 +105,7 @@ Deploy these functions to the same Supabase project:
 - `enrol-learner`
 - `student-sign-in`
 - `manage-learner-account`
+- `manage-guardian-verification`
 - `generate-lesson-recap`
 - `submit-exercise-attempt`
 - `jaas-token`

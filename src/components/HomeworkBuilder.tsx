@@ -128,10 +128,10 @@ export default function HomeworkBuilder() {
         setError("The prepared homework details could not be loaded. Please enter the class details manually.");
       }
     };
-    applyHandoff();
+    if (!loadingLearners) applyHandoff();
     window.addEventListener("studyspace-prefill-homework-builder", applyHandoff);
     return () => window.removeEventListener("studyspace-prefill-homework-builder", applyHandoff);
-  }, []);
+  }, [loadingLearners]);
 
   useEffect(() => {
     let alive = true;

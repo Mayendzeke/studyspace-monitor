@@ -17,7 +17,7 @@ export default defineConfig({
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
-        id: '/studyspace-monitor/',
+        id: 'https://mayendzeke.github.io/studyspace-monitor/',
         start_url: '/studyspace-monitor/',
         scope: '/studyspace-monitor/',
         prefer_related_applications: false,

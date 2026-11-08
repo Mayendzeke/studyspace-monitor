@@ -1,5 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+function getNamedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const value = parsed?.default;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function getPublishableKey(): string {
+  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+function getSecretKey(): string {
+  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
@@ -28,7 +44,15 @@ Deno.serve(async request => {
   const serviceKey = getSecretKey();
   const pinPepper = Deno.env.get("PIN_PEPPER"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
   if (!url || !anonKey || !serviceKey || !pinPepper || !ratePepper) return json(500, { error: "Enrolment service configuration is incomplete." });
-  let body: { studentId?: string; pin?: string; password?: string };
+  let body: {
+    studentId?: string;
+    pin?: string;
+    password?: string;
+    termsAccepted?: boolean;
+    termsVersion?: string;
+    acceptedByName?: string;
+    acceptanceRole?: string;
+  };
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
   const studentId = String(body.studentId ?? "").trim().toUpperCase();
   const pin = String(body.pin ?? "").replace(/\s+/g, "");
@@ -36,7 +60,23 @@ Deno.serve(async request => {
   if (!/^STU-[A-Z0-9]{8}$/.test(studentId) || !/^\d{8}$/.test(pin)) return json(400, { error: "Check the Student ID and 8-digit enrolment PIN." });
   if (password.length < 10 || password.length > 128) return json(400, { error: "Choose a password between 10 and 128 characters." });
 
+  const acceptedByName = String(body.acceptedByName ?? "").trim();
+  const acceptanceRole = String(body.acceptanceRole ?? "");
+  if (body.termsAccepted !== true || body.termsVersion !== "2026-11-07-v3") {
+    return json(400, { error: "Read and accept the current StudySpace Terms and Conditions before creating your account." });
+  }
+  if (acceptedByName.length < 2 || acceptedByName.length > 120) {
+    return json(400, { error: "Enter the full name of the person accepting the Terms and Conditions." });
+  }
+  if (!["adult_learner", "parent_guardian"].includes(acceptanceRole)) {
+    return json(400, { error: "Confirm whether acceptance is by an adult learner or a parent/legal guardian." });
+  }
+
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data: capacityAvailable, error: capacityError } = await admin.rpc("studyspace_enrolment_capacity_available");
+  if (capacityError) return json(503, { error: "Enrolment capacity could not be verified. Please try again shortly." });
+  if (capacityAvailable !== true) return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
+
   const source = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const identifierHash = await digest(ratePepper + ":" + studentId);
   const sourceHash = await digest(ratePepper + ":" + source);
@@ -78,15 +118,23 @@ Deno.serve(async request => {
     return json(409, { error: "This invitation has just been used or revoked. Ask your administrator for a new one." });
   }
 
-  const { data: completedProfile, error: profileError } = await admin.from("profiles").update({
-    student_id: studentId, account_status: "active", updated_at: new Date().toISOString(),
-  }).eq("id", created.user.id).select("id").single();
-  if (profileError || !completedProfile) {
-    await admin.from("enrolment_pins").update({ redeemed_by: null, redeemed_at: null }).eq("id", invitation.id);
+  const { data: completed, error: completionError } = await admin.rpc("complete_studyspace_enrolment", {
+    p_learner_id: created.user.id,
+    p_student_id: studentId,
+    p_accepted_by_name: acceptedByName,
+    p_acceptance_role: acceptanceRole,
+  });
+  if (completionError || completed !== true) {
+    await admin.from("enrolment_pins")
+      .update({ redeemed_by: null, redeemed_at: null })
+      .eq("id", invitation.id)
+      .eq("redeemed_by", created.user.id);
     await admin.auth.admin.deleteUser(created.user.id);
-    return json(500, { error: "The account was not completed. The invitation has been released; contact your administrator." });
+    if (!completionError && completed === false) {
+      return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
+    }
+    return json(500, { error: "The account could not be completed. The invitation has been released; please try again or contact Study Space." });
   }
   await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: true });
-  await admin.from("audit_events").insert({ actor_id: created.user.id, event_type: "learner_account_enrolled", target_type: "profile", target_id: created.user.id });
   return json(200, { success: true, studentId, message: "Account created. Sign in with your Student ID and password." });
 });

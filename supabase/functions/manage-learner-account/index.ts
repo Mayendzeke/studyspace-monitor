@@ -136,6 +136,8 @@ Deno.serve(async (request) => {
     action?: string;
     profile?: Record<string, unknown>;
     confirmation?: string;
+    paymentConfirmed?: boolean;
+    paymentTransactionReference?: string;
   };
   try {
     body = await request.json();
@@ -145,6 +147,7 @@ Deno.serve(async (request) => {
 
   const learnerId = String(body.learnerId ?? "");
   const action = String(body.action ?? "");
+  const paymentTransactionReference = String(body.paymentTransactionReference ?? "").trim();
   if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
   if (learnerId === authData.user.id) return json(400, { error: "An administrator cannot manage or delete their own account as a learner." });
   if (!["disable", "enable", "reset_password", "update_profile", "delete"].includes(action)) {
@@ -154,7 +157,7 @@ Deno.serve(async (request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin
     .from("profiles")
-    .select("id,role,account_status,student_id,full_name,preferred_name")
+    .select("id,role,account_status,student_id,full_name,preferred_name,subscription_tier,subscription_expires_at")
     .eq("id", learnerId)
     .single();
   if (learnerError || !learner || learner.role !== "learner") {
@@ -198,8 +201,36 @@ Deno.serve(async (request) => {
     if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
     const nextTier = updates.subscription_tier === undefined ? null : updates.subscription_tier;
     const nextExpiry = updates.subscription_expires_at === undefined ? null : updates.subscription_expires_at;
+    if (nextTier && !["Weekly", "2 Weeks", "Monthly"].includes(nextTier)) {
+      return json(400, { error: "Choose Weekly, 2 Weeks or Monthly. The 48-hour free trial is automatic and cannot be assigned as a paid tier." });
+    }
     if (nextTier && !nextExpiry) return json(400, { error: "A paid tier must have an expiry date. Set both fields, or clear both for no expiry." });
     if (nextExpiry && !nextTier) return json(400, { error: "Choose a paid tier when setting an expiry date." });
+    const tierChanged = updates.subscription_tier !== undefined
+      && updates.subscription_tier !== (learner.subscription_tier ?? null);
+    const expiryChanged = updates.subscription_expires_at !== undefined
+      && updates.subscription_expires_at !== (learner.subscription_expires_at ?? null);
+    if (nextTier && (tierChanged || expiryChanged)) {
+      if (body.paymentConfirmed !== true) {
+        return json(400, { error: "Confirm that the MTN MoMo payment has been received and verified against this learner's Student ID before activating or renewing a paid plan." });
+      }
+      if (paymentTransactionReference.length < 4 || paymentTransactionReference.length > 120) {
+        return json(400, { error: "Enter the MTN MoMo transaction reference from the verified payment receipt." });
+      }
+      const { data: priorPayment, error: priorPaymentError } = await admin
+        .from("audit_events")
+        .select("id")
+        .eq("event_type", "learner_subscription_activated")
+        .filter("details->>payment_transaction_reference", "eq", paymentTransactionReference)
+        .limit(1)
+        .maybeSingle();
+      if (priorPaymentError) {
+        return json(503, { error: "Payment reference checks are temporarily unavailable. Do not activate this plan until the reference can be checked." });
+      }
+      if (priorPayment) {
+        return json(409, { error: "This MTN MoMo transaction reference has already been used for a StudySpace subscription. Check the receipt or contact support." });
+      }
+    }
     const resultingFullName = updates.full_name ?? learner.full_name ?? "";
     if (!String(resultingFullName).trim()) return json(400, { error: "Full name cannot be empty." });
     updates.updated_at = new Date().toISOString();
@@ -218,6 +249,36 @@ Deno.serve(async (request) => {
       target_type: "profile",
       target_id: learnerId,
     });
+    if (nextTier && (tierChanged || expiryChanged)) {
+      const { error: activationAuditError } = await admin.from("audit_events").insert({
+        actor_id: authData.user.id,
+        event_type: "learner_subscription_activated",
+        target_type: "profile",
+        target_id: learnerId,
+        details: {
+          tier: updated.subscription_tier,
+          expires_at: updated.subscription_expires_at,
+          payment_method: "MTN MoMo",
+          payment_reference: learner.student_id,
+          payment_transaction_reference: paymentTransactionReference,
+          payment_amount_emalangeni: ({ "Weekly": 100, "2 Weeks": 200, "Monthly": 350 } as Record<string, number>)[String(updated.subscription_tier)] ?? null,
+          payment_currency: "SZL",
+          payment_verified_by: authData.user.id,
+          payment_verified_at: new Date().toISOString(),
+        },
+      });
+      if (activationAuditError) {
+        const { error: rollbackError } = await admin.from("profiles").update({
+          subscription_tier: learner.subscription_tier,
+          subscription_expires_at: learner.subscription_expires_at,
+          updated_at: new Date().toISOString(),
+        }).eq("id", learnerId).eq("role", "learner");
+        if (rollbackError) {
+          return json(500, { error: "The payment activation audit failed and the subscription rollback also needs manual reconciliation. Do not confirm access until the learner record and audit log have been checked." });
+        }
+        return json(500, { error: "The payment activation audit could not be recorded, so the subscription change was rolled back. Retry after checking the audit service." });
+      }
+    }
     return json(200, { success: true, learner: updated, message: "Learner profile updated." });
   }
 

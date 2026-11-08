@@ -613,7 +613,6 @@ function StatCard({ label, value, detail, icon }: { label: string; value: string
 function PinPage() {
   type PinRecord = { id: string; student_id: string | null; expires_at: string; redeemed_at: string | null; revoked_at: string | null; created_at: string }
   const [pins, setPins] = useState<PinRecord[]>([])
-  const [expiresInDays, setExpiresInDays] = useState('7')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -633,7 +632,7 @@ function PinPage() {
     if (!supabase) { setError('Connect Supabase before creating enrolment PINs.'); return }
     setBusy(true); setError(''); setNotice(''); setNewPin(null)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('create-enrolment-pin', { body: { expiresInDays: Number(expiresInDays) } })
+      const { data, error: invokeError } = await supabase.functions.invoke('create-enrolment-pin', { body: {} })
       if (invokeError) throw invokeError
       if (!data?.pin || !data?.studentId) throw new Error(data?.error || 'The server did not return the new enrolment details.')
       setNewPin({ pin: data.pin, studentId: data.studentId, expiresAt: data.expiresAt })
@@ -660,7 +659,7 @@ function PinPage() {
     <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Create one-time invitations for first-time enrolment. The PIN expires if unused and cannot be reused after enrolment. Once a learner has enrolled, their Student ID and password remain their sign-in credentials; do not issue another enrolment PIN to restore an existing account.</p>
     <div className="panel pin-create-panel">
       <div className="panel-heading"><div><h2>Create learner access</h2><p>Requires an authenticated administrator with MFA verified.</p></div><KeyRound size={20}/></div>
-      <div className="pin-create-controls"><label>PIN expiry<select value={expiresInDays} onChange={e=>setExpiresInDays(e.target.value)}><option value="1">1 day</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></label><button className="primary-button" onClick={()=>void createPin()} disabled={busy}>{busy?'Working…':'Generate Student ID + PIN'}</button></div>
+      <div className="pin-create-controls"><p className="subtle-note">Every one-time PIN expires exactly 24 hours after generation. The learner’s free 48-hour trial begins only after successful account registration.</p><button className="primary-button" onClick={()=>void createPin()} disabled={busy}>{busy?'Working…':'Generate Student ID + PIN'}</button></div>
       {newPin && <div className="pin-issued-card"><strong>New learner credentials · shown once</strong><div><span>Student ID</span><code>{newPin.studentId}</code><button className="subtle-button" onClick={()=>copy(newPin.studentId)}>Copy ID</button></div><div><span>One-time PIN</span><code>{newPin.pin}</code><button className="subtle-button" onClick={()=>copy(newPin.pin)}>Copy PIN</button></div><small>Expires {new Date(newPin.expiresAt).toLocaleString()}. Keep these details private and deliver them directly to the learner.</small></div>}
       {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
     </div>

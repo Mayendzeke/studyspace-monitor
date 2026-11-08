@@ -24,5 +24,9 @@
     "typescript": "~5.8.3",
     "vite": "^6.4.5",
     "vite-plugin-pwa": "^0.21.1"
+  },
+  "overrides": {
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }

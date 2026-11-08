@@ -24,6 +24,9 @@ type Learner = {
   academic_year: string;
   subscription_tier: string | null;
   subscription_expires_at: string | null;
+  trial_started_at: string | null;
+  trial_expires_at: string | null;
+  trial_reminder_shown_at: string | null;
 };
 
 type ProfileForm = Pick<
@@ -35,7 +38,6 @@ type ProfileForm = Pick<
 type ManageAction = "disable" | "enable" | "reset_password";
 
 const SUBSCRIPTION_PLANS = [
-  { value: "Free Trial", label: "Free Trial — 1 day — E0", days: 1 },
   { value: "Weekly", label: "Weekly — 7 days — E100", days: 7 },
   { value: "2 Weeks", label: "2 Weeks — 14 days — E200", days: 14 },
   { value: "Monthly", label: "Monthly — 28 days — E350", days: 28 },
@@ -43,7 +45,7 @@ const SUBSCRIPTION_PLANS = [
 
 function expiryFromNow(days: number): string {
   const expiry = new Date();
-  expiry.setDate(expiry.getDate() + days);
+  expiry.setTime(expiry.getTime() + days * 24 * 60 * 60 * 1000);
   expiry.setSeconds(0, 0);
   const local = new Date(expiry.getTime() - expiry.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
@@ -89,6 +91,7 @@ function csvCell(value: unknown): string {
 }
 
 export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void }) {
+  const publicEnrolmentEnabled = import.meta.env.VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED === "true";
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -100,6 +103,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [editTarget, setEditTarget] = useState<Learner | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyForm);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentTransactionReference, setPaymentTransactionReference] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Learner | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -153,7 +158,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at")
+      .select("id,student_id,full_name,preferred_name,account_status,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -167,6 +172,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   }
 
   useEffect(() => { void refresh(); }, []);
+
+  const paymentVerificationRequired = Boolean(editTarget && profileForm.subscription_tier && (
+    profileForm.subscription_tier !== (editTarget.subscription_tier ?? "") ||
+    new Date(profileForm.subscription_expires_at).getTime() !== new Date(editTarget.subscription_expires_at ?? "").getTime()
+  ));
 
   const counts = useMemo(() => ({
     all: learners.length,
@@ -224,6 +234,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
 
   function openEdit(learner: Learner) {
     setEditTarget(learner);
+    setPaymentConfirmed(false);
+    setPaymentTransactionReference("");
     setProfileForm({
       full_name: learner.full_name || "",
       preferred_name: learner.preferred_name || "",
@@ -249,7 +261,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
+        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -370,7 +382,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
         <div><strong>{visible.length} learner{visible.length === 1 ? "" : "s"} shown</strong><small>Profile edits and account actions require administrator MFA.</small></div>
         <button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading || !!busyId}><RefreshCw size={14}/> Refresh</button>
         <button type="button" className="subtle-button" onClick={exportCsv} disabled={!learners.length}><Download size={14}/> Export CSV</button>
-        <button type="button" className="primary-button" onClick={onCreatePin}><KeyRound size={14}/> Create enrolment PIN</button>
+        {publicEnrolmentEnabled ? <button type="button" className="primary-button" onClick={onCreatePin}><KeyRound size={14}/> Create enrolment PIN</button> : <button type="button" className="secondary-button" disabled title="New learner invitations remain paused until registration is complete."><KeyRound size={14}/> New enrolment paused</button>}
       </div>
 
       <div className="learners-filter-row">
@@ -412,6 +424,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"}{learner.course ? " · " + learner.course : ""} · {learner.curriculum || "Curriculum not set"}</span>
               <small><Building2 size={12}/> {learner.institution || "School not set"} · {learner.education_level || "Level not set"} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
               <small>Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
+              <small>{learner.subscription_tier
+                ? "Paid plan: " + learner.subscription_tier + (learner.subscription_expires_at ? " · expires " + new Date(learner.subscription_expires_at).toLocaleString() : " · no expiry")
+                : learner.trial_expires_at
+                  ? "48-hour trial · " + (new Date(learner.trial_expires_at).getTime() <= Date.now() ? "expired" : "ends " + new Date(learner.trial_expires_at).toLocaleString())
+                  : "No active trial or paid plan"}</small>
             </div>
             <span className={"pin-status " + learner.account_status}>{learner.account_status}</span>
             <div className="learner-actions learner-admin-actions">
@@ -486,9 +503,10 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <label>Access due date<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Automatically calculated from today when you choose a tier. You can adjust the date manually if needed.</small></label>
               </div>
               <div className="learner-readonly-row"><span>Student ID</span><strong>{editTarget.student_id || "Not assigned"}</strong><small>Student IDs are kept fixed because they are also used to identify the sign-in account.</small></div>
+              {paymentVerificationRequired && <><label>MTN MoMo transaction reference<input type="text" value={paymentTransactionReference} onChange={event => setPaymentTransactionReference(event.target.value.slice(0, 120))} minLength={4} maxLength={120} autoComplete="off" placeholder="Enter the transaction ID from the MTN MoMo receipt" required/><small>Record the reference shown on the payment receipt. Do not enter the learner’s Student ID here.</small></label><label className="payment-confirmation-check"><input type="checkbox" checked={paymentConfirmed} onChange={event => setPaymentConfirmed(event.target.checked)}/><span><strong>Payment verified</strong><small>I confirm that the amount and recipient match the plan, and that the payment reference above was verified against this learner’s Student ID.</small></span></label></>}
               <div className="learner-modal-actions">
                 <button type="button" className="subtle-button" disabled={savingProfile} onClick={() => setEditTarget(null)}>Cancel</button>
-                <button type="submit" className="primary-button" disabled={savingProfile}><Save size={14}/>{savingProfile ? "Saving…" : "Save profile"}</button>
+                <button type="submit" className="primary-button" disabled={savingProfile || (paymentVerificationRequired && (!paymentConfirmed || paymentTransactionReference.trim().length < 4))}><Save size={14}/>{savingProfile ? "Saving…" : "Save profile"}</button>
               </div>
             </form>
           </section>

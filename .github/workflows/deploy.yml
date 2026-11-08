@@ -21,13 +21,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Report dependency audit
+        run: |
+          npm audit --json > audit-all.json || true
+          npm audit --omit=dev --json > audit-production.json || true
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          for (const [label, file] of [['all dependencies', 'audit-all.json'], ['production dependencies', 'audit-production.json']]) {
+            const report = JSON.parse(readFileSync(file, 'utf8'))
+            const vulnerabilities = Object.entries(report.vulnerabilities || {})
+            console.log(label + ': ' + vulnerabilities.length + ' vulnerable package(s)')
+            for (const [name, item] of vulnerabilities) {
+              const titles = (item.via || []).filter(value => typeof value === 'object').map(value => value.title).join('; ')
+              console.log(' - ' + name + ' [' + item.severity + '] direct=' + item.isDirect + ' fix=' + JSON.stringify(item.fixAvailable) + (titles ? ' ' + titles : ''))
+            }
+          }
+          const production = JSON.parse(readFileSync('audit-production.json', 'utf8'))
+          const productionVulnerabilities = Object.entries(production.vulnerabilities || {})
+          if (productionVulnerabilities.length > 0) {
+            console.error('Production dependency audit failed: ' + productionVulnerabilities.length + ' vulnerable package(s).')
+            process.exitCode = 1
+          } else {
+            console.log('Production dependency audit passed: no vulnerable production packages.')
+          }
+          NODE
       - name: Validate Supabase frontend configuration
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
@@ -141,6 +165,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
+          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'true'
+          VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'false'
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
         run: |
@@ -168,12 +194,48 @@ jobs:
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIA lesson handoff is incomplete.')
           if (!classroom.includes('studyspace-monitor-mia-lesson-handoff-v1') || !classroom.includes('studyspace-open-classroom-studio')) throw new Error('Classroom Studio lesson handoff receiver is incomplete.')
           if (!classroom.includes("extractSection('Learning objectives')") || !classroom.includes("extractSection('Homework')")) throw new Error('MIA lesson sections are not mapped into editable Classroom Studio fields.')
+          const termsVersion = '2026-11-07-v3'
+          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts']) {
+            const source = readFileSync(path, 'utf8')
+            if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
+            if (source.includes('2026-11-07-v1')) throw new Error(path + ' still contains a stale StudySpace terms-version check.')
+          }
+          const enrolment = readFileSync('supabase/functions/enrol-learner/index.ts', 'utf8')
+          if (!enrolment.includes(termsVersion)) throw new Error('Learner enrolment does not record the current StudySpace terms version.')
+          const capacityMigration = readFileSync('supabase/migrations/20261107210002_studyspace_enrolment_capacity.sql', 'utf8')
+          if (!capacityMigration.includes("interval '48 hours'")) throw new Error('The learner trial must last exactly 48 hours.')
+          if (!enrolment.includes('complete_studyspace_enrolment')) throw new Error('Learner enrolment must start its 48-hour trial through the database transaction.')
+          const pinCreation = readFileSync('supabase/functions/create-enrolment-pin/index.ts', 'utf8')
+          if (!pinCreation.includes('24 * 60 * 60 * 1000')) throw new Error('New enrolment PINs must expire after exactly 24 hours.')
+          if (!pinCreation.includes('studyspace_enrolment_capacity_available')) throw new Error('PIN creation must verify the server-side enrolment limit.')
+          if (!enrolment.includes('complete_studyspace_enrolment')) throw new Error('Learner enrolment must atomically enforce the 100-account limit.')
+          const accountManagement = readFileSync('supabase/functions/manage-learner-account/index.ts', 'utf8')
+          const learnerAdminPage = readFileSync('src/components/LearnersPage.tsx', 'utf8')
+          if (!accountManagement.includes('paymentTransactionReference') || !accountManagement.includes('payment_transaction_reference')) throw new Error('Subscription audit must require and retain the MTN MoMo transaction reference.')
+          if (!learnerAdminPage.includes('MTN MoMo transaction reference') || !learnerAdminPage.includes('paymentTransactionReference.trim().length < 4')) throw new Error('Monitor must collect a transaction reference before confirming payment.')
+          if (!accountManagement.includes('payment_transaction_reference') || !accountManagement.includes('already been used')) throw new Error('Subscription activation must audit and reject reused MTN MoMo transaction references.')
+          const paymentReferenceMigration = readFileSync('supabase/migrations/20261107210001_studyspace_unique_payment_transaction_references.sql', 'utf8')
+          if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
+          for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
+            const source = readFileSync(path, 'utf8')
+            if (!source.includes('json(503')) throw new Error(path + ' must fail closed while MIA is paused.')
+            if (/generativelanguage\.googleapis\.com|api\.openai\.com|GEMINI_API_KEY|OPENAI_API_KEY/.test(source)) {
+              throw new Error(path + ' must not contain an active external AI provider integration while MIA is paused.')
+            }
+          }
+          console.log('MIA server-side privacy pause checks passed for learner, administrator and lesson-recap endpoints.')
+          const migration = readFileSync('supabase/migrations/20261107210000_universal_trial_and_terms_acceptance.sql', 'utf8')
+          if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
+          if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
+          if (!migration.includes("terms_version = '2026-11-07-v3'")) throw new Error('Database access must require the current Terms version.')
+          console.log('Database trial-start, invoker-security and current-terms guards passed.')
+          console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')
           NODE
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -187,4 +249,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

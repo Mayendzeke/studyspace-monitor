@@ -248,7 +248,7 @@ Deno.serve(async (request: Request) => {
   const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
-    .select("id,role,account_status,subscription_expires_at,preferred_name,full_name")
+    .select("id,role,account_status,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,terms_accepted_at,terms_version,preferred_name,full_name")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -258,8 +258,21 @@ Deno.serve(async (request: Request) => {
 
   const isAdministrator = profile.role === "admin";
   const isLearner = profile.role === "learner";
-  if (isLearner && profile.subscription_expires_at && new Date(profile.subscription_expires_at).getTime() <= Date.now()) {
-    return json(403, { error: "Your Studyspace paid access has expired. Contact your administrator to renew it." }, origin);
+  if (isLearner) {
+    const now = Date.now();
+    const paidExpiry = profile.subscription_expires_at ? Date.parse(profile.subscription_expires_at) : NaN;
+    const trialStart = profile.trial_started_at ? Date.parse(profile.trial_started_at) : NaN;
+    const trialExpiry = profile.trial_expires_at ? Date.parse(profile.trial_expires_at) : NaN;
+    const hasPaidAccess = Boolean(profile.subscription_tier && Number.isFinite(paidExpiry) && paidExpiry > now);
+    const hasTrialAccess = Boolean(!profile.subscription_tier && Number.isFinite(trialStart)
+      && Number.isFinite(trialExpiry) && trialStart <= now && trialExpiry > now);
+    const hasAcceptedTerms = Boolean(profile.terms_accepted_at && profile.terms_version === "2026-11-07-v3");
+    if (!hasAcceptedTerms) {
+      return json(403, { error: "Please accept the current StudySpace Terms and Conditions before joining a class." }, origin);
+    }
+    if (!hasPaidAccess && !hasTrialAccess) {
+      return json(403, { error: "Your StudySpace access is paused. Choose a paid plan to continue." }, origin);
+    }
   }
   if (!isAdministrator && !isLearner) return json(403, { error: "This account cannot join Studyspace classrooms." }, origin);
 

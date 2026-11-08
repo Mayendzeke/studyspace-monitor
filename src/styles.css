@@ -416,7 +416,11 @@ h1 span { color: #8278d9; }
 .classroom-form-grid input,.classroom-form-grid select,.classroom-wide-field textarea,.classroom-date-field input,.classroom-checkpoints input{width:100%;min-width:0;padding:10px 11px;border:1px solid rgba(128,140,160,.24);border-radius:9px;background:var(--surface);color:var(--ink);font:500 12px 'DM Sans',sans-serif;outline:none}
 .classroom-wide-field{margin:14px 0}.classroom-wide-field textarea{resize:vertical;line-height:1.6}
 .classroom-points-heading{display:flex;justify-content:space-between;align-items:center;margin:17px 0 9px}.classroom-points-heading div{display:flex;flex-direction:column;gap:4px}.classroom-points-heading strong{font-size:12px;color:var(--ink)}.classroom-points-heading small,.classroom-points-heading span{font-size:10px;color:var(--muted)}
-.classroom-checkpoints{display:grid;gap:8px}.classroom-checkpoints label{display:flex;align-items:center;gap:8px}.classroom-checkpoints label>span{display:grid;place-items:center;flex:0 0 25px;height:25px;border-radius:8px;background:var(--surface);color:var(--muted);font-size:10px;font-weight:800}.classroom-ai-card{display:flex;gap:12px;padding:14px;border:1px solid rgba(128,140,160,.24);border-radius:11px;background:var(--surface);margin:16px 0}.classroom-ai-card>svg{color:var(--mint);flex-shrink:0}.classroom-ai-card strong{font-size:12px;color:var(--ink)}.classroom-ai-card p{margin:5px 0;color:var(--muted);font-size:10px;line-height:1.65}.classroom-ai-card small{color:var(--muted);font-size:9px}
+.classroom-checkpoints{display:grid;gap:8px}.classroom-checkpoints label{display:flex;align-items:center;gap:8px}.classroom-checkpoints label>span{display:grid;place-items:center;flex:0 0 25px;height:25px;border-radius:8px;background:var(--surface);color:var(--muted);font-size:10px;font-weight:800}.classroom-ai-paused{display:flex;align-items:flex-start;gap:12px;margin:16px 0;padding:15px;border:1px solid rgba(128,140,160,.24);border-radius:11px;background:var(--surface);color:var(--muted);font-size:11px;line-height:1.65}
+.classroom-ai-paused>svg{flex:0 0 auto;color:var(--muted)}
+.classroom-ai-paused strong{display:block;margin-bottom:4px;color:var(--ink);font-size:12px}
+.classroom-ai-paused p{margin:0;color:var(--muted);font-size:10px;line-height:1.65}
+.classroom-ai-card{display:flex;gap:12px;padding:14px;border:1px solid rgba(128,140,160,.24);border-radius:11px;background:var(--surface);margin:16px 0}.classroom-ai-card>svg{color:var(--mint);flex-shrink:0}.classroom-ai-card strong{font-size:12px;color:var(--ink)}.classroom-ai-card p{margin:5px 0;color:var(--muted);font-size:10px;line-height:1.65}.classroom-ai-card small{color:var(--muted);font-size:9px}
 .classroom-date-field{max-width:240px}.classroom-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:17px}.classroom-saved-plan{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid rgba(128,140,160,.24)}.classroom-saved-plan>button:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;border:0;background:transparent;text-align:left}.classroom-saved-plan strong{font-size:11px;color:var(--ink)}.classroom-saved-plan span,.classroom-saved-plan small{font-size:9px;color:var(--muted)}.classroom-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 8px;color:var(--muted);text-align:center}.classroom-empty strong{font-size:12px;color:var(--ink)}.classroom-empty span{font-size:10px}.classroom-sync-note{display:flex;gap:9px;padding:12px;margin-top:15px;border-radius:9px;background:var(--surface);color:var(--muted);font-size:9px;line-height:1.6}.classroom-sync-note svg{flex-shrink:0;color:var(--mint)}.classroom-feature-row{display:flex;align-items:center;gap:8px;margin-top:11px;color:var(--muted);font-size:10px}.classroom-feature-row svg{color:var(--mint)}
 @media(max-width:900px){.classroom-layout{grid-template-columns:1fr}}
 @media(max-width:560px){.classroom-editor,.classroom-side{padding:14px}.classroom-form-grid{grid-template-columns:1fr}.classroom-actions>*{flex:1 1 100%;justify-content:center}}
@@ -608,6 +612,10 @@ h1 span { color: #8278d9; }
 .learner-admin-actions{justify-content:flex-end;max-width:370px}
 .learner-admin-actions .text-button{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .learner-admin-actions .text-button:disabled{opacity:.45;cursor:not-allowed}
+.payment-confirmation-check{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:13px 14px;border:1px solid rgba(242,189,112,.34);border-radius:11px;background:rgba(242,189,112,.07);font-size:12px;line-height:1.55;color:var(--ink)}
+.payment-confirmation-check input{width:17px;height:17px;flex:0 0 17px;margin-top:2px;accent-color:var(--mint)}
+.payment-confirmation-check span{display:grid;gap:3px}
+.payment-confirmation-check small{font-size:10px;line-height:1.6;color:var(--muted)}
 .learner-modal-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:auto;padding:18px;background:rgba(10,14,25,.64);backdrop-filter:blur(7px)}
 .learner-admin-modal{width:min(760px,100%);max-height:min(90vh,900px);overflow:auto;padding:22px;border:1px solid var(--line,rgba(120,130,160,.25));border-radius:17px;background:var(--surface,#fff);color:var(--ink);box-shadow:0 22px 70px rgba(0,0,0,.28)}
 .learner-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:20px}
@@ -782,6 +790,9 @@ h1 span { color: #8278d9; }
 /* MIA administrator workspace */
 .main-nav { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .mia-page { max-width: 1120px; margin: 0 auto; }
+.mia-paused-panel{max-width:760px;margin:32px auto;padding:28px;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow)}
+.mia-paused-panel h2{margin:14px 0 8px;font-size:22px;color:var(--ink)}
+.mia-paused-panel p{max-width:620px;margin:0;color:var(--muted);font-size:13px;line-height:1.75}
 .mia-hero { display:flex; align-items:center; gap:18px; padding:23px 25px; border:1px solid rgba(255,255,255,.55); border-radius:19px; background:linear-gradient(115deg,#e7e4fb,#edf0f7 72%); box-shadow:var(--raised); }
 .mia-brand-mark { width:54px; height:54px; display:grid; place-items:center; flex:0 0 auto; color:#fff; border-radius:17px; background:linear-gradient(145deg,#8e82ed,#6256c8); box-shadow:5px 5px 11px #c6cad7,-4px -4px 9px #fff; }
 .mia-hero-copy { min-width:0; flex:1; }

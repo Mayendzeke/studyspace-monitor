@@ -1,5 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getPublishableKey, getSecretKey } from "../_shared/supabase-keys.ts";
+function getNamedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const value = parsed?.default;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function getPublishableKey(): string {
+  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+function getSecretKey(): string {
+  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "null",
@@ -46,16 +62,19 @@ Deno.serve(async request => {
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
   if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
 
-  let body: { expiresInDays?: number };
-  try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
-  const days = Number(body.expiresInDays ?? 7);
-  if (!Number.isInteger(days) || days < 1 || days > 30) return json(400, { error: "Expiry must be between 1 and 30 days." });
+  // Enrolment invitations always expire exactly 24 hours after generation.
+  // The learner trial is a separate 48-hour period beginning after successful enrolment.
+  try { await request.json(); } catch { /* Empty request bodies are valid. */ }
+
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data: capacityAvailable, error: capacityError } = await admin.rpc("studyspace_enrolment_capacity_available");
+  if (capacityError) return json(503, { error: "Enrolment capacity could not be verified. Please try again shortly." });
+  if (capacityAvailable !== true) return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
 
   const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
   const studentId = "STU-" + Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => (byte % 36).toString(36)).join("").toUpperCase();
   const pinHash = await pinDigest(pin, pinPepper);
-  const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const { error: insertError } = await admin.from("enrolment_pins").insert({
     pin_hash: pinHash,
     student_id: studentId,

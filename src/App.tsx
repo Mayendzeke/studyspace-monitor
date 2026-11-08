@@ -1,6 +1,7 @@
 import ContentStudio from './components/ContentStudio'
 import ClassroomStudio from './components/ClassroomStudio'
 import LearnersPage from './components/LearnersPage'
+import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
 import MiaStudio from './components/MiaStudio'
 import SplashScreen from './components/SplashScreen'
@@ -17,7 +18,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -25,6 +26,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'MIA', icon: Sparkles },
   { label: 'Learners', icon: Users },
+  { label: 'Guardian verification', icon: ShieldCheck },
   { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
@@ -251,6 +253,7 @@ function App() {
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
+          {page === 'Guardian verification' && <GuardianVerificationPage />}
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIA' && <MiaStudio />}
           {page === 'Content Studio' && <ContentStudio />}

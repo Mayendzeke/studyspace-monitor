@@ -225,7 +225,7 @@ jobs:
             if (!source.includes('CLOUDFLARE_ACCOUNT_ID') || !source.includes('CLOUDFLARE_API_TOKEN') || !source.includes('@cf/google/gemma-4-26b-a4b-it')) {
               throw new Error(path + ' must use the configured Cloudflare Workers AI model and protected credentials.')
             }
-            if (/generativelanguage\\.googleapis\\.com|GEMINI_API_KEY|gemini-3\\.8-flash/.test(source)) throw new Error(path + ' must not retain the retired Gemini API connection.')
+            if (source.includes('generativelanguage.googleapis.com') || source.includes('GEMINI_API_KEY') || source.includes('gemini-3.8-flash')) throw new Error(path + ' must not retain the retired Gemini API connection.')
           }
           for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
             const source = readFileSync(path, 'utf8')

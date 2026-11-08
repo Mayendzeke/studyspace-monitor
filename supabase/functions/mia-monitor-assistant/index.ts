@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const MODEL = "gemini-3.8-flash";
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") ?? "";
 const allowedOrigins = new Set(["https://mayendzeke.github.io", ...APP_ORIGIN.split(",").map(value => { try { return new URL(value.trim()).origin; } catch { return ""; } }).filter(Boolean)]);
 function originAllowed(origin: string) { return !origin || allowedOrigins.has(origin); }
@@ -41,37 +41,31 @@ async function authorizeAdmin(request: Request) {
   return { userId: auth.user.id, url, service };
 }
 async function generate(prompt: string) {
-  const key = Deno.env.get("GEMINI_API_KEY")?.trim();
-  if (!key) throw new Error("The Gemini API key is not configured in Supabase Edge Function secrets (GEMINI_API_KEY).");
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim();
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim();
+  if (!accountId || !apiToken) throw new Error("The Cloudflare Workers AI account ID and API token must be added to Supabase Edge Function secrets.");
   let response: Response;
   try {
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.45, maxOutputTokens: 4096 },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-      ],
-    }),
-    signal: AbortSignal.timeout(25000),
+    response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, messages: [{ role: "user", content: prompt }], max_tokens: 1800, temperature: 0.3, stream: false, store: false }),
+      signal: AbortSignal.timeout(60000),
     });
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Gemini did not respond within 25 seconds. Please retry.");
-    throw error;
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("MIA's AI provider did not respond within 60 seconds.");
+    throw new Error("MIA could not reach Cloudflare Workers AI.");
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = typeof payload?.error?.message === "string" ? payload.error.message : "Gemini returned HTTP " + response.status + ".";
-    throw new Error(message.slice(0, 500));
+    if (response.status === 429) throw new Error("MIA is temporarily at its AI usage or capacity limit. Please try again later.");
+    if ([401, 403].includes(response.status)) throw new Error("The Cloudflare Workers AI credentials or permissions are invalid.");
+    const detail = Array.isArray(payload?.errors) ? payload.errors.map((item: any) => item?.message || "").filter(Boolean).join("; ") : "";
+    throw new Error((detail || "Cloudflare Workers AI returned HTTP " + response.status + ".").slice(0, 450));
   }
-  const text = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? "").join("").trim();
-  if (!text) throw new Error("Gemini returned no text. Check the model quota and safety response.");
-  return text;
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) throw new Error("MIA received an empty response from its AI provider.");
+  return content.trim();
 }
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
@@ -102,14 +96,14 @@ Deno.serve(async (request: Request) => {
     const reply = await generate(prompt);
     const { error: auditError } = await admin.from("audit_events").insert({
       actor_id: auth.userId, event_type: "mia_admin_request", target_type: "ai_usage",
-      details: { provider: "Google Gemini", model: MODEL, feature: "administrator_assistant" },
+      details: { provider: "Cloudflare Workers AI", model: MODEL, feature: "administrator_assistant" },
     });
     if (auditError) throw new Error("MIA could not record the usage audit. The generated response was not returned.");
-    return json(200, { success: true, provider: "Google Gemini", model: MODEL, reply, remainingDailyRequests: Math.max(0, 79 - (count ?? 0)) });
+    return json(200, { success: true, provider: "Cloudflare Workers AI", model: MODEL, reply, remainingDailyRequests: Math.max(0, 79 - (count ?? 0)) });
   } catch (error) {
     if (error instanceof Response) return new Response(await error.text(), { status: error.status, headers });
-    const message = error instanceof Error ? error.message : "The Gemini request failed.";
-    const status = /daily MIA limit/.test(message) ? 429 : /API key is not configured/.test(message) ? 503 : 502;
+    const message = error instanceof Error ? error.message : "The Cloudflare Workers AI request failed.";
+    const status = /daily MIA limit|usage or capacity limit/.test(message) ? 429 : /credentials or permissions|must be added/.test(message) ? 503 : /did not respond within 60 seconds/.test(message) ? 504 : 502;
     return json(status, { error: message });
   }
 });

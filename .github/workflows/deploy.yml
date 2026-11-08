@@ -28,6 +28,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Verify scheduled homework fallback authentication configuration
+        run: node --test scripts/homework-fallback-auth-config.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

@@ -266,7 +266,6 @@ export default function MiaStudio() {
 
   return (
     <section className="mia-page">
-      <>
       <div className="mia-hero">
         <div className="mia-brand-mark"><Sparkles size={25}/></div>
         <div className="mia-hero-copy">
@@ -377,7 +376,6 @@ export default function MiaStudio() {
           </section>
         </div>
       )}
-      </>
     </section>
   )
 }

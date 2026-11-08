@@ -1131,3 +1131,10 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .guardian-form-actions{display:flex;justify-content:flex-end;gap:.65rem;flex-wrap:wrap;margin-top:1rem}
 .guardian-privacy-note{font-size:.78rem;color:var(--muted,#7b8496);line-height:1.55;margin-top:1rem}
 @media(max-width:680px){.guardian-queue-heading{align-items:flex-start;flex-direction:column}.guardian-form-grid{grid-template-columns:1fr}.guardian-queue-item{align-items:flex-start;flex-wrap:wrap}.guardian-pending-tag{margin-left:3.2rem}}
+
+
+.guardian-record-view{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border,#dce2ec)}
+.guardian-record-grid{display:grid;grid-template-columns:minmax(110px,.6fr) 1.4fr;gap:.55rem 1rem;margin-top:.8rem;font-size:.84rem}
+.guardian-record-grid span{color:var(--muted,#7b8496)}
+.guardian-record-grid b{font-weight:650;overflow-wrap:anywhere}
+.learner-pending-action{font-size:.75rem;color:var(--muted,#7b8496);padding:.3rem .45rem}

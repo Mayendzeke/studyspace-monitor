@@ -38,3 +38,7 @@ verify_jwt = true
 
 [functions.mia-monitor-assistant]
 verify_jwt = true
+
+
+[functions.guardian-consent]
+verify_jwt = false

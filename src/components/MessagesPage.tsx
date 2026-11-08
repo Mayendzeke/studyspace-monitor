@@ -61,6 +61,15 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       .subscribe();
     return()=>{void supabase?.removeChannel(channel);};
   },[userId]);
+  useEffect(()=>{
+    if(!supabase||!userId)return;
+    const heartbeat=()=>{if(document.visibilityState==="visible")void supabase!.from("studyspace_user_presence").upsert({user_id:userId,last_seen_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:"user_id"});};
+    heartbeat();
+    const timer=window.setInterval(heartbeat,45000);
+    window.addEventListener("focus",heartbeat);
+    document.addEventListener("visibilitychange",heartbeat);
+    return()=>{window.clearInterval(timer);window.removeEventListener("focus",heartbeat);document.removeEventListener("visibilitychange",heartbeat);};
+  },[userId]);
   const visibleContacts=useMemo(()=>contacts.filter(c=>(mailbox!=="sent"||messages.some(m=>m.sender_id===userId&&m.recipient_id===c.contact_id))&&(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query,messages,mailbox,userId]);
   const draftWords=draft.trim()?draft.trim().split(/\s+/).length:0;
   const thread=messages.filter(m=>(m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId));

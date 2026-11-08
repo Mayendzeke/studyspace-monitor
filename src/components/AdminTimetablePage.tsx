@@ -53,10 +53,14 @@ export default function AdminTimetablePage() {
           .select("id,learner_id,timetable_kind,subject_name,title,day_of_week,starts_at,ends_at,location,notes")
           .in("learner_id", next.map(item => item.id))
           .order("day_of_week").order("starts_at");
-        if (timetableError) throw timetableError;
-        setEntries((timetableRows || []) as TimetableEntry[]);
+        if (timetableError) {
+          setScheduleError("Central timetable entries could not be loaded. Check administrator access and database policies.");
+          setEntries([]);
+        } else {
+          setEntries((timetableRows || []) as TimetableEntry[]);
+          setScheduleError("");
+        }
       }
-      setScheduleError("");
       setUpdatedAt(new Date().toISOString());
     }
     setLoading(false);

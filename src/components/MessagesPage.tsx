@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, CheckCheck, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
 type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null};
@@ -10,6 +11,7 @@ const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/w
 
 export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void}){
   const [userId,setUserId]=useState("");
+  const [mailbox,setMailbox]=useState<"inbox"|"sent"|"groups">("inbox");
   const [contacts,setContacts]=useState<Contact[]>([]);
   const [messages,setMessages]=useState<Message[]>([]);
   const [selected,setSelected]=useState("");
@@ -56,7 +58,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       .subscribe();
     return()=>{void supabase?.removeChannel(channel);};
   },[userId]);
-  const visibleContacts=useMemo(()=>contacts.filter(c=>(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query]);
+  const visibleContacts=useMemo(()=>contacts.filter(c=>(mailbox!=="sent"||messages.some(m=>m.sender_id===userId&&m.recipient_id===c.contact_id))&&(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query,messages,mailbox,userId]);
   const draftWords=draft.trim()?draft.trim().split(/\s+/).length:0;
   const thread=messages.filter(m=>(m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId));
   const selectedContact=contacts.find(c=>c.contact_id===selected);
@@ -122,6 +124,12 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     <div className="welcome-row"><div><div className="eyebrow"><MessageCircle size={14}/> PRIVATE LEARNER COMMUNICATION</div><h1>Messages <span>in one place.</span></h1><p className="page-subtitle">A private channel between the Monitor and each learner. Attachments stay in a private Studyspace bucket.</p></div><div className="monitor-messages-header-actions"><button type="button" className="secondary-button" onClick={onOpenHomework}><FileText size={14}/> Homework help inbox</button><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/>{loading?"Refreshing…":"Refresh inbox"}</button></div></div>
     {error&&<p className="inline-message error-message" role="alert"><AlertCircle size={15}/>{error}</p>}
     {notice&&<p className="inline-message" role="status">{notice}</p>}
+    <nav className="ss-mailbox-tabs" aria-label="Message folders">
+      <button className={mailbox==="inbox"?"is-active":""} onClick={()=>setMailbox("inbox")}><MessageCircle size={14}/> Inbox</button>
+      <button className={mailbox==="sent"?"is-active":""} onClick={()=>setMailbox("sent")}><Send size={14}/> Sent</button>
+      <button className={mailbox==="groups"?"is-active":""} onClick={()=>setMailbox("groups")}><Users size={14}/> Groups</button>
+    </nav>
+    {mailbox==="groups"?<StudyspaceGroupsPanel/>:
     <section className="monitor-messages-shell">
       <aside className="monitor-contact-panel">
         <div className="monitor-contact-heading"><strong>Learners</strong><span>{contacts.length}</span></div>
@@ -151,6 +159,6 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
           </form>
         </>:<div className="monitor-message-empty"><MessageCircle size={28}/><strong>{loading?"Opening your inbox…":"Select a learner"}</strong><span>Choose a learner from the list to view or start a conversation.</span></div>}
       </section>
-    </section>
+    </section>}
   </div>;
 }

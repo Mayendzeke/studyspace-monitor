@@ -13,7 +13,9 @@ const required = [
   "20261108135554_studyspace_harden_homework_uploads_and_timer.sql",
   "20261108135646_studyspace_fix_homework_photo_extension_pattern.sql",
   "20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql",
+  "20261106051401_studyspace_realtime_classroom_membership.sql",
   "20261108161203_studyspace_realtime_homework_notifications.sql",
+  "20261108182736_student_feedback_realtime_inbox.sql",
   "20261108190000_studyspace_guardian_verifications_verified_by_index.sql",
 ];
 
@@ -34,4 +36,24 @@ test("migration files use applied Supabase versions and retain every applied mig
   for (const file of superseded) assert.ok(!files.includes(file), "Superseded migration version remains: " + file);
   const versions = files.map((file) => file.slice(0, 14));
   assert.equal(new Set(versions).size, versions.length, "Migration version prefixes must be unique.");
+});
+
+const realtimeMigrations = [
+  ["20261106051401_studyspace_realtime_classroom_membership.sql", "class_session_members"],
+  ["20261108161203_studyspace_realtime_homework_notifications.sql", "exercise_assignments"],
+  ["20261108182736_student_feedback_realtime_inbox.sql", "student_feedback"],
+];
+
+test("all Realtime publication migrations are present and idempotent", () => {
+  for (const [file, table] of realtimeMigrations) {
+    assert.ok(files.includes(file), "Missing Realtime migration source: " + file);
+    const sql = readFileSync("supabase/migrations/" + file, "utf8");
+    assert.match(sql, /if\\s+not\\s+exists/i, file + " must guard against duplicate publication entries.");
+    assert.match(sql, /pg_publication_tables/i, file + " must inspect the current publication.");
+    assert.match(
+      sql,
+      new RegExp("alter\\\\s+publication\\\\s+supabase_realtime\\\\s+add\\\\s+table\\\\s+public\\\\." + table + "\\\\b", "i"),
+      file + " must publish public." + table + ".",
+    );
+  }
 });

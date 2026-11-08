@@ -64,6 +64,13 @@ function loadMessages(userId: string): ChatMessage[] {
   } catch { /* Start a clean local conversation if storage is unavailable. */ }
   return [welcome]
 }
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    operation.then(value => { window.clearTimeout(timer); resolve(value) }, error => { window.clearTimeout(timer); reject(error) })
+  })
+}
+
 async function edgeError(reason: unknown): Promise<string> {
   const context = reason && typeof reason === 'object' && 'context' in reason
     ? (reason as { context?: unknown }).context : undefined
@@ -153,9 +160,9 @@ export default function MiaStudio() {
     const next = [...previousMessages, { id: crypto.randomUUID(), role: 'user' as const, content: clean }]
     saveMessages(next)
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('mia-monitor-assistant', {
+      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
         body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
-      })
+      }), 45000, 'MIA did not respond within 45 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'MIA did not return a usable response.')

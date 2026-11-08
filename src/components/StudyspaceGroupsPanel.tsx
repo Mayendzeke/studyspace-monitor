@@ -15,7 +15,7 @@ export default function StudyspaceGroupsPanel(){
  const [active,setActive]=useState(""),[kind,setKind]=useState<G["group_type"]>("classroom"),[name,setName]=useState(""),[description,setDescription]=useState(""),[school,setSchool]=useState(""),[level,setLevel]=useState(""),[grade,setGrade]=useState(""),[entry,setEntry]=useState(""),[draft,setDraft]=useState(""),[file,setFile]=useState<File|null>(null),[invitePeer,setInvitePeer]=useState(""),[query,setQuery]=useState("");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[sending,setSending]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const bottom=useRef<HTMLDivElement>(null),fileRef=useRef<HTMLInputElement>(null);
- const group=groups.find(g=>g.id===active),mine=members.find(m=>m.group_id===active&&m.learner_id===uid),activeMembers=members.filter(m=>m.group_id===active&&m.membership_status==="active"),thread=msgs.filter(m=>m.group_id===active),pending=members.filter(m=>m.group_id===active&&m.membership_status==="pending"),incoming=invites.filter(i=>i.invitee_id===uid);
+ const group=groups.find(g=>g.id===active),mine=members.find(m=>m.group_id===active&&m.learner_id===uid),thread=msgs.filter(m=>m.group_id===active),pending=members.filter(m=>m.group_id===active&&m.membership_status==="pending"),incoming=invites.filter(i=>i.invitee_id===uid);
  const refresh=async()=>{
   if(!supabase)return;setLoading(true);setError("");
   try{
@@ -54,7 +54,7 @@ export default function StudyspaceGroupsPanel(){
   if(!supabase||!uid)return;
   const beat=()=>{if(document.visibilityState==="visible")void supabase!.from("studyspace_user_presence").upsert({user_id:uid,last_seen_at:new Date().toISOString(),updated_at:new Date().toISOString()},{onConflict:"user_id"});};
   beat();const timer=window.setInterval(beat,45000);window.addEventListener("focus",beat);document.addEventListener("visibilitychange",beat);
-  const ch=supabase.channel("studyspace-groups-"+uid).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_messages"},()=>void loadThread()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_members"},()=>void refresh()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_invites"},()=>void refresh()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_user_presence"},()=>void loadThread()).subscribe();
+  const ch=supabase.channel("studyspace-groups-"+uid).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_messages"},()=>void loadThread()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_members"},()=>void refresh()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_invites"},()=>void refresh()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_group_message_receipts"},()=>void loadThread()).on("postgres_changes",{event:"*",schema:"public",table:"studyspace_user_presence"},()=>void loadThread()).subscribe();
   return()=>{window.clearInterval(timer);window.removeEventListener("focus",beat);document.removeEventListener("visibilitychange",beat);void supabase?.removeChannel(ch);};
  },[uid,active]);
  useEffect(()=>{if(active&&uid)void loadThread(active).catch(e=>setError(e.message||"Could not load group messages."));},[active,uid]);

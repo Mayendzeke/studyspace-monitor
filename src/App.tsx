@@ -741,7 +741,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="panel-heading"><div><h2>Connected applications</h2><p>Student and Monitor are two interfaces to the same StudySpace backend.</p></div><BookOpen size={19}/></div>
       <div className="settings-row"><div className="settings-symbol"><GraduationCap size={19}/></div><div><strong>StudySpace Student</strong><p>Open the learner-facing planner to inspect the student experience, assignments and study timetable.</p></div><a className="secondary-button" href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">Open Student app <ArrowUpRight size={14}/></a></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><CalendarDays size={19}/></div><div><strong>Central timetable</strong><p>Manage a learner's school and personal timetable from one Monitor workspace without opening their learner profile.</p></div><button type="button" className="secondary-button" onClick={onOpenTimetable}>Open timetable <ArrowUpRight size={14}/></button></div>
+      <div className="settings-row"><div className="settings-symbol"><CalendarDays size={19}/></div><div><strong>Central timetable</strong><p>View only the classes and lessons you have published to learners. Open an individual learner from Learners to inspect their timetable.</p></div><button type="button" className="secondary-button" onClick={onOpenTimetable}>Open timetable <ArrowUpRight size={14}/></button></div>
     </div>
 
     <div className="panel settings-card">

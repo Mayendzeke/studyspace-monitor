@@ -162,7 +162,7 @@ Deno.serve(async request => {
   if (relationship === "other" && (relationshipDetails.length < 2 || relationshipDetails.length > 100)) return json(400, { error: "Describe the guardian’s relationship to the learner." });
   if (!/^\+?[0-9][0-9 ()-]{5,28}$/.test(guardianPhone)) return json(400, { error: "Enter a valid guardian contact number." });
   if (!guardianConsent) return json(400, { error: "The guardian must personally agree to the Terms and Conditions and give consent before activation." });
-  if (termsVersion !== "2026-11-07-v3") return json(400, { error: "The current Terms and Conditions must be reviewed before activation." });
+  if (termsVersion !== "2026-11-08-v5") return json(400, { error: "The current Terms and Conditions must be reviewed before activation." });
 
   const { data: activated, error: activationError } = await admin.rpc("activate_studyspace_minor_learner", {
     p_learner_id: learnerId,

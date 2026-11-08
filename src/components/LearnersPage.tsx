@@ -5,7 +5,6 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
-import SharedStudyTimetable from "./SharedStudyTimetable";
 
 type Learner = {
   id: string;
@@ -122,7 +121,6 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [deleteTarget, setDeleteTarget] = useState<Learner | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const [adminId, setAdminId] = useState("");
   const [viewTarget, setViewTarget] = useState<Learner | null>(null);
   const [viewSubjects, setViewSubjects] = useState<string[]>([]);
   const [viewSubjectsLoading, setViewSubjectsLoading] = useState(false);
@@ -146,11 +144,6 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       window.removeEventListener("keydown", closeOnEscape)
     }
   }, [editTarget, deleteTarget, viewTarget, savingProfile, deleting])
-
-  useEffect(() => {
-    if (!supabase) return;
-    void supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? ""));
-  }, []);
 
   async function openView(learner: Learner) {
     if (!supabase) return;
@@ -383,10 +376,6 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       <div className="eyebrow">LEARNER MANAGEMENT</div>
       <h1>Learner accounts</h1>
       <p className="page-subtitle">Manage learner records, school placement, academic details, sign-in access and account deletion from one secure workspace.</p>
-
-      {adminId && <TimetableManager learnerId={adminId} kind="personal" title="My teacher timetable" allowGroupEvents/>}
-      <SharedStudyTimetable/>
-
 
       <div className="learners-summary">
         <button type="button" className={statusFilter === "all" ? "learner-summary-card selected" : "learner-summary-card"} onClick={() => setStatusFilter("all")}>

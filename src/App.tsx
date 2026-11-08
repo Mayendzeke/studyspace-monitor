@@ -629,6 +629,7 @@ function StatCard({ label, value, detail, icon }: { label: string; value: string
 }
 
 function PinPage() {
+  const enrolmentOpen = import.meta.env.VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED === "true";
   type PinRecord = { id: string; student_id: string | null; expires_at: string; redeemed_at: string | null; revoked_at: string | null; created_at: string }
   const [pins, setPins] = useState<PinRecord[]>([])
   const [busy, setBusy] = useState(false)
@@ -647,6 +648,7 @@ function PinPage() {
   useEffect(() => { void refresh() }, [])
 
   const createPin = async () => {
+    if (!enrolmentOpen) { setError('New learner registration is currently closed. Do not issue PINs until the private invitation route is approved.'); return; }
     if (!supabase) { setError('Connect Supabase before creating enrolment PINs.'); return }
     setBusy(true); setError(''); setNotice(''); setNewPin(null)
     try {
@@ -674,16 +676,17 @@ function PinPage() {
   const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }
 
   return <div className="subpage">
-    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Create one-time invitations for first-time enrolment. The PIN expires if unused and cannot be reused after enrolment. Once a learner has enrolled, their Student ID and password remain their sign-in credentials; do not issue another enrolment PIN to restore an existing account.</p>
+    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Issue single-use invitations only when the enrolment service is enabled. Existing learners sign in with their Student ID and password; they do not need a new PIN.</p>
+    {!enrolmentOpen && <div className="security-note"><LockKeyhole size={17}/><p><strong>New enrolment is currently closed.</strong> Public registration remains off and the server-side PIN redemption route has not been approved for private invitation use. You can review existing PIN records, but do not issue or send new invitations until this control is reopened.</p></div>}
     <div className="panel pin-create-panel">
-      <div className="panel-heading"><div><h2>Create learner access</h2><p>Requires an authenticated administrator with MFA verified.</p></div><KeyRound size={20}/></div>
-      <div className="pin-create-controls"><p className="subtle-note">Every one-time PIN expires exactly 24 hours after generation. The learner’s free 48-hour trial begins only after successful account registration.</p><button className="primary-button" onClick={()=>void createPin()} disabled={busy}>{busy?'Working…':'Generate Student ID + PIN'}</button></div>
+      <div className="panel-heading"><div><h2>{enrolmentOpen ? "Create learner access" : "Learner invitations paused"}</h2><p>{enrolmentOpen ? "Requires an authenticated administrator with MFA verified." : "PIN creation is disabled while the server rejects all new registrations."}</p></div><KeyRound size={20}/></div>
+      <div className="pin-create-controls"><p className="subtle-note">When enrolment is enabled, each PIN expires after 24 hours and the learner’s 48-hour trial begins only after successful registration.</p><button className="primary-button" onClick={()=>void createPin()} disabled={busy || !enrolmentOpen}>{busy?'Working…':enrolmentOpen ? 'Generate Student ID + PIN' : 'Enrolment closed'}</button></div>
       {newPin && <div className="pin-issued-card"><strong>New learner credentials · shown once</strong><div><span>Student ID</span><code>{newPin.studentId}</code><button className="subtle-button" onClick={()=>copy(newPin.studentId)}>Copy ID</button></div><div><span>One-time PIN</span><code>{newPin.pin}</code><button className="subtle-button" onClick={()=>copy(newPin.pin)}>Copy PIN</button></div><small>Expires {new Date(newPin.expiresAt).toLocaleString()}. Keep these details private and deliver them directly to the learner.</small></div>}
       {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
     </div>
     <div className="panel pin-history-panel">
       <div className="panel-heading"><div><h2>Recent invitations</h2><p>{pins.length} recent record(s)</p></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button></div>
-      {pins.length ? <div className="pin-history-list">{pins.map(pin=>{const status=pin.redeemed_at?'Redeemed':pin.revoked_at?'Revoked':new Date(pin.expires_at).getTime()<Date.now()?'Expired':'Unused';return <article key={pin.id}><div><strong>{pin.student_id || 'Student ID unavailable'}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={'pin-status '+status.toLowerCase()}>{status}</span>{status==='Unused'&&<button className="text-button" disabled={busy} onClick={()=>void revokePin(pin.id)}>Revoke</button>}</article>})}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No invitations yet</strong><span>Create a PIN to invite your first learner.</span></div>}
+      {pins.length ? <div className="pin-history-list">{pins.map(pin=>{const status=pin.redeemed_at?'Redeemed':pin.revoked_at?'Revoked':new Date(pin.expires_at).getTime()<Date.now()?'Expired':'Unused';return <article key={pin.id}><div><strong>{pin.student_id || 'Student ID unavailable'}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={'pin-status '+status.toLowerCase()}>{status}</span>{status==='Unused'&&<button className="text-button" disabled={busy} onClick={()=>void revokePin(pin.id)}>Revoke</button>}</article>})}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No invitations yet</strong><span>{enrolmentOpen ? "Create a PIN to invite your first learner." : "New invitations are unavailable until the server-side registration route is approved."}</span></div>}
     </div>
   </div>
 }

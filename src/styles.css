@@ -1439,3 +1439,7 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .ss-admin-add{margin-top:9px;}
 .ss-admin-add select{min-width:0;flex:1;}
 @media(max-width:700px){.ss-notification-preferences{padding:15px;border-radius:17px;}.ss-notification-pref-header{display:block;}.ss-notification-pref-status{margin-top:10px;}.ss-notification-pref-grid{grid-template-columns:1fr;}.ss-notification-device{align-items:flex-start;flex-direction:column;}}
+
+
+.ss-group-mute{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border,rgba(127,140,180,.28));background:rgba(110,125,185,.08);cursor:pointer;color:var(--text,inherit);font:inherit;font-size:11px;padding:7px 10px;white-space:nowrap;}
+.ss-group-mute:disabled{opacity:.55;cursor:wait;}

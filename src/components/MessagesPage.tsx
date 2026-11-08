@@ -8,7 +8,7 @@ type Message={id:string;sender_id:string;recipient_id:string;body:string;attachm
 const allowedTypes=["image/jpeg","image/png","image/webp","application/pdf","text/plain"];
 const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf","text/plain":"txt" } as Record<string,string>)[file.type]||"";
 
-export default function MessagesPage(){
+export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void}){
   const [userId,setUserId]=useState("");
   const [contacts,setContacts]=useState<Contact[]>([]);
   const [messages,setMessages]=useState<Message[]>([]);
@@ -118,7 +118,7 @@ export default function MessagesPage(){
   const formatBytes=(size:number)=>size<1024*1024?Math.max(1,Math.round(size/1024))+" KB":(size/1024/1024).toFixed(1)+" MB";
 
   return <div className="subpage monitor-messages-page">
-    <div className="welcome-row"><div><div className="eyebrow"><MessageCircle size={14}/> PRIVATE LEARNER COMMUNICATION</div><h1>Messages <span>in one place.</span></h1><p className="page-subtitle">A private channel between the Monitor and each learner. Attachments stay in a private Studyspace bucket.</p></div><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/>{loading?"Refreshing…":"Refresh inbox"}</button></div>
+    <div className="welcome-row"><div><div className="eyebrow"><MessageCircle size={14}/> PRIVATE LEARNER COMMUNICATION</div><h1>Messages <span>in one place.</span></h1><p className="page-subtitle">A private channel between the Monitor and each learner. Attachments stay in a private Studyspace bucket.</p></div><div className="monitor-messages-header-actions"><button type="button" className="secondary-button" onClick={onOpenHomework}><FileText size={14}/> Homework help inbox</button><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={loading}><RefreshCw size={15}/>{loading?"Refreshing…":"Refresh inbox"}</button></div></div>
     {error&&<p className="inline-message error-message" role="alert"><AlertCircle size={15}/>{error}</p>}
     {notice&&<p className="inline-message" role="status">{notice}</p>}
     <section className="monitor-messages-shell">

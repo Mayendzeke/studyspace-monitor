@@ -89,7 +89,8 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     if(!supabase||!userId||!selected||sending)return;
     const body=draft.trim();
     if(!body&&!file)return;
-    if(body.length>2000){setError("Messages are limited to 2,000 characters.");return;}\n    if(body&&body.split(/\\s+/).length>350){setError("Messages are limited to 350 words.");return;}
+    if(body.length>2000){setError("Messages are limited to 2,000 characters.");return;}
+    if(body&&body.split(/\s+/).length>350){setError("Messages are limited to 350 words.");return;}
     if(file&&(file.size>5*1024*1024||!allowedTypes.includes(file.type))){setError("Attachments must be a PDF, JPG, PNG, WebP or TXT file up to 5 MB.");return;}
     setSending(true);setError("");setNotice("");
     let path:string|null=null;

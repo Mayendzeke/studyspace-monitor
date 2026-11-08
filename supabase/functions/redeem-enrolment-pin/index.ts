@@ -28,7 +28,6 @@ Deno.serve(async request => {
   const allowedOrigin = Deno.env.get("APP_ORIGIN");
   const requestOrigin = request.headers.get("Origin");
   if (!allowedOrigin || !requestOrigin || requestOrigin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
-  if (Deno.env.get("STUDYSPACE_PUBLIC_ENROLMENT_ENABLED") !== "true") return json(503, { error: "New learner enrolment is temporarily closed while Study Space completes its required data-protection registration." });
 
   const authorization = request.headers.get("Authorization");
   const url = Deno.env.get("SUPABASE_URL");

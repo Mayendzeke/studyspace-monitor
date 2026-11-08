@@ -11,3 +11,8 @@ test("lesson recap handles Cloudflare response bodies and content variants", () 
   assert.match(source, /typeof choice\?\.text === ["']string["']/, "Support the legacy completion text field.");
   assert.match(source, /response_format:\s*\{\s*type:\s*["']json_object["']\s*\}/, "Request JSON mode for the recap object.");
 });
+
+test("lesson recap forwards null-body HTTP statuses safely", () => {
+  assert.match(source, /if\s*\(\[204,\s*205,\s*304\]\.includes\(error\.status\)\)/, "Do not construct a text body for bodyless HTTP statuses.");
+  assert.match(source, /new Response\(null,\s*\{\s*status:\s*error\.status,\s*headers\s*\}\)/, "Forward bodyless statuses with a null body.");
+});

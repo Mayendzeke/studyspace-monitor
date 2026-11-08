@@ -375,6 +375,39 @@ export default function ClassroomStudio() {
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : 'The class session could not be published.') }
     finally { setPublishing(false) }
   }
+  const generateHomeworkFromLesson = () => {
+    if (!draft.subject.trim() || !draft.level.trim() || !draft.grade.trim()) {
+      setNotice('Choose the education level, grade/year and subject before generating homework.');
+      return;
+    }
+    if (!selectedLearners.length) {
+      setNotice('Select the learners who should receive this homework first.');
+      return;
+    }
+    const topic = draft.title.trim() || completePoints[0] || 'Lesson practice';
+    const context = [
+      draft.objectives.trim() && 'Learning objectives: ' + draft.objectives.trim(),
+      completePoints.length && 'Lesson checkpoints: ' + completePoints.join('; '),
+      draft.aiRecap?.summary && 'Lesson summary: ' + draft.aiRecap.summary,
+      draft.aiRecap?.keyPoints?.length && 'Key points: ' + draft.aiRecap.keyPoints.join('; '),
+      draft.aiRecap?.workedExample && 'Worked example: ' + draft.aiRecap.workedExample,
+      draft.sourceNotes.trim() && 'Teacher source notes: ' + draft.sourceNotes.trim(),
+      draft.homework.trim() && 'Teacher homework direction: ' + draft.homework.trim(),
+    ].filter(Boolean).join('\n\n').slice(0, 1800);
+    try {
+      localStorage.setItem('studyspace-monitor-homework-handoff-v1', JSON.stringify({
+        level: draft.level, grade: draft.grade, course: courseFilter || draft.course || '',
+        subject: draft.subject, curriculum: draft.curriculum, topic,
+        instructions: (context || 'Create age-appropriate interactive practice for this lesson.') + '\n\nLearner instructions: Answer every question and show working where appropriate.',
+        dueDate: draft.homeworkDue || '', learnerIds: selectedLearners,
+      }));
+      window.dispatchEvent(new CustomEvent('studyspace-prefill-homework-builder'));
+      setNotice('Lesson details and selected learners sent to the interactive homework builder below. Generate, review and publish the question form there.');
+    } catch {
+      setNotice('Homework details could not be handed to the builder. Check browser storage and try again.');
+    }
+  };
+
   const save = () => {
     if (!draft.title.trim() || !draft.subject.trim()) { setNotice('Add a lesson title and subject before saving.'); return }
     const saved = { ...draft, course: courseFilter, title: draft.title.trim(), subject: draft.subject.trim(), checkpoints: completePoints }
@@ -430,6 +463,7 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
+        <div className="classroom-ai-actions"><button type="button" className="primary-button" onClick={generateHomeworkFromLesson} disabled={!draft.subject.trim() || !draft.level.trim() || !draft.grade.trim() || selectedLearners.length===0}><Sparkles size={15}/> Generate Homework with MIA</button><small>Uses the subject, grade, curriculum, objectives, lesson notes and selected learners above. Opens the interactive question builder below for review and publishing.</small></div>
         <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select from the {draft.level || 'selected'} learners. {scopedLearnerCountLabel}.</small></div>{scopedLearners.length ? <div className="classroom-learner-checks">{scopedLearners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'} · {learner.grade || 'Grade not set'}{learner.course ? ' · ' + learner.course : ''}</small></span></label>)}</div> : <p>{learners.length ? 'No active learners match this level and group yet. Choose another level, course or grade, or enrol learners with complete profile details.' : 'No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.'}</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
         <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
         {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}

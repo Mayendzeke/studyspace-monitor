@@ -215,7 +215,7 @@ export default function GuardianVerificationPage() {
               <button type="button" className="subtle-button guardian-switch-inperson" onClick={() => { setForceInPerson(true); setGuardianConsent(false); }}>Guardian is here — complete verification in person</button>
             </>
           ) : (
-            <p className="guardian-consent-instruction">Use this route only when the parent or legal guardian is physically with you. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full terms are available in the <a href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">StudySpace Student App</a>. This route will replace any earlier unapproved online submission with the details you confirm in person.</p>
+            <p className="guardian-consent-instruction">Use this route only when the parent or legal guardian is physically with you. Read the current StudySpace Terms and Conditions and Privacy Notice with them, explain the data collected and how the learner’s account works, and answer their questions before recording consent. The full terms are available in the <a href="https://mayendzeke.github.io/planner/?studyspace_terms=1" target="_blank" rel="noreferrer">StudySpace Student App</a>. This route will replace any earlier unapproved online submission with the details you confirm in person.</p>
           )}
           <form onSubmit={event => void approve(event)}>
             <div className="guardian-form-grid">

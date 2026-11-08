@@ -29,3 +29,9 @@ verify_jwt = true
 
 [functions.jaas-token]
 verify_jwt = true
+
+[functions.mia-assistant]
+verify_jwt = true
+
+[functions.mia-monitor-assistant]
+verify_jwt = true

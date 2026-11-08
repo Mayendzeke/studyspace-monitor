@@ -30,7 +30,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Cloudflare Workers AI · Gemma 4. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant, using Gemini with Gemma as an automatic backup. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
@@ -167,7 +167,10 @@ export default function MiaStudio() {
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'MIA did not return a usable response.')
       }
-      const completed = [...next, { id: crypto.randomUUID(), role: 'assistant' as const, content: data.reply }]
+      const notice = typeof data.providerNotice === 'string' && data.providerNotice.trim()
+        ? [{ id: crypto.randomUUID(), role: 'assistant' as const, content: data.providerNotice }]
+        : []
+      const completed = [...next, ...notice, { id: crypto.randomUUID(), role: 'assistant' as const, content: data.reply }]
       saveMessages(completed)
       if (lessonContext) setLessonHandoff({ ...lessonContext, content: data.reply })
       setRemaining(typeof data.remainingDailyRequests === 'number' ? data.remainingDailyRequests : null)

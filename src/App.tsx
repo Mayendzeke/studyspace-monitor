@@ -4,6 +4,7 @@ import HomeworkBuilder from './components/HomeworkBuilder'
 import HomeworkHelpInbox from './components/HomeworkHelpInbox'
 import AssessmentReviewQueue from './components/AssessmentReviewQueue'
 import LearnersPage from './components/LearnersPage'
+import AdminTimetablePage from './components/AdminTimetablePage'
 import GuardianVerificationPage from './components/GuardianVerificationPage'
 import SubscriptionsPage from './components/SubscriptionsPage'
 import MiaStudio from './components/MiaStudio'
@@ -21,7 +22,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -29,6 +30,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'MIA', icon: Sparkles },
   { label: 'Learners', icon: Users },
+  { label: 'Timetable', icon: CalendarDays },
   { label: 'Guardian verification', icon: ShieldCheck },
   { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
@@ -256,6 +258,7 @@ function App() {
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
+          {page === 'Timetable' && <AdminTimetablePage />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIA' && <MiaStudio />}
@@ -263,7 +266,8 @@ function App() {
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
-          {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} />}
+          {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} theme={theme} onThemeChange={setTheme} />}
+
         </div>
       </main>
       {installHelpOpen && <div className="monitor-install-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setInstallHelpOpen(false) }}><section className="monitor-install-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-install-title"><header><div><span className="eyebrow">STUDYSPACE MONITOR</span><h2 id="monitor-install-title">Install on your device</h2><p>Use Monitor like an app, with its own icon and app window. Your administrator sign-in and MFA remain required.</p></div><button type="button" className="icon-button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={18}/></button></header><div className="monitor-install-instructions"><article><strong>Android · Chrome</strong><p>Open the browser menu (⋮), then choose <b>Install app</b> or <b>Add to Home screen</b>.</p></article><article><strong>Windows · Chrome or Edge</strong><p>Use the install icon in the address bar, or open the browser menu and choose <b>Install Studyspace Monitor</b>.</p></article><article><strong>iPhone / iPad · Safari</strong><p>Tap <b>Share</b>, choose <b>Add to Home Screen</b>, then confirm.</p></article><article><strong>Mac · Chrome or Safari</strong><p>In Chrome use <b>Install page as app</b>. In supported Safari versions, use <b>File → Add to Dock</b>.</p></article></div><footer><span>Requires an internet connection for the latest learner and administrator records. Offline caching does not bypass sign-in or access checks.</span><button type="button" className="primary-button" onClick={() => setInstallHelpOpen(false)}>Got it</button></footer></section></div>}
@@ -677,17 +681,73 @@ function PinPage() {
 }
 
 
-function SettingsPage({ supabaseConfigured }: { supabaseConfigured: boolean }) {
+function SettingsPage({ supabaseConfigured, theme, onThemeChange }: {
+  supabaseConfigured: boolean;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+}) {
+  const [checking, setChecking] = useState(false);
+  const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[]>([]);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
+
+  async function runWorkspaceChecks() {
+    if (!supabase) return;
+    setChecking(true);
+    const results = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "learner"),
+      supabase.from("student_timetable_entries").select("id", { count: "exact", head: true }),
+      supabase.from("exercise_assignments").select("id", { count: "exact", head: true }),
+      supabase.from("student_goals").select("learner_id", { count: "exact", head: true }),
+    ]);
+    const labels = ["Learner records", "Timetable records", "Homework assignments", "Student study plans"];
+    setChecks(results.map((result, index) => ({
+      label: labels[index],
+      ok: !result.error,
+      detail: result.error ? result.error.message : String(result.count ?? 0) + " record(s) accessible",
+    })));
+    setCheckedAt(new Date().toISOString());
+    setChecking(false);
+  }
+
   return <div className="subpage">
-    <div className="eyebrow">CONFIGURATION</div><h1>Workspace settings</h1><p className="page-subtitle">Prepare the secure services that power Studyspace Monitor.</p>
+    <div className="eyebrow">CONFIGURATION &amp; OPERATIONS</div>
+    <h1>Workspace settings</h1>
+    <p className="page-subtitle">Control your Monitor workspace, inspect the shared StudySpace services and review the safeguards applied to learner accounts.</p>
+
     <div className="panel settings-card">
-      <div className="settings-row"><div className="settings-symbol"><ShieldCheck size={19} /></div><div><strong>Authentication and database</strong><p>The current deployment is connected to the Studyspace Supabase project. The latest automated smoke check confirmed that the public learner enrolment and sign-in Edge Functions respond from the student app origin; it does not certify every table or feature.</p></div><span className="connection-pill"><i /> {supabaseConfigured ? 'Auth functions checked' : 'Not configured'}</span></div>
-      <div className="settings-divider" />
-      <div className="settings-row"><div className="settings-symbol"><BookOpen size={19} /></div><div><strong>Studyspace Planner integration</strong><p>Student ID enrolment, sign-in and profile onboarding use the shared Supabase project. The student Planner synchronises its profile, subjects, tasks, study history, academic periods, calendar events and personal files when online, while retaining an account-separated offline copy. Assignments, submissions and live classroom sessions use the shared backend.</p></div><span className="connection-pill"><i /> Shared workspace</span></div>
-      <div className="settings-divider" />
-      <div className="settings-row"><div className="settings-symbol"><LockKeyhole size={19} /></div><div><strong>Security controls</strong><p>Administrator access is gated by verified MFA (AAL2). Server-side functions check active administrator permissions; learner sign-in and enrolment are rate-limited. Protected database operations also depend on the production RLS migrations.</p></div><span className="connection-pill"><i /> MFA-gated</span></div>
+      <div className="panel-heading"><div><h2>Appearance</h2><p>Set the Monitor display theme on this device.</p></div><Sun size={19}/></div>
+      <div className="theme-options" role="group" aria-label="Monitor appearance">
+        <button type="button" className={theme === "light" ? "chosen" : ""} aria-pressed={theme === "light"} onClick={() => onThemeChange("light")}><Sun size={15}/> Light</button>
+        <button type="button" className={theme === "dark" ? "chosen" : ""} aria-pressed={theme === "dark"} onClick={() => onThemeChange("dark")}><Moon size={15}/> Dark</button>
+      </div>
     </div>
-    <div className="security-note"><LockKeyhole size={17} /><p><strong>Keep credentials private.</strong> Deliver Student IDs, one-time PINs and reset passwords directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>
+
+    <div className="panel settings-card">
+      <div className="panel-heading"><div><h2>Workspace diagnostics</h2><p>Run read-only checks against the shared learner, timetable, homework and study-plan records.</p></div><Activity size={19}/></div>
+      <div className="setting-row">
+        <div><strong>Database access check</strong><span>{checkedAt ? "Last checked " + new Date(checkedAt).toLocaleString() : "No diagnostic run has been completed in this session."}</span></div>
+        <button type="button" className="primary-button" onClick={() => void runWorkspaceChecks()} disabled={!supabaseConfigured || checking}><RefreshCw size={15}/>{checking ? "Checking…" : "Run workspace checks"}</button>
+      </div>
+      {checks.length > 0 && <div className="privacy-list" aria-live="polite">{checks.map(item => <p key={item.label}><span className={item.ok ? "status-dot" : "status-dot status-error"}/><strong>{item.label}:</strong> {item.ok ? "Available" : "Check failed"} · {item.detail}</p>)}</div>}
+    </div>
+
+    <div className="panel settings-card">
+      <div className="panel-heading"><div><h2>Connected applications</h2><p>Student and Monitor are two interfaces to the same StudySpace backend.</p></div><BookOpen size={19}/></div>
+      <div className="settings-row"><div className="settings-symbol"><GraduationCap size={19}/></div><div><strong>StudySpace Student</strong><p>Open the learner-facing planner to inspect the student experience, assignments and study timetable.</p></div><a className="secondary-button" href="https://mayendzeke.github.io/planner/" target="_blank" rel="noreferrer">Open Student app <ArrowUpRight size={14}/></a></div>
+      <div className="settings-divider"/>
+      <div className="settings-row"><div className="settings-symbol"><CalendarDays size={19}/></div><div><strong>Central timetable</strong><p>Manage a learner's school and personal timetable from one Monitor workspace without opening their learner profile.</p></div><button type="button" className="secondary-button" onClick={() => window.dispatchEvent(new CustomEvent("studyspace-open-admin-timetable"))}>Open timetable <ArrowUpRight size={14}/></button></div>
+    </div>
+
+    <div className="panel settings-card">
+      <div className="panel-heading"><div><h2>Platform safeguards</h2><p>Critical controls stay enforced by the backend and cannot be weakened from a browser setting.</p></div><ShieldCheck size={19}/></div>
+      <div className="settings-row"><div className="settings-symbol"><LockKeyhole size={19}/></div><div><strong>Administrator MFA</strong><p>Monitor requires a verified administrator AAL2 session before showing the workspace or allowing privileged actions.</p></div><span className="connection-pill"><i/> Required</span></div>
+      <div className="settings-divider"/>
+      <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
+      <div className="settings-divider"/>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Public learner enrolment</strong><p>New public enrolment remains closed while business registration and legal readiness are pending. Enabling a front-end switch would not override the server-side enrolment block.</p></div><span className="connection-pill"><i/> Closed</span></div>
+    </div>
+
+    <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Deliver Student IDs, one-time PINs and reset passwords directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>
   </div>
 }
 

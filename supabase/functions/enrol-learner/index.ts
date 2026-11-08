@@ -24,7 +24,6 @@ Deno.serve(async request => {
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   const origin = request.headers.get("Origin");
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
-  if (Deno.env.get("STUDYSPACE_PUBLIC_ENROLMENT_ENABLED") !== "true") return json(503, { error: "New learner enrolment is temporarily closed while Study Space completes its required data-protection registration. Existing learners can still sign in." });
   const url = Deno.env.get("SUPABASE_URL"), anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
   const pinPepper = Deno.env.get("PIN_PEPPER"), ratePepper = Deno.env.get("AUTH_RATE_LIMIT_PEPPER");
@@ -58,6 +57,10 @@ Deno.serve(async request => {
   }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const { data: capacityAvailable, error: capacityError } = await admin.rpc("studyspace_enrolment_capacity_available");
+  if (capacityError) return json(503, { error: "Enrolment capacity could not be verified. Please try again shortly." });
+  if (capacityAvailable !== true) return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
+
   const source = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const identifierHash = await digest(ratePepper + ":" + studentId);
   const sourceHash = await digest(ratePepper + ":" + source);
@@ -99,28 +102,23 @@ Deno.serve(async request => {
     return json(409, { error: "This invitation has just been used or revoked. Ask your administrator for a new one." });
   }
 
-  const trialStartedAt = new Date();
-  const trialExpiresAt = new Date(trialStartedAt.getTime() + 48 * 60 * 60 * 1000);
-  const { data: completedProfile, error: profileError } = await admin.from("profiles").update({
-    student_id: studentId,
-    account_status: "active",
-    subscription_tier: null,
-    subscription_expires_at: null,
-    trial_started_at: trialStartedAt.toISOString(),
-    trial_expires_at: trialExpiresAt.toISOString(),
-    trial_reminder_shown_at: null,
-    terms_accepted_at: trialStartedAt.toISOString(),
-    terms_version: "2026-11-07-v3",
-    terms_accepted_by_name: acceptedByName,
-    terms_acceptance_role: acceptanceRole,
-    updated_at: trialStartedAt.toISOString(),
-  }).eq("id", created.user.id).select("id").single();
-  if (profileError || !completedProfile) {
-    await admin.from("enrolment_pins").update({ redeemed_by: null, redeemed_at: null }).eq("id", invitation.id);
+  const { data: completed, error: completionError } = await admin.rpc("complete_studyspace_enrolment", {
+    p_learner_id: created.user.id,
+    p_student_id: studentId,
+    p_accepted_by_name: acceptedByName,
+    p_acceptance_role: acceptanceRole,
+  });
+  if (completionError || completed !== true) {
+    await admin.from("enrolment_pins")
+      .update({ redeemed_by: null, redeemed_at: null })
+      .eq("id", invitation.id)
+      .eq("redeemed_by", created.user.id);
     await admin.auth.admin.deleteUser(created.user.id);
-    return json(500, { error: "The account was not completed. The invitation has been released; contact your administrator." });
+    if (!completionError && completed === false) {
+      return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
+    }
+    return json(500, { error: "The account could not be completed. The invitation has been released; please try again or contact Study Space." });
   }
   await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: true });
-  await admin.from("audit_events").insert({ actor_id: created.user.id, event_type: "learner_account_enrolled", target_type: "profile", target_id: created.user.id });
   return json(200, { success: true, studentId, message: "Account created. Sign in with your Student ID and password." });
 });

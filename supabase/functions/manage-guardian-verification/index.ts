@@ -72,26 +72,79 @@ Deno.serve(async request => {
       .eq("account_status", "pending_guardian_verification")
       .order("created_at", { ascending: true });
     if (error) return json(503, { error: "The guardian verification queue could not be loaded." });
+    const learnerIds = (data ?? []).map(row => row.id);
+    const { data: guardianRows, error: guardianRowsError } = learnerIds.length
+      ? await admin.from("guardian_verifications")
+          .select("learner_id,guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at")
+          .in("learner_id", learnerIds)
+      : { data: [], error: null };
+    if (guardianRowsError) return json(503, { error: "Guardian consent submissions could not be loaded." });
+    const guardianByLearner = new Map((guardianRows ?? []).map(row => [row.learner_id, row]));
     const today = new Date();
     const learners = (data ?? []).map(row => {
       const dob = new Date(String(row.date_of_birth) + "T00:00:00Z");
       let age = today.getUTCFullYear() - dob.getUTCFullYear();
       const monthDelta = today.getUTCMonth() - dob.getUTCMonth();
       if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < dob.getUTCDate())) age--;
-      return { ...row, age };
+      return { ...row, age, guardianSubmission: guardianByLearner.get(row.id) ?? null };
     });
     return json(200, { success: true, learners });
+  }
+
+  if (action === "create_invite") {
+    const learnerId = String(body.learnerId ?? "");
+    if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "Select a valid learner account." });
+    const { data: learner, error: learnerError } = await admin.from("profiles")
+      .select("id,date_of_birth,account_status")
+      .eq("id", learnerId).eq("role", "learner").single();
+    if (learnerError || !learner || learner.account_status !== "pending_guardian_verification" || !learner.date_of_birth) {
+      return json(409, { error: "This learner is not awaiting guardian verification." });
+    }
+    const { data: existingConsent, error: consentError } = await admin.from("guardian_verifications")
+      .select("id").eq("learner_id", learnerId).maybeSingle();
+    if (consentError) return json(503, { error: "The existing guardian record could not be checked." });
+    if (existingConsent) return json(409, { error: "A guardian consent submission already exists. Review it in the verification queue instead of issuing another link." });
+    const randomToken = crypto.getRandomValues(new Uint8Array(32));
+    const token = Array.from(randomToken, byte => byte.toString(16).padStart(2, "0")).join("");
+    const tokenHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const tokenHashHex = Array.from(new Uint8Array(tokenHash), byte => byte.toString(16).padStart(2, "0")).join("");
+    const { error: inviteError } = await admin.from("guardian_verification_invites").upsert({
+      learner_id: learnerId,
+      token_hash: tokenHashHex,
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      redeemed_at: null,
+      revoked_at: null,
+    }, { onConflict: "learner_id" });
+    if (inviteError) return json(503, { error: "A guardian link could not be generated. Please try again." });
+    const studentAppUrl = Deno.env.get("STUDENT_APP_URL") ?? "https://mayendzeke.github.io/planner/";
+    const shareUrl = new URL(studentAppUrl);
+    shareUrl.searchParams.set("guardian_consent", token);
+    return json(200, { success: true, guardianUrl: shareUrl.toString(), expiresInDays: 14 });
   }
 
   if (action === "get_record") {
     const learnerId = String(body.learnerId ?? "");
     if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
     const { data, error } = await admin.from("guardian_verifications")
-      .select("guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verified_at")
+      .select("guardian_full_name,relationship,relationship_details,guardian_phone,consent_given,terms_version,terms_accepted_at,verification_source,approval_status,verified_at")
       .eq("learner_id", learnerId)
       .maybeSingle();
     if (error) return json(503, { error: "The guardian verification record could not be loaded." });
     return json(200, { success: true, record: data ?? null });
+  }
+
+  if (action === "approve_submitted") {
+    const learnerId = String(body.learnerId ?? "");
+    if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "Select a valid learner account." });
+    if (body.administratorConfirmed !== true) return json(400, { error: "Confirm that you have reviewed the guardian submission and verified the consent before activation." });
+    const { data: approved, error: approvalError } = await admin.rpc("approve_studyspace_guardian_link_consent", {
+      p_learner_id: learnerId,
+      p_verified_by: authData.user.id,
+    });
+    if (approvalError || approved !== true) {
+      return json(409, { error: approvalError?.message || "The guardian submission could not be approved." });
+    }
+    return json(200, { success: true, message: "Guardian link submission reviewed and approved. The learner account is now active." });
   }
 
   if (action !== "approve") return json(400, { error: "Unsupported guardian verification action." });

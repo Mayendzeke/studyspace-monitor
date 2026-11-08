@@ -143,6 +143,7 @@ Deno.serve(async request => {
     const guardianPhone = String(body.guardianPhone ?? "").trim();
     const consent = body.guardianConsent === true;
     const termsVersion = String(body.termsVersion ?? "");
+    const testimonialMarketingConsent = body.testimonialMarketingConsent === true;
     if (guardianFullName.length < 2 || guardianFullName.length > 120) return json(400, { error: "Enter the parent or guardian’s full name." });
     if (!["mother", "father", "legal_guardian", "grandparent", "other"].includes(relationship)) return json(400, { error: "Choose the relationship to the learner." });
     if (relationship === "other" && (relationshipDetails.length < 2 || relationshipDetails.length > 100)) return json(400, { error: "Describe the relationship to the learner." });
@@ -158,6 +159,7 @@ Deno.serve(async request => {
       p_guardian_phone: guardianPhone,
       p_guardian_consent: true,
       p_terms_version: termsVersion,
+      p_testimonial_marketing_consent: testimonialMarketingConsent,
     });
     if (submitError || submitted !== true) {
       return json(409, { error: submitError?.message || "Guardian consent could not be submitted. Refresh the page and try again." });

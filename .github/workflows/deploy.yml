@@ -30,6 +30,8 @@ jobs:
         run: npm install
       - name: Verify scheduled homework fallback authentication configuration
         run: node --test scripts/homework-fallback-auth-config.test.mjs
+      - name: Verify Monitor MIA response content variants
+        run: node --test scripts/mia-monitor-response-shape.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

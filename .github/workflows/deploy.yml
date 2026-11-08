@@ -273,7 +273,7 @@ jobs:
           const homeworkReply = readFileSync('supabase/functions/reply-homework-help/index.ts', 'utf8')
           const homeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
           const homeworkMigration = readFileSync('supabase/migrations/20261108153000_studyspace_connected_school_homework_help_and_cron.sql', 'utf8')
-          const homeworkHardening = readFileSync('supabase/migrations/20261108161000_studyspace_fix_homework_photo_extension_pattern.sql', 'utf8')
+          const homeworkHardening = readFileSync('supabase/migrations/20261108160000_studyspace_harden_homework_uploads_and_timer.sql', 'utf8')
           const termsMigration = readFileSync('supabase/migrations/20261108162000_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!homeworkBuilder.includes('save_studyspace_exercise_draft') || !homeworkBuilder.includes('exercise_assignments') || !homeworkBuilder.includes('reviewed')) throw new Error('MIA Homework must save reviewed assignments to the connected assessment schema.')
           if (!homeworkFunction.includes('aal2') || !homeworkFunction.includes('@cf/google/gemma-4-26b-a4b-it') || !homeworkFunction.includes('markingGuide')) throw new Error('MIA Homework generation must use protected administrator access and Cloudflare Gemma.')

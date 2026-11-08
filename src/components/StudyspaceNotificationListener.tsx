@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { showStudyspaceNotification } from "../lib/studyspaceNotifications";
 
 type DirectMessageEvent = { id?: string; sender_id?: string; body?: string; attachment_name?: string };
-type GroupMessageEvent = { id?: string; sender_id?: string; body?: string; attachment_name?: string };
+type GroupMessageEvent = { id?: string; group_id?: string; sender_id?: string; body?: string; attachment_name?: string };
 type GroupInviteEvent = { id?: string; group_id?: string };
 
 export default function StudyspaceNotificationListener() {

@@ -189,10 +189,10 @@ function App() {
     setMobileOpen(false)
   }
 
-  if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} />
-  if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} />
+  if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
+  if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (authLoading || adminLoading || !splashElapsed) return <SplashScreen theme={theme} />
-  if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} />
+  if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (!mfaVerified) return <AdminMfaGate onVerified={handleMfaVerified} />
 
   return (

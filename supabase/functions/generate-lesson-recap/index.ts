@@ -34,22 +34,78 @@ async function callCloudflare(prompt: string, maxTokens = 2800) {
       method: "POST",
       headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(60000),
-      body: JSON.stringify({ model: MODEL, messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, temperature: 0.2, stream: false, store: false }),
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        max_completion_tokens: maxTokens,
+        temperature: 0.2,
+        stream: false,
+        store: false,
+        chat_template_kwargs: { enable_thinking: false, clear_thinking: true },
+        response_format: { type: "json_object" },
+      }),
     });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Cloudflare Workers AI did not respond within 60 seconds.");
     throw new Error("StudySpace could not reach Cloudflare Workers AI.");
   }
-  const payload = await response.json().catch(() => ({}));
+  const responseText = await response.text();
+  let payload: any = {};
+  try { payload = JSON.parse(responseText); } catch { payload = {}; }
+  const requestId = response.headers.get("cf-ray") || response.headers.get("x-request-id") || "not-provided";
   if (!response.ok) {
-    if (response.status === 429) throw new Response(JSON.stringify({ error: "The AI service has reached its daily usage or temporary capacity limit. Please retry later." }), { status: 429, headers });
-    if ([401, 403].includes(response.status)) throw new Error("Cloudflare Workers AI credentials or permissions are invalid.");
-    const detail = Array.isArray(payload?.errors) ? payload.errors.map((item: any) => item?.message || "").filter(Boolean).join("; ") : "";
-    throw new Error((detail || "Cloudflare Workers AI returned HTTP " + response.status + ".").slice(0, 450));
+    const providerError = Array.isArray(payload?.errors)
+      ? payload.errors.map((item: any) => item?.message || "").filter(Boolean).join("; ")
+      : (typeof payload?.error === "string" ? payload.error : payload?.error?.message || "");
+    console.error("Cloudflare lesson recap request failed", JSON.stringify({
+      status: response.status, requestId, providerError: String(providerError).slice(0, 240),
+      responseBytes: responseText.length, topLevelKeys: Object.keys(payload || {}).slice(0, 12),
+    }));
+    if (response.status === 429) {
+      throw new Response(JSON.stringify({ error: "The AI service has reached its daily usage or temporary capacity limit. Please retry later.", providerStatus: 429, requestId }), { status: 429, headers });
+    }
+    if ([401, 403].includes(response.status)) throw new Error("Cloudflare Workers AI credentials or permissions are invalid. Reference: " + requestId);
+    throw new Error(("Cloudflare Workers AI returned HTTP " + response.status + ". " + (providerError || "No provider error message was supplied.") + " Reference: " + requestId).slice(0, 450));
   }
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) throw new Error("Cloudflare Workers AI returned no usable content.");
-  return content.trim();
+
+  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
+  const message = choice?.message;
+  const rawContent = message?.content;
+  let content = "";
+  if (typeof rawContent === "string") content = rawContent.trim();
+  else if (Array.isArray(rawContent)) {
+    content = rawContent.map((part: any) =>
+      typeof part === "string" ? part
+        : part && typeof part === "object" && part.type === "text" && typeof part.text === "string" ? part.text
+        : ""
+    ).filter(Boolean).join("\\n").trim();
+  }
+  if (!content && typeof choice?.text === "string") content = choice.text.trim();
+  if (!content) {
+    const shape = {
+      status: response.status,
+      requestId,
+      topLevelKeys: Object.keys(payload || {}).slice(0, 12),
+      choiceKeys: choice && typeof choice === "object" ? Object.keys(choice).slice(0, 16) : [],
+      finishReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : null,
+      messageKeys: message && typeof message === "object" ? Object.keys(message).slice(0, 20) : [],
+      contentType: rawContent === null ? "null" : Array.isArray(rawContent) ? "array" : typeof rawContent,
+      contentPartShapes: Array.isArray(rawContent) ? rawContent.slice(0, 8).map((part: any) => ({
+        type: part && typeof part === "object" && typeof part.type === "string" ? part.type : typeof part,
+        keys: part && typeof part === "object" ? Object.keys(part).slice(0, 8) : [],
+        textType: part && typeof part === "object" ? typeof part.text : "not-applicable",
+        textLength: part && typeof part === "object" && typeof part.text === "string" ? part.text.length : null,
+      })) : [],
+      refusalPresent: typeof message?.refusal === "string" && message.refusal.length > 0,
+      toolCallCount: Array.isArray(message?.tool_calls) ? message.tool_calls.length : 0,
+      responseBytes: responseText.length,
+    };
+    console.error("Cloudflare Workers AI lesson recap response shape", JSON.stringify(shape));
+    if (typeof message?.refusal === "string" && message.refusal.trim()) throw new Error("Cloudflare Workers AI declined to generate the lesson recap. Please revise the lesson details and retry.");
+    if (Array.isArray(message?.tool_calls) && message.tool_calls.length) throw new Error("Cloudflare Workers AI returned a tool-call response instead of lesson text.");
+    throw new Error("Cloudflare Workers AI returned no readable text content (HTTP " + response.status + "). Reference: " + requestId + ".");
+  }
+  return content;
 }
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
@@ -80,7 +136,10 @@ Deno.serve(async request => {
     if (auditError) throw new Error("The AI usage audit could not be recorded. The generated response was not returned.");
     return json(200, { success: true, provider: "Cloudflare Workers AI", model: MODEL, recap });
   } catch (error) {
-    if (error instanceof Response) return new Response(await error.text(), { status: error.status, headers });
+    if (error instanceof Response) {
+      if ([204, 205, 304].includes(error.status)) return new Response(null, { status: error.status, headers });
+      return new Response(await error.text(), { status: error.status, headers });
+    }
     const message = error instanceof Error ? error.message : "Cloudflare Workers AI request failed.";
     return json(/daily MIA limit|usage or capacity limit/.test(message) ? 429 : /credentials or permissions|must be configured/.test(message) ? 503 : /did not respond within 60 seconds/.test(message) ? 504 : 502, { error: message });
   }

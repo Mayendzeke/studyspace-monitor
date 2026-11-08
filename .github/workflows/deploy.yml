@@ -165,7 +165,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
-          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'false'
+          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'true'
           VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'false'
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
@@ -205,7 +205,8 @@ jobs:
           if (!enrolment.includes('48 * 60 * 60 * 1000')) throw new Error('The learner trial must start at enrolment and last 48 hours.')
           const pinCreation = readFileSync('supabase/functions/create-enrolment-pin/index.ts', 'utf8')
           if (!pinCreation.includes('24 * 60 * 60 * 1000')) throw new Error('New enrolment PINs must expire after exactly 24 hours.')
-          if (!pinCreation.includes('STUDYSPACE_PUBLIC_ENROLMENT_ENABLED')) throw new Error('PIN creation must remain behind the server-side enrolment gate.')
+          if (!pinCreation.includes('studyspace_enrolment_capacity_available')) throw new Error('PIN creation must verify the server-side enrolment limit.')
+          if (!enrolment.includes('complete_studyspace_enrolment')) throw new Error('Learner enrolment must atomically enforce the 100-account limit.')
           const accountManagement = readFileSync('supabase/functions/manage-learner-account/index.ts', 'utf8')
           const learnerAdminPage = readFileSync('src/components/LearnersPage.tsx', 'utf8')
           if (!accountManagement.includes('paymentTransactionReference') || !accountManagement.includes('payment_transaction_reference')) throw new Error('Subscription audit must require and retain the MTN MoMo transaction reference.')

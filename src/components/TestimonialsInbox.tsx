@@ -80,6 +80,22 @@ export default function TestimonialsInbox() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("studyspace-private-testimonials-inbox")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "student_feedback", filter: "category=eq.Testimonial" },
+        payload => {
+          const row = payload.new as Partial<Testimonial>;
+          if (row.testimonial_private_consent === true) void refresh();
+        }
+      )
+      .subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [refresh]);
+
   async function updateStatus(id: string, status: Testimonial['status']) {
     if (!supabase || busyId) return;
     setBusyId(id);

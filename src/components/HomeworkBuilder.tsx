@@ -104,7 +104,7 @@ export default function HomeworkBuilder() {
         if (!raw) return;
         const handoff = JSON.parse(raw) as {
           level?: string; grade?: string; course?: string; subject?: string; curriculum?: string;
-          topic?: string; instructions?: string; dueDate?: string; learnerIds?: string[];
+          topic?: string; instructions?: string; dueDate?: string; learnerIds?: string[]; questionCount?: number; pointsPerQuestion?: number;
         };
         if (handoff.level) setLevel(handoff.level);
         if (handoff.grade) setGrade(handoff.grade);
@@ -113,6 +113,8 @@ export default function HomeworkBuilder() {
         if (handoff.curriculum) setCurriculum(handoff.curriculum);
         if (handoff.topic) setTopic(handoff.topic);
         if (handoff.instructions) setInstructions(handoff.instructions.slice(0, 2000));
+        if (typeof handoff.questionCount === "number" && Number.isFinite(handoff.questionCount)) setQuestionCount(Math.max(1, Math.min(25, Math.round(handoff.questionCount))));
+        if (typeof handoff.pointsPerQuestion === "number" && Number.isFinite(handoff.pointsPerQuestion)) setPoints(Math.max(0.25, Math.min(100, handoff.pointsPerQuestion)));
         if (handoff.dueDate) setDueDate(handoff.dueDate);
         if (Array.isArray(handoff.learnerIds) && handoff.learnerIds.length) {
           setRecipientMode("selected");

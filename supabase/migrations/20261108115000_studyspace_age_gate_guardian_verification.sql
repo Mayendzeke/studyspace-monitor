@@ -201,7 +201,7 @@ begin
      or length(btrim(p_guardian_full_name)) > 120 then
     raise exception 'Enter the guardian’s full name.';
   end if;
-  if p_relationship not in ('mother','father','legal_guardian','grandparent','other') then
+  if p_relationship is null or p_relationship not in ('mother','father','legal_guardian','grandparent','other') then
     raise exception 'Choose the guardian’s relationship to the learner.';
   end if;
   if p_relationship = 'other' and length(btrim(coalesce(p_relationship_details,''))) < 2 then

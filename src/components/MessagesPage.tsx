@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
-type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null;delivered_at:string|null;edited_at:string|null;unsent_at:string|null};
+type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null;delivered_at:string|null;edited_at:string|null;unsent_at:string|null;deleted_for_everyone_at:string|null};
 
 const allowedTypes=["image/jpeg","image/png","image/webp","application/pdf","text/plain"];
 const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf","text/plain":"txt" } as Record<string,string>)[file.type]||"";
@@ -32,7 +32,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
 
   const loadMessages=async()=>{
     if(!supabase||!userId)return;
-    const {data,error:e}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at,edited_at,unsent_at").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("created_at",{ascending:true}).limit(400);
+    const {data,error:e}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at,edited_at,unsent_at,deleted_for_everyone_at").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("created_at",{ascending:true}).limit(400);
     if(e)throw e;
     const rows=(data??[]) as Message[];setMessages(rows);const {data:deleted,error:deleteError}=await supabase.from("direct_message_user_deletions").select("message_id").eq("user_id",userId);if(deleteError)throw deleteError;setHiddenMessageIds((deleted??[]).map(x=>x.message_id));const undelivered=rows.filter(m=>m.recipient_id===userId&&!m.delivered_at);if(undelivered.length)void supabase.from("direct_messages").update({delivered_at:new Date().toISOString()}).in("id",undelivered.map(m=>m.id));
   };
@@ -48,7 +48,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       const contactRows=(contactData??[]) as Contact[];
       setContacts(contactRows);
       setSelected(current=>current&&contactRows.some(x=>x.contact_id===current)?current:(contactRows[0]?.contact_id??""));
-      const {data:messageData,error:messageError}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at,edited_at,unsent_at").or("sender_id.eq."+data.user.id+",recipient_id.eq."+data.user.id).order("created_at",{ascending:true}).limit(400);
+      const {data:messageData,error:messageError}=await supabase.from("direct_messages").select("id,sender_id,recipient_id,body,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,read_at,delivered_at,edited_at,unsent_at,deleted_for_everyone_at").or("sender_id.eq."+data.user.id+",recipient_id.eq."+data.user.id).order("created_at",{ascending:true}).limit(400);
       if(messageError)throw messageError;
       const messageRows=(messageData??[]) as Message[];setMessages(messageRows);const {data:deletedRows,error:deletedError}=await supabase.from("direct_message_user_deletions").select("message_id").eq("user_id",data.user.id);if(deletedError)throw deletedError;setHiddenMessageIds((deletedRows??[]).map(x=>x.message_id));const undelivered=messageRows.filter(m=>m.recipient_id===data.user.id&&!m.delivered_at);if(undelivered.length)void supabase.from("direct_messages").update({delivered_at:new Date().toISOString()}).in("id",undelivered.map(m=>m.id));
       const {data:presenceRows}=await supabase.from("studyspace_user_presence").select("user_id,last_seen_at").in("user_id",contactRows.map(x=>x.contact_id));const pmap:Record<string,string>={};(presenceRows??[]).forEach((x:any)=>pmap[x.user_id]=Date.now()-new Date(x.last_seen_at).getTime()<120000?"online":x.last_seen_at);setPresence(pmap);
@@ -134,7 +134,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       setError(reason instanceof Error?reason.message:"Message could not be sent.");
     }finally{setSending(false);}
   };
-  const canEditMessage=(m:Message)=>m.sender_id===userId&&!m.unsent_at&&Date.now()-new Date(m.created_at).getTime()<120000;
+  const canEditMessage=(m:Message)=>m.sender_id===userId&&!m.unsent_at&&!m.deleted_for_everyone_at&&Date.now()-new Date(m.created_at).getTime()<120000;
   const beginEditMessage=(m:Message)=>{if(!canEditMessage(m)){setError("Messages can only be edited by their sender within two minutes.");return;}setEditingMessageId(m.id);setEditingMessageDraft(m.body);setNotice("");setError("");};
   const saveEditedMessage=async(m:Message)=>{
     const body=editingMessageDraft.trim();
@@ -145,13 +145,22 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     if(e)setError(e.message);else{setEditingMessageId(null);setNotice("Message edited.");await loadMessages();}
   };
   const unsendMessage=async(m:Message)=>{
-    if(!supabase||!userId||m.sender_id!==userId||m.unsent_at)return;
+    if(!supabase||!userId||m.sender_id!==userId||m.unsent_at||m.deleted_for_everyone_at)return;
     if(!window.confirm("Unsend this message for everyone? The content will be replaced with a message-unsent notice."))return;
     const oldPath=m.attachment_path;
     const {error:e}=await supabase.from("direct_messages").update({body:"This message was unsent.",attachment_path:null,attachment_name:"",attachment_mime:"",attachment_size:0,unsent_at:new Date().toISOString()}).eq("id",m.id).eq("sender_id",userId);
     if(e){setError(e.message);return;}
     if(oldPath)try{await supabase.storage.from("studyspace-direct-messages").remove([oldPath]);}catch{/* The message is already unsent; keep the conversation state. */}
     setEditingMessageId(null);setNotice("Message unsent for everyone.");await loadMessages();
+  };
+  const deleteMessageForEveryone=async(m:Message)=>{
+    if(!supabase||!userId||m.sender_id!==userId||m.unsent_at||m.deleted_for_everyone_at)return;
+    if(!window.confirm("Delete this message for everyone? Its content and attachment will be removed from all participants' conversations."))return;
+    const oldPath=m.attachment_path;
+    const {error:e}=await supabase.from("direct_messages").update({body:"This message was deleted.",attachment_path:null,attachment_name:"",attachment_mime:"",attachment_size:0,deleted_for_everyone_at:new Date().toISOString()}).eq("id",m.id).eq("sender_id",userId);
+    if(e){setError(e.message);return;}
+    if(oldPath)try{await supabase.storage.from("studyspace-direct-messages").remove([oldPath]);}catch{/* Message deletion already succeeded. */}
+    setEditingMessageId(null);setNotice("Message deleted for everyone.");await loadMessages();
   };
   const deleteMessageForMe=async(m:Message)=>{
     if(!supabase||!userId)return;
@@ -193,7 +202,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       <section className="monitor-conversation">
         {selectedContact?<><header className="monitor-conversation-head"><div><span className="monitor-contact-avatar">{selectedContact.display_name.trim().slice(0,1).toUpperCase()}</span><div><strong>{selectedContact.display_name}</strong><small>{selectedContact.grade||"Studyspace learner"} · {presenceLabel(selectedContact.contact_id)} · Private direct messages</small></div></div><span className="monitor-secure-label"><Check size={13}/> Private</span></header>
           <div className="monitor-message-list">
-            {loading&&!thread.length?<p className="monitor-message-empty">Loading conversation…</p>:thread.length?thread.map(m=><article key={m.id} className={"monitor-message-bubble"+(m.sender_id===userId?" is-outgoing":"")}><div>{editingMessageId===m.id?<div className="ss-message-edit"><textarea value={editingMessageDraft} maxLength={2000} onChange={e=>setEditingMessageDraft(e.target.value)}/><div><button type="button" onClick={()=>void saveEditedMessage(m)}>Save edit</button><button type="button" onClick={()=>setEditingMessageId(null)}>Cancel</button></div></div>:m.unsent_at?<p className="ss-message-unsent">This message was unsent.</p>:m.body&&<p>{m.body}</p>}{!m.unsent_at&&m.attachment_path&&<a className="monitor-message-attachment" href={signedUrls[m.id]||"#"} target="_blank" rel="noreferrer" onClick={e=>{if(!signedUrls[m.id])e.preventDefault();}}><FileText size={16}/><span>{m.attachment_name||"Attachment"}<small>{formatBytes(m.attachment_size)}</small></span></a>}</div><time>{new Date(m.created_at).toLocaleString([], {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{m.edited_at&&!m.unsent_at&&<small className="ss-message-edited">Edited</small>}{m.sender_id===userId&&<small className="monitor-message-status">{m.read_at?"Seen":m.delivered_at?"Delivered":"Sent"}</small>}</time><details className="ss-message-actions"><summary aria-label="Message actions">⋯</summary><div>{m.sender_id===userId&&!m.unsent_at&&canEditMessage(m)&&<button type="button" onClick={()=>beginEditMessage(m)}>Edit</button>}{m.sender_id===userId&&!m.unsent_at&&<button type="button" onClick={()=>void unsendMessage(m)}>Unsend for everyone</button>}<button type="button" onClick={()=>void deleteMessageForMe(m)}>Delete for me</button></div></details></article>):<div className="monitor-message-empty"><MessageCircle size={25}/><strong>No messages yet</strong><span>Start a private conversation with {selectedContact.display_name}.</span></div>}
+            {loading&&!thread.length?<p className="monitor-message-empty">Loading conversation…</p>:thread.length?thread.map(m=><article key={m.id} className={"monitor-message-bubble"+(m.sender_id===userId?" is-outgoing":"")}><div>{editingMessageId===m.id?<div className="ss-message-edit"><textarea value={editingMessageDraft} maxLength={2000} onChange={e=>setEditingMessageDraft(e.target.value)}/><div><button type="button" onClick={()=>void saveEditedMessage(m)}>Save edit</button><button type="button" onClick={()=>setEditingMessageId(null)}>Cancel</button></div></div>:m.unsent_at?<p className="ss-message-unsent">This message was unsent.</p>:m.deleted_for_everyone_at?<p className="ss-message-unsent">This message was deleted.</p>:m.body&&<p>{m.body}</p>}{!m.unsent_at&&!m.deleted_for_everyone_at&&m.attachment_path&&<a className="monitor-message-attachment" href={signedUrls[m.id]||"#"} target="_blank" rel="noreferrer" onClick={e=>{if(!signedUrls[m.id])e.preventDefault();}}><FileText size={16}/><span>{m.attachment_name||"Attachment"}<small>{formatBytes(m.attachment_size)}</small></span></a>}</div><time>{new Date(m.created_at).toLocaleString([], {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{m.edited_at&&!m.unsent_at&&!m.deleted_for_everyone_at&&<small className="ss-message-edited">Edited</small>}{m.sender_id===userId&&<small className="monitor-message-status">{m.read_at?"Seen":m.delivered_at?"Delivered":"Sent"}</small>}</time><details className="ss-message-actions"><summary aria-label="Message actions">⋯</summary><div>{m.sender_id===userId&&!m.unsent_at&&canEditMessage(m)&&<button type="button" onClick={()=>beginEditMessage(m)}>Edit</button>}{m.sender_id===userId&&!m.unsent_at&&!m.deleted_for_everyone_at&&<button type="button" onClick={()=>void unsendMessage(m)}>Unsend</button>}{m.sender_id===userId&&!m.unsent_at&&!m.deleted_for_everyone_at&&<button type="button" onClick={()=>void deleteMessageForEveryone(m)}>Delete for everyone</button>}<button type="button" onClick={()=>void deleteMessageForMe(m)}>Delete for me</button></div></details></article>):<div className="monitor-message-empty"><MessageCircle size={25}/><strong>No messages yet</strong><span>Start a private conversation with {selectedContact.display_name}.</span></div>}
             <div ref={bottomRef}/>
           </div>
           <form className="monitor-message-composer" onSubmit={send}>

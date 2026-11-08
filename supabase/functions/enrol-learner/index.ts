@@ -160,11 +160,29 @@ Deno.serve(async request => {
   }
   await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: true });
   if (completed === "pending_guardian_verification") {
+    const randomToken = crypto.getRandomValues(new Uint8Array(32));
+    const guardianToken = Array.from(randomToken, byte => byte.toString(16).padStart(2, "0")).join("");
+    const guardianTokenHash = await digest(guardianToken);
+    const { error: inviteError } = await admin.from("guardian_verification_invites").insert({
+      learner_id: created.user.id,
+      token_hash: guardianTokenHash,
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const studentAppUrl = Deno.env.get("STUDENT_APP_URL") ?? "https://mayendzeke.github.io/planner/";
+    let guardianUrl: string | null = null;
+    if (!inviteError) {
+      const shareUrl = new URL(studentAppUrl);
+      shareUrl.searchParams.set("guardian_consent", guardianToken);
+      guardianUrl = shareUrl.toString();
+    }
     return json(200, {
       success: true,
       studentId,
       accountStatus: "pending_guardian_verification",
-      message: "Registration is complete. A parent or legal guardian must complete in-person verification with a StudySpace representative before this account can be opened.",
+      guardianUrl,
+      message: inviteError
+        ? "Registration is complete. Your account is locked while guardian verification is pending. A StudySpace representative can record guardian consent in person or generate a fresh guardian link in Monitor."
+        : "Registration is complete. Copy the guardian invitation link and send it to your parent or legal guardian. The account will remain locked until StudySpace approves the consent.",
     });
   }
   return json(200, { success: true, studentId, accountStatus: "active", message: "Account created. Sign in with your Student ID and password." });

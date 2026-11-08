@@ -56,8 +56,10 @@ Deno.serve(async request => {
   try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
   const action = String(body.action ?? "");
   const token = String(body.token ?? "").trim();
-  if (!TOKEN_PATTERN.test(token)) return json(400, { error: "This guardian invitation is invalid. Ask the learner or StudySpace for a current link." });
-  const tokenHash = await digest(token.toLowerCase());
+  if (action !== "issue_invite" && !TOKEN_PATTERN.test(token)) {
+    return json(400, { error: "This guardian invitation is invalid. Ask the learner or StudySpace for a current link." });
+  }
+  const tokenHash = TOKEN_PATTERN.test(token) ? await digest(token.toLowerCase()) : "";
   const admin = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   if (action === "issue_invite") {

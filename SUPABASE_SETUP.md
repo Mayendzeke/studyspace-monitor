@@ -20,6 +20,10 @@ The GitHub integration watches commits to the production branch. When Deploy to 
 
 Migration 006 is a corrective, forward-only repair for the two production columns `student_subjects.period_ids` and `exercise_assignments.available_at`. It uses `ADD COLUMN IF NOT EXISTS`, preserving existing rows and values. It also normalizes learner assessment-read policies so scheduled assessments remain hidden until release, restores authenticated table privileges for administrators to manage answer keys through Content Studio, and keeps answer-key access restricted by the AAL2 administrator-only RLS policy. It is safe to apply if the columns or policies are already present.
 
+The university/course profile migration creates the `profiles.course` field and keeps both the legacy eight-argument and current course-aware learner profile RPC signatures. It must precede the single-learner profile RPC migration.
+
+The universal trial migration starts the 48-hour trial only after successful PIN redemption, records acceptance of the current terms, and enforces that terms and a valid paid plan or trial are required for learner access. The payment-reference migration prevents a reused MTN MoMo transaction reference from activating a second subscription. The enrolment-capacity migration serializes successful enrolments and enforces the 100-learner ceiling at the database layer.
+
 Migrations 007 and 008 close the last assessment/resource access gaps: answer variants, correct matching pairs and explanations are moved out of learner-readable question records into the AAL2-protected answer-key table; matching choices are shuffled for learners; and the private Storage bucket receives policies for administrator uploads and assigned learner downloads. The bucket remains private.
 
 Migration 009 adds a protected teacher-marking workflow for written assessment answers. Learners can read their own attempts but cannot change scores or feedback; AAL2 administrators can mark written responses and update saved progress.
@@ -29,7 +33,6 @@ Migration 010 restores Word Puzzle clues to learner-visible question content aft
 Migration 011 removes a legacy administrator-wide Storage policy. Administrators can manage teacher resources only in their own `/resources/` path; learners can read resources assigned to them; personal `/personal/` files remain owner-only.
 
 The current migration sequence is:
-
 1. `supabase/migrations/20261104000100_studyspace_core.sql`
 2. `supabase/migrations/20261104000200_studyspace_security_hardening.sql`
 3. `supabase/migrations/20261104000300_studyspace_admin_mfa_enforcement.sql`
@@ -57,12 +60,16 @@ The current migration sequence is:
 25. `supabase/migrations/20261106074344_studyspace_student_feedback.sql`
 26. `supabase/migrations/20261106121531_mia_learning_companion_foundation.sql`
 27. `supabase/migrations/20261106171600_remove_duplicate_timetable_index.sql`
-28. `supabase/migrations/20261106214130_teacher_timetable_access.sql`
-29. `supabase/migrations/20261106214438_consolidate_timetable_access_policy.sql`
-30. `supabase/migrations/20261106214510_remove_duplicate_timetable_index.sql`
-31. `supabase/migrations/20261106235339_mia_messages_learner_id_index.sql`
-32. `supabase/migrations/20261107002924_studyspace_single_learner_profile_rpc.sql`
-33. `supabase/migrations/20261107005219_add_student_subscription_expiry.sql`
+28. `supabase/migrations/20261106192500_add_university_course_profile.sql`
+29. `supabase/migrations/20261106214130_teacher_timetable_access.sql`
+30. `supabase/migrations/20261106214438_consolidate_timetable_access_policy.sql`
+31. `supabase/migrations/20261106214510_remove_duplicate_timetable_index.sql`
+32. `supabase/migrations/20261106235339_mia_messages_learner_id_index.sql`
+33. `supabase/migrations/20261107002924_studyspace_single_learner_profile_rpc.sql`
+34. `supabase/migrations/20261107005219_add_student_subscription_expiry.sql`
+35. `supabase/migrations/20261108070859_universal_trial_and_terms_acceptance.sql`
+36. `supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql`
+37. `supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql`
 
 Migrations 007 and 008 are required before using the shared assessment and resource workflows. Migration 007 removes answer variants, correct matching pairs and explanations from learner-readable question rows after moving them into the protected answer-key table. Migration 008 permits AAL2 administrators to manage teacher files in the private bucket and permits learners to download only resources assigned to their own account.
 
@@ -84,7 +91,7 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 
 Keep both peppers private. Do not put them in GitHub, browser environment variables, frontend bundles, or chat.
 
-AI lesson recaps use server-side provider secrets. The active setup also uses `AI_PROVIDER`, the matching provider API key, and the matching model name as Edge Function secrets only. Never expose provider keys in the browser.
+The learner-facing MIA assistant, Monitor MIA assistant and AI lesson-recap endpoint are intentionally paused and currently fail closed with HTTP 503. They do not call an external model or send learner messages or attachments to an AI provider. Do not add provider secrets or enable these features until a provider whose terms permit school-age use has been selected and the complete workflow has been reviewed and tested.
 
 ## 4. Deploy Edge Functions
 
@@ -101,7 +108,7 @@ Deploy these functions to the same Supabase project:
 - `mia-assistant` — learner-facing MIΛ learning companion
 - `mia-monitor-assistant` — administrator-facing MIA teaching and StudySpace assistant
 
-Both MIA functions require gateway JWT verification. The learner function validates the active learner account and subscription access. The Monitor function validates a signed-in active administrator and requires AAL2 MFA. Keep these two authorization paths separate; the Monitor assistant must never accept a learner session, and the learner assistant must never accept an administrator session.
+Both MIA functions remain gateway-JWT protected, but they currently return HTTP 503 without generating text while provider approval is pending. The Monitor UI feature flag is off. No external model requests are made and learner text or attachments are not forwarded to a provider. Keep the role-separated access controls when re-enabling: the learner endpoint must accept only an active learner, while the Monitor endpoint must accept only an active administrator with AAL2 MFA.
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 
@@ -147,7 +154,7 @@ Before configuring the Student Planner, confirm its current Supabase client code
 - One Supabase project is shared by both apps.
 - Keep the `studyspace-resources` Storage bucket private.
 - Admin functions require MFA; student enrolment and sign-in have server-side attempt throttling.
-- AI lesson recaps are teacher drafts. Review every recap before publishing and submit anonymised lesson material only.
+- MIA and AI lesson recaps remain paused. Do not submit learner material to an external AI service or publish AI-generated content until an age-compliant provider is approved and tested.
 - Live video and audio are served by 8x8 JaaS (`8x8.vc`). Meeting tokens are signed server-side and restricted to the individual Studyspace class; the client never receives the JaaS private key. Meeting room identifiers are not secrets, but do not share class details outside the assigned class.
 - The planner sync migrations add updated timestamps, account-owned personal file records, private Storage policies, and a server-side deletion ledger. The student client synchronises tasks, subjects, sessions, calendar entries, study preferences, test attempts, flashcard progress and personal files while signed in; the browser database remains the offline cache. The Content Studio migration stores assessments, answer keys, review state, resources and assignment records in the shared project. Apply all migrations to the production Supabase project before enabling these newer cloud-sync and assessment workflows.
 

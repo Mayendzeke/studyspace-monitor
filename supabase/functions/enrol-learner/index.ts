@@ -63,12 +63,12 @@ Deno.serve(async request => {
   if (!/^STU-[A-Z0-9]{8}$/.test(studentId) || !/^\d{8}$/.test(pin)) return json(400, { error: "Check the Student ID and 8-digit enrolment PIN." });
   if (password.length < 10 || password.length > 128) return json(400, { error: "Choose a password between 10 and 128 characters." });
 
-  const fullName = String(body.fullName ?? "").trim().replace(/\\s+/g, " ");
-  const preferredName = String(body.preferredName ?? "").trim().replace(/\\s+/g, " ");
+  const fullName = String(body.fullName ?? "").trim().replace(/\s+/g, " ");
+  const preferredName = String(body.preferredName ?? "").trim().replace(/\s+/g, " ");
   const dateOfBirth = String(body.dateOfBirth ?? "");
   if (fullName.length < 2 || fullName.length > 120) return json(400, { error: "Enter the learner’s full name." });
   if (preferredName.length > 80) return json(400, { error: "The preferred name is too long." });
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
   const birthDate = new Date(dateOfBirth + "T00:00:00.000Z");
   if (Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== dateOfBirth || birthDate.getTime() > Date.now()) {
     return json(400, { error: "Enter a valid date of birth." });

@@ -80,7 +80,6 @@ async function edgeError(reason: unknown): Promise<string> {
 const unique = (values: (string | null | undefined)[]) => Array.from(new Set(values.map(value => value?.trim()).filter((value): value is string => !!value))).sort((a, b) => a.localeCompare(b))
 
 export default function MiaStudio() {
-  const adminMiaEnabled = true;
   const [userId, setUserId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([welcome])
   const [draft, setDraft] = useState('')
@@ -267,7 +266,7 @@ export default function MiaStudio() {
 
   return (
     <section className="mia-page">
-      {adminMiaEnabled ? <>
+      <>
       <div className="mia-hero">
         <div className="mia-brand-mark"><Sparkles size={25}/></div>
         <div className="mia-hero-copy">

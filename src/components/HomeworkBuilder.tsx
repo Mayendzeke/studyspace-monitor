@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Check, Clock3, Plus, Sparkles, Trash2, Users } from "lucide-react";
+import { BookOpen, Clock3, Plus, Sparkles, Trash2, Users } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 type QuestionType = "multiple_choice" | "fill_blank" | "short_answer" | "true_false" | "matching";

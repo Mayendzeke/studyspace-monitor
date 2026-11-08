@@ -113,7 +113,7 @@ export default function TestimonialsInbox() {
           setGuardianMarketingConsents(guardianMap);
         } else {
           setGuardianMarketingConsents({});
-          setError(guardianData?.error || guardianError?.message || 'Guardian marketing permissions could not be verified. PNG export is disabled until they can be checked.');
+          setError(guardianData?.error || guardianError?.message || 'Guardian marketing permissions could not be verified. PNG export for under-18 learners remains disabled until they can be checked.');
         }
         const signed = await Promise.all(Object.values(byId).filter(profile => profile.avatar_path).map(async profile => {
           const { data: signedData } = await supabase!.storage.from('studyspace-avatars').createSignedUrl(profile.avatar_path!, 3600);

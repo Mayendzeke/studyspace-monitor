@@ -150,7 +150,7 @@ begin
   end if;
 
   if p_avatar_path is not null
-    and p_avatar_path !~ ('^' || auth.uid()::text || '/avatar-[A-Fa-f0-9-]+\\.(png|jpg|webp)$') then
+    and p_avatar_path !~ ('^' || auth.uid()::text || '/avatar-[A-Fa-f0-9-]+[.](png|jpg|webp)$') then
     raise exception 'The profile image path is invalid';
   end if;
 

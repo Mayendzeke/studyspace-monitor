@@ -115,6 +115,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   const [temporary, setTemporary] = useState<{ studentId: string; password: string } | null>(null);
   const [editTarget, setEditTarget] = useState<Learner | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyForm);
+  const [verifiedDateOfBirth, setVerifiedDateOfBirth] = useState("");
+  const [ageVerificationConfirmed, setAgeVerificationConfirmed] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [paymentTransactionReference, setPaymentTransactionReference] = useState("");
@@ -254,6 +256,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setEditTarget(learner);
     setPaymentConfirmed(false);
     setPaymentTransactionReference("");
+    setVerifiedDateOfBirth("");
+    setAgeVerificationConfirmed(false);
     setProfileForm({
       full_name: learner.full_name || "",
       preferred_name: learner.preferred_name || "",
@@ -269,6 +273,27 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     });
     setError("");
     setNotice("");
+  }
+
+  async function verifyLearnerAge() {
+    if (!supabase || !editTarget || !verifiedDateOfBirth || !ageVerificationConfirmed || savingProfile) return;
+    setSavingProfile(true);
+    setError("");
+    setNotice("");
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
+        body: { learnerId: editTarget.id, action: "verify_age", dateOfBirth: verifiedDateOfBirth, administratorConfirmed: true },
+      });
+      if (invokeError) throw new Error(await functionError(invokeError, "The age record could not be saved."));
+      if (!data?.success) throw new Error(data?.error || "The age record could not be saved.");
+      setEditTarget(null);
+      setNotice("Verified date of birth recorded for " + learnerName(editTarget) + ". The learner must sign in again to continue.");
+      await refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The age record could not be saved.");
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
@@ -520,6 +545,14 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <div><span className="eyebrow">LEARNER RECORD</span><h2 id="learner-edit-title">Edit learner details</h2><p>{learnerName(editTarget)} · {editTarget.student_id || "Student ID unavailable"}</p></div>
               <button type="button" className="icon-button" aria-label="Close editor" disabled={savingProfile} onClick={() => setEditTarget(null)}><X size={18}/></button>
             </div>
+            {!editTarget.date_of_birth && <section className="learner-age-verification">
+              <strong>Age verification required</strong>
+              <p>This account has no recorded date of birth. Enter the date checked using the approved age-verification method. StudySpace accepts learners aged 9 or older.</p>
+              <label>Verified date of birth<input type="date" value={verifiedDateOfBirth} max={new Date().toISOString().slice(0, 10)} onChange={event => setVerifiedDateOfBirth(event.target.value)}/></label>
+              <label className="learner-age-confirm"><input type="checkbox" checked={ageVerificationConfirmed} onChange={event => setAgeVerificationConfirmed(event.target.checked)}/> I confirm that I checked this date using the approved age-verification method.</label>
+              <button type="button" className="primary-button" disabled={savingProfile || !verifiedDateOfBirth || !ageVerificationConfirmed} onClick={() => void verifyLearnerAge()}><ShieldAlert size={14}/>{savingProfile ? "Recording…" : "Record verified age"}</button>
+            </section>}
+            {editTarget.date_of_birth && <div className="learner-readonly-row"><span>Date of birth</span><strong>{new Date(editTarget.date_of_birth + "T00:00:00").toLocaleDateString()}</strong><small>Date-of-birth records cannot be changed after verification.</small></div>}
             <form onSubmit={event => void saveProfile(event)}>
               <div className="learner-form-grid">
                 <label>Full name<input required maxLength={120} value={profileForm.full_name} onChange={event => setProfileForm(current => ({ ...current, full_name: event.target.value }))}/></label>

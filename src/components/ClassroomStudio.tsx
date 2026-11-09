@@ -272,7 +272,7 @@ export default function ClassroomStudio() {
       const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      } }), 70000, 'AI lesson recap timed out after 70 seconds. Your lesson has not been lost; please retry.');
+      } }), 90000, 'AI lesson recap timed out after 90 seconds. Your lesson has not been lost; please retry.');
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
       update({
@@ -291,7 +291,7 @@ export default function ClassroomStudio() {
     } finally { setAiBusy(false) }
   }
   const generateLessonStructure = async () => {
-    if (!adminAiEnabled) { setNotice('AI lesson objectives are unavailable. Check the Cloudflare Workers AI connection and try again.'); return; }
+    if (!adminAiEnabled) { setNotice('AI lesson objectives are unavailable. Check the Gemini primary and Gemma automatic backup.'); return; }
     if (!supabase) { setNotice('Connect Supabase before generating lesson objectives.'); return; }
     const hasLessonContext = [draft.title, draft.subject, draft.grade, draft.curriculum, draft.objectives, draft.sourceNotes].some(value => value.trim());
     if (!hasLessonContext) { setNotice('Add at least a lesson title, subject, grade, curriculum, objective or source note. MIΛ can create a short introductory draft from limited context.'); return; }
@@ -300,7 +300,7 @@ export default function ClassroomStudio() {
       const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      }}), 70000, 'AI lesson planning timed out after 70 seconds. Your form is still available; please retry.');
+      }}), 90000, 'AI lesson planning timed out after 90 seconds. Your form is still available; please retry.');
       if (error) throw error;
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return lesson structure.');
       const recap = data.recap as LessonRecap & { learningObjectives?: string[] };
@@ -458,7 +458,7 @@ export default function ClassroomStudio() {
           <label>Lesson length (minutes)<input type="number" min="10" max="240" value={draft.duration} onChange={e=>update({duration:Math.max(10,Math.min(240,Number(e.target.value)||45))})}/></label>
         </div>
         <label className="classroom-wide-field">Learning objectives<textarea rows={3} value={draft.objectives} onChange={e=>update({objectives:e.target.value})} placeholder="What should learners be able to explain or do by the end?"/></label>
-        {adminAiEnabled ? <div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiBusy||![draft.title,draft.subject,draft.grade,draft.curriculum,draft.objectives,draft.sourceNotes].some(value=>value.trim())} onClick={()=>void generateLessonStructure()}><Sparkles size={14}/>{aiBusy?'Generating…':'Auto-generate objectives & checkpoints'}</button><small>You can edit every generated objective and checkpoint before saving or publishing.</small></div> : <div className="classroom-ai-paused" role="status">AI lesson objectives and checkpoints are unavailable. Check the Cloudflare Workers AI connection and try again.</div>}
+        {adminAiEnabled ? <div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiBusy||![draft.title,draft.subject,draft.grade,draft.curriculum,draft.objectives,draft.sourceNotes].some(value=>value.trim())} onClick={()=>void generateLessonStructure()}><Sparkles size={14}/>{aiBusy?'Generating…':'Auto-generate objectives & checkpoints'}</button><small>You can edit every generated objective and checkpoint before saving or publishing.</small></div> : <div className="classroom-ai-paused" role="status">AI lesson objectives and checkpoints are unavailable. Check the Gemini primary and Gemma automatic backup.</div>}
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>

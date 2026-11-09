@@ -177,7 +177,9 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
       primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";
     }
   } else {
-    primaryFailure = "Gemini is not configured.";
+    primaryFailure = geminiKey()
+      ? "Gemini is disabled until active paid API billing is confirmed by setting GEMINI_API_PAID_SERVICE_CONFIRMED=true."
+      : "GEMINI_API_KEY is not configured.";
   }
 
   if (!status.gemma.configured) {

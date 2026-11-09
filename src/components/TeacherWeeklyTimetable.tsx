@@ -5,6 +5,7 @@ import LiveClassroomCall from "./LiveClassroomCall";
 
 type Learner = { id:string; full_name:string; preferred_name:string; student_id:string|null; education_level:string; grade:string; curriculum:string; course:string; account_status:string };
 type Entry = { id:string; teacher_id:string; title:string; subject_name:string; education_level:string; grade:string; curriculum:string; course:string; day_of_week:number; starts_at:string; ends_at:string; location:string; notes:string; is_active:boolean; learnerIds:string[] };
+type PersonalSlot = { id:string; learner_id:string; subject_name:string; title:string; day_of_week:number; starts_at:string; ends_at:string; notes:string };
 type HomeworkItem = { id:string; title:string; subject:string; learner:string; dueAt:string; submitted:boolean };
 type Session = { id:string; title:string; subject_name:string; starts_at:string; duration_minutes:number; status:"scheduled"|"live"|"ended"|"cancelled" };
 type Draft = Omit<Entry,"id"|"teacher_id"|"is_active"|"learnerIds">;
@@ -33,6 +34,8 @@ export default function TeacherWeeklyTimetable() {
   const [draft,setDraft]=useState<Draft>(emptyDraft());
   const [selectedLearners,setSelectedLearners]=useState<string[]>([]);
   const [studentSearch,setStudentSearch]=useState("");
+  const [availabilitySearch,setAvailabilitySearch]=useState("");
+  const [personalSlots,setPersonalSlots]=useState<PersonalSlot[]>([]);
   const [subjectCustom,setSubjectCustom]=useState(false);
   const [zoom,setZoom]=useState(1);
   const touchDistance=useRef<number|null>(null);
@@ -63,6 +66,16 @@ export default function TeacherWeeklyTimetable() {
       const memberMap=new Map<string,string[]>();
       membership.forEach(x=>memberMap.set(x.entry_id,[...(memberMap.get(x.entry_id)??[]),x.learner_id]));
       const nextEntries=((e.data??[]) as Omit<Entry,"learnerIds">[]).map(x=>({...x,learnerIds:memberMap.get(x.id)??[]}));
+      let learnerAvailability: PersonalSlot[] = [];
+      if (learnerRows.length) {
+        const availability = await supabase.from("student_timetable_entries")
+          .select("id,learner_id,subject_name,title,day_of_week,starts_at,ends_at,notes")
+          .eq("timetable_kind","personal")
+          .in("learner_id",learnerRows.map(learner => learner.id))
+          .order("learner_id").order("day_of_week").order("starts_at");
+        if (availability.error) throw availability.error;
+        learnerAvailability = (availability.data ?? []) as PersonalSlot[];
+      }
       const subjectSet=new Set<string>();
       (s.data??[] as {learner_id:string;name:string}[]).forEach(x=>{if(learnerRows.some(l=>l.id===x.learner_id)&&x.name?.trim())subjectSet.add(x.name.trim());});
       const setMap=new Map(((sets.data??[]) as {id:string;title:string;subject_name:string}[]).map(x=>[x.id,x]));
@@ -72,7 +85,7 @@ export default function TeacherWeeklyTimetable() {
         const set=setMap.get(x.exercise_set_id), learner=learnerMap.get(x.learner_id);
         return set&&learner?[{id:x.id,title:set.title,subject:set.subject_name||"General",learner:nameOf(learner),dueAt:x.due_at,submitted:submitted.has(x.learner_id+":"+x.id)}]:[];
       });
-      setLearners(learnerRows);setEntries(nextEntries);setSubjects([...subjectSet].sort((x,y)=>x.localeCompare(y)));
+      setLearners(learnerRows);setEntries(nextEntries);setPersonalSlots(learnerAvailability);setSubjects([...subjectSet].sort((x,y)=>x.localeCompare(y)));
       setHomework(homeworkRows);setTodaySessions((sessions.data??[]) as Session[]);
       if(quiet)setNotice("Timetable and homework refreshed.");
     }catch(reason){setError(reason instanceof Error?reason.message:"Timetable records could not be loaded.");}
@@ -85,6 +98,7 @@ export default function TeacherWeeklyTimetable() {
     const channel=supabase.channel("monitor-weekly-timetable")
       .on("postgres_changes",{event:"*",schema:"public",table:"teacher_timetable_entries"},()=>void refresh(true))
       .on("postgres_changes",{event:"*",schema:"public",table:"teacher_timetable_members"},()=>void refresh(true))
+      .on("postgres_changes",{event:"*",schema:"public",table:"student_timetable_entries"},()=>void refresh(true))
       .subscribe();
     return()=>{void supabase?.removeChannel(channel);};
   },[]);
@@ -94,6 +108,8 @@ export default function TeacherWeeklyTimetable() {
   const grades=[...new Set(learners.filter(x=>(!draft.education_level||x.education_level===draft.education_level)&&(!draft.course||x.course===draft.course)).map(x=>x.grade).filter(Boolean))].sort();
   const eligible=useMemo(()=>learners.filter(x=>(!draft.education_level||x.education_level===draft.education_level)&&(!draft.course||x.course===draft.course)&&(!draft.grade||x.grade===draft.grade)&&(!draft.curriculum||x.curriculum===draft.curriculum)),[learners,draft.education_level,draft.course,draft.grade,draft.curriculum]);
   const visible=eligible.filter(x=>[nameOf(x),x.full_name,x.student_id,x.grade,x.course].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase()));
+  const availabilityLearners=learners.filter(x=>[nameOf(x),x.full_name,x.student_id,x.grade,x.course].join(" ").toLowerCase().includes(availabilitySearch.trim().toLowerCase()));
+  const readyAvailabilityCount=personalSlots.filter(x=>(x.notes||"").includes("[READY_FOR_STUDY]")).length;
   const times=[...new Set(entries.map(x=>hhmm(x.starts_at)))].sort((a,b)=>mins(a)-mins(b));
   const today=new Date().getDay(), todayText=new Date().toLocaleDateString([],{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const todayEntries=entries.filter(x=>x.day_of_week===today).sort((a,b)=>mins(a.starts_at)-mins(b.starts_at));
@@ -147,6 +163,27 @@ export default function TeacherWeeklyTimetable() {
       <div className="monitor-today-heading"><div><div className="eyebrow">TODAY'S CLASSES</div><h2>{todayText}</h2><p>{todayEntries.length} teaching period{todayEntries.length===1?"":"s"} · {todayEntries.reduce((n,x)=>n+x.learnerIds.length,0)} learner places</p></div><div className="monitor-today-icon"><CalendarDays size={22}/></div></div>
       {loading?<div className="monitor-today-empty">Loading classes…</div>:todayEntries.length?<div className="monitor-today-cards">{todayEntries.map(x=>{const names=x.learnerIds.map(id=>nameMap.get(id)).filter(Boolean) as string[];const running=mins(x.starts_at)<=new Date().getHours()*60+new Date().getMinutes()&&mins(x.ends_at)>new Date().getHours()*60+new Date().getMinutes();return <article className={"monitor-today-class"+(running?" is-current":"")} key={x.id}><div className="monitor-today-class-time"><strong>{hhmm(x.starts_at)}</strong><span>{hhmm(x.ends_at)}</span></div><div className="monitor-today-class-main"><strong>{x.title}</strong><span>{x.subject_name} · {x.grade||x.education_level||"Learner group"}</span><small>{names.join(", ")||"No learners assigned"}</small></div><div className="monitor-today-class-meta"><span><Users size={13}/>{names.length} learners</span>{x.location&&<span><MapPin size={13}/>{x.location}</span>}</div><button type="button" className="icon-button" title="Edit class" onClick={()=>beginEdit(x)}><Pencil size={14}/></button></article>;})}</div>:<div className="monitor-today-empty"><CalendarDays size={22}/><strong>No classes scheduled for today</strong><span>Add a teaching period to populate your daily overview.</span><button type="button" className="text-button" onClick={beginNew}>Add today's first class</button></div>}
       {todaySessions.length>0&&<div className="monitor-today-live-sessions"><div className="monitor-today-live-title"><Video size={16}/><strong>Live classroom sessions today</strong></div>{todaySessions.map(x=><article key={x.id}><div><strong>{x.title}</strong><span>{x.subject_name} · {dateTime(x.starts_at)}</span></div><span className={"monitor-session-status "+x.status}>{x.status==="live"?"LIVE":x.status}</span><button type="button" className="secondary-button" onClick={()=>setSelectedSession(v=>v===x.id?"":x.id)}><Video size={14}/>{selectedSession===x.id?"Close room":x.status==="live"?"Open in app":"View session"}</button></article>)}{selectedSession&&<LiveClassroomCall sessionId={selectedSession} audience="teacher"/>}</div>}
+    </section>
+    <section className="panel monitor-availability-panel">
+      <div className="monitor-availability-heading">
+        <div><div className="eyebrow">STUDENT PERSONAL TIMETABLES</div><h2>My students' study availability</h2><p>These are personal study slots selected by learners in the Student app. School lesson timetables are kept separate.</p><span className="monitor-availability-summary">{personalSlots.length} personal slots · {readyAvailabilityCount} marked ready</span></div>
+        <label className="monitor-learner-search"><Search size={14}/><input value={availabilitySearch} onChange={event=>setAvailabilitySearch(event.target.value)} placeholder="Find a student by name or ID" aria-label="Search student availability"/></label>
+      </div>
+      {loading?<div className="monitor-table-empty">Loading student availability…</div>:!availabilityLearners.length?<div className="monitor-table-empty">No active learners match this search.</div>:<div className="monitor-availability-list">
+        {availabilityLearners.map(learner=>{
+          const slots=personalSlots.filter(slot=>slot.learner_id===learner.id).sort((a,b)=>a.day_of_week-b.day_of_week||mins(a.starts_at)-mins(b.starts_at));
+          return <article className="monitor-availability-student" key={learner.id}>
+            <div className="monitor-availability-student-head"><div><strong>{nameOf(learner)}</strong><span>{[learner.education_level,learner.grade,learner.course].filter(Boolean).join(" · ")||"Learner"}</span></div><small>{slots.length} personal slot{slots.length===1?"":"s"}</small></div>
+            {slots.length?<div className="monitor-availability-days">{DAYS.map(day=>{
+              const daySlots=slots.filter(slot=>slot.day_of_week===day.day);
+              return daySlots.length?<div className="monitor-availability-day" key={day.day}><strong>{day.label}</strong><div>{daySlots.map(slot=>{
+                const ready=(slot.notes||"").includes("[READY_FOR_STUDY]");
+                return <span className={"monitor-availability-slot"+(ready?" is-ready":"")} key={slot.id}><b>{hhmm(slot.starts_at)}–{hhmm(slot.ends_at)}</b><span>{slot.subject_name||slot.title||"Study time"}</span><small>{ready?"Ready to study":"Planned"}</small></span>;
+              })}</div></div>:null;
+            })}</div>:<p className="monitor-availability-empty">No personal study slots have been added yet.</p>}
+          </article>;
+        })}
+      </div>}
     </section>
     {editorOpen&&<section className="panel monitor-timetable-editor"><div className="panel-heading"><div><h2>{editingId?"Edit teaching period":"Add a teaching period"}</h2><p>Choose students and subjects already stored in Studyspace.</p></div><button type="button" className="icon-button" onClick={()=>setEditorOpen(false)} aria-label="Close editor"><X size={17}/></button></div><form onSubmit={event=>void save(event)}><div className="monitor-timetable-form-grid">
       <label>Class title<input maxLength={120} value={draft.title} onChange={e=>setDraft(v=>({...v,title:e.target.value}))} placeholder="e.g. Form 3 Mathematics"/></label>

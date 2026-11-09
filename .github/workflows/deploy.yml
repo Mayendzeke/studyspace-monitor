@@ -200,7 +200,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
-          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'true'
+          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'false'
           VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'true'
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
@@ -320,7 +320,7 @@ jobs:
           if (!homeworkMigration.includes("interval '2 minutes'") || !homeworkMigration.includes("'30 seconds'") || !homeworkMigration.includes('studyspace_homework_cron_token')) throw new Error('The two-minute teacher window and private 30-second scheduler must be configured.')
           if (!homeworkHardening.includes('set_studyspace_homework_request_defaults') || !homeworkHardening.includes("new.fallback_due_at := now() + interval '2 minutes'")) throw new Error('The database must control homework request status and fallback timing.')
           if (!termsMigration.includes("2026-11-09-v8")) throw new Error('The database migration must upgrade all learner and guardian terms gates to v8.')
-          if (!enrolment.includes('PUBLIC_ENROLMENT_ENABLED = true') || !enrolment.includes('learnerAge < 9')) throw new Error('Public enrolment must remain paused and enforce the approved minimum age of 9 when re-enabled.')
+          if (!enrolment.includes('PUBLIC_ENROLMENT_ENABLED = false') || !enrolment.includes('learnerAge < 9')) throw new Error('Public enrolment must remain paused and enforce the approved minimum age of 9 when re-enabled.')
           console.log('Connected assessment homework, protected MIA generation, teacher fallback, photo security, Terms v8 and 9+ enrolment gate checks passed.')
           console.log('Database trial-start, invoker-security and current-terms guards passed.')
           console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')

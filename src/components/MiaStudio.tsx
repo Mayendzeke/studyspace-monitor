@@ -32,7 +32,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant. MIA is for educational purposes only: lesson planning, subject explanations, assessments, worksheets, revision schedules and learner-support methods. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
+  content: "Hello. I’m MIΛ, your StudySpace teaching assistant. MIΛ is for educational purposes only: lesson planning, subject explanations, assessments, worksheets, revision schedules and learner-support methods. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
@@ -82,9 +82,9 @@ async function edgeError(reason: unknown): Promise<string> {
       if (typeof payload.error === 'string' && payload.error.trim()) return payload.error
       if (typeof payload.message === 'string' && payload.message.trim()) return payload.message
     } catch { /* Fall through to the original error. */ }
-    return 'MIA could not complete the request (HTTP ' + context.status + ').'
+    return 'MIΛ could not complete the request (HTTP ' + context.status + ').'
   }
-  return reason instanceof Error ? reason.message : 'MIA could not complete the request. Check your connection and try again.'
+  return reason instanceof Error ? reason.message : 'MIΛ could not complete the request. Check your connection and try again.'
 }
 const unique = (values: (string | null | undefined)[]) => Array.from(new Set(values.map(value => value?.trim()).filter((value): value is string => !!value))).sort((a, b) => a.localeCompare(b))
 
@@ -119,7 +119,7 @@ export default function MiaStudio() {
         supabase.from('student_subjects').select('learner_id,name').order('name'),
       ])
       if (!alive) return
-      if (authError || !data.user) { setError('Sign in again to use MIA.'); return }
+      if (authError || !data.user) { setError('Sign in again to use MIΛ.'); return }
       setUserId(data.user.id)
       setMessages(loadMessages(data.user.id))
       if (!profileError) setProfiles((profileData ?? []) as AcademicProfile[])
@@ -165,10 +165,10 @@ export default function MiaStudio() {
     try {
       const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
         body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
-      }), 90000, 'MIA did not respond within 90 seconds. Your message has been restored so you can retry.');
+      }), 90000, 'MIΛ did not respond within 90 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
-        throw new Error(typeof data?.error === 'string' ? data.error : 'MIA did not return a usable response.')
+        throw new Error(typeof data?.error === 'string' ? data.error : 'MIΛ did not return a usable response.')
       }
       const notice = typeof data.providerNotice === 'string' && data.providerNotice.trim()
         ? [{ id: crypto.randomUUID(), role: 'assistant' as const, content: data.providerNotice }]
@@ -246,7 +246,7 @@ export default function MiaStudio() {
     if (activeGuide === 'teaching') requirements = 'Suggest at least five practical ways to teach this topic. Resource preference: ' + guided.resourceStyle + '. Include a short activity sequence, materials, learner participation, differentiation and a quick way to check understanding.'
     if (activeGuide === 'support') requirements = 'Design a supportive teaching and learning plan. Main need: ' + guided.supportFocus + '. Include likely learning barriers, a short intervention sequence, accessible practice, ways to check progress and next steps. Avoid labelling or making assumptions about a learner.'
     if (activeGuide === 'research') requirements = 'Act as an academic research coach for a college/university learner, not a ghostwriter. Prioritise a credible source plan and references before writing guidance. First identify the research question and key concepts; then provide a source-search strategy (Google Scholar, subject databases, library catalogue, official and institutional sources as appropriate), search terms, source-evaluation criteria and a shortlist of reliable sources with full bibliographic details, DOI/stable URL only when known and verifiable. Never fabricate references or claim to have verified a source that you cannot verify. Use the referencing style specified by the institution; if unknown, ask or label APA 7 as provisional. Provide example in-text citations and reference-list formatting, explain the evidence and limitations, propose a thesis and outline, and give a brief illustrative example only. Do not write a complete assignment, essay or report for submission. Include a section explaining the concepts, a student-authored work checklist and 2–3 questions to check understanding. The learner must read the sources and write their own analysis.'
-    return 'Act as MIA, the StudySpace teaching assistant. Use the following selected academic context and do not ask me to re-enter it:\n' + (academic || 'Education context not yet specified.') + '\n\nTask: ' + (activity?.title || 'Teaching support') + '\n' + requirements + '\n\nWrite in clear, well-structured sections. Keep the material age-appropriate and practical. State any assumptions and ask only for information that is genuinely essential. Do not invent curriculum requirements.'
+    return 'Act as MIΛ, the StudySpace teaching assistant. Use the following selected academic context and do not ask me to re-enter it:\n' + (academic || 'Education context not yet specified.') + '\n\nTask: ' + (activity?.title || 'Teaching support') + '\n' + requirements + '\n\nWrite in clear, well-structured sections. Keep the material age-appropriate and practical. State any assumptions and ask only for information that is genuinely essential. Do not invent curriculum requirements.'
   }
   const submitGuide = () => {
     if (!activeGuide || !guided.topic.trim()) return
@@ -261,7 +261,7 @@ export default function MiaStudio() {
     const homeworkContext = activeGuide === 'assessment' || activeGuide === 'worksheet' ? {
       title: guided.topic.trim(), subject: guided.subject, level: guided.level, grade: guided.grade,
       course: guided.course, curriculum: guided.curriculum, topic: guided.topic.trim(),
-      instructions: 'MIA ' + (activeGuide === 'assessment' ? guided.assessmentType : guided.worksheetType) + ' · ' + (activeGuide === 'assessment' ? guided.marks + ' marks · ' : '') + guided.questionCount + ' requested questions. Use this generated material as source guidance when creating an interactive question set.',
+      instructions: 'MIΛ ' + (activeGuide === 'assessment' ? guided.assessmentType : guided.worksheetType) + ' · ' + (activeGuide === 'assessment' ? guided.marks + ' marks · ' : '') + guided.questionCount + ' requested questions. Use this generated material as source guidance when creating an interactive question set.',
       questionCount: Number(guided.questionCount) || 10,
       pointsPerQuestion: activeGuide === 'assessment' ? Math.max(0.25, Number(guided.marks) / Math.max(1, Number(guided.questionCount) || 10)) : 1,
     } : undefined
@@ -289,7 +289,7 @@ export default function MiaStudio() {
       setHomeworkHandoff(null)
       window.dispatchEvent(new CustomEvent('studyspace-open-homework-builder'))
     } catch {
-      setError('The MIA assessment could not be handed to the interactive homework builder. Check browser storage and try again.')
+      setError('The MIΛ assessment could not be handed to the interactive homework builder. Check browser storage and try again.')
     }
   }
 
@@ -304,7 +304,7 @@ export default function MiaStudio() {
         <div className="mia-brand-mark"><Sparkles size={25}/></div>
         <div className="mia-hero-copy">
           <span className="eyebrow">MAYENDZEKE'S ARTIFICIAL INTELLIGENCE</span>
-          <h1>MIA <span>· Your StudySpace companion</span></h1>
+          <h1>MIΛ <span>· Your StudySpace companion</span></h1>
           <p>Your teaching assistant for lesson planning, assessments, worksheets, study schedules and learner support. Choose an activity and complete a few selections; type only the topic or details that are not already in StudySpace.</p>
         </div>
         <div className="mia-availability"><i/> Administrator assistant</div>
@@ -324,7 +324,7 @@ export default function MiaStudio() {
 
       <div className="mia-workspace">
         <div className="mia-chat-heading">
-          <div><strong><Bot size={18}/> MIA conversation</strong><small>Choose a guided task below, or type a custom request when you need to.</small></div>
+          <div><strong><Bot size={18}/> MIΛ conversation</strong><small>Choose a guided task below, or type a custom request when you need to.</small></div>
           <div className="mia-chat-tools">
             {remaining !== null && <span className="mia-remaining">{remaining} requests left today</span>}
             <button type="button" className="secondary-button" onClick={clearConversation}><Trash2 size={14}/> Clear chat</button>
@@ -332,7 +332,7 @@ export default function MiaStudio() {
         </div>
 
         <div className="mia-guided-launch">
-          <div><strong>Start a guided task</strong><span>These options stay available while you chat with MIA.</span></div>
+          <div><strong>Start a guided task</strong><span>These options stay available while you chat with MIΛ.</span></div>
           <div className="mia-prompt-grid">
             {activities.filter(item => item.id !== 'research' || showResearchSupport).map(({ id, icon: Icon, title, description }) => (
               <button type="button" key={id} className="mia-prompt-card" onClick={() => openGuide(id)}>
@@ -347,16 +347,16 @@ export default function MiaStudio() {
             <article key={item.id} className={'mia-message mia-message-' + item.role}>
               <span className="mia-message-avatar">{item.role === 'assistant' ? <Sparkles size={15}/> : 'You'}</span>
               <div className="mia-message-bubble">
-                <small>{item.role === 'assistant' ? 'MIA' : 'YOU'}</small>
+                <small>{item.role === 'assistant' ? 'MIΛ' : 'YOU'}</small>
                 <p>{item.content}</p>
               </div>
             </article>
           ))}
-          {busy && <article className="mia-message mia-message-assistant"><span className="mia-message-avatar"><Sparkles size={15}/></span><div className="mia-message-bubble"><small>MIA</small><p className="mia-thinking">Preparing your response…</p></div></article>}
+          {busy && <article className="mia-message mia-message-assistant"><span className="mia-message-avatar"><Sparkles size={15}/></span><div className="mia-message-bubble"><small>MIΛ</small><p className="mia-thinking">Preparing your response…</p></div></article>}
         </div>
 
-        {lessonHandoff && <div className="mia-lesson-handoff"><div><strong><BookOpen size={16}/> Your lesson draft is ready</strong><p>MIA has prepared the lesson content. Open it in Classroom Studio to edit, save locally or publish it to selected learners.</p></div><button type="button" className="primary-button" onClick={openLessonInClassroom}>Create in Classroom Studio <span aria-hidden="true">→</span></button></div>}
-        {homeworkHandoff && <div className="mia-lesson-handoff"><div><strong><ClipboardCheck size={16}/> Your interactive assessment draft is ready</strong><p>Convert MIA's generated material into a question-by-question student form. You can edit questions, set recipients and due dates, review the answer key, then publish it through StudySpace Homework.</p></div><button type="button" className="primary-button" onClick={openHomeworkInClassroom}>Build interactive homework <span aria-hidden="true">→</span></button></div>}
+        {lessonHandoff && <div className="mia-lesson-handoff"><div><strong><BookOpen size={16}/> Your lesson draft is ready</strong><p>MIΛ has prepared the lesson content. Open it in Classroom Studio to edit, save locally or publish it to selected learners.</p></div><button type="button" className="primary-button" onClick={openLessonInClassroom}>Create in Classroom Studio <span aria-hidden="true">→</span></button></div>}
+        {homeworkHandoff && <div className="mia-lesson-handoff"><div><strong><ClipboardCheck size={16}/> Your interactive assessment draft is ready</strong><p>Convert MIΛ's generated material into a question-by-question student form. You can edit questions, set recipients and due dates, review the answer key, then publish it through StudySpace Homework.</p></div><button type="button" className="primary-button" onClick={openHomeworkInClassroom}>Build interactive homework <span aria-hidden="true">→</span></button></div>}
         {error && <p className="mia-error" role="alert">{error}</p>}
         {profileNotice && <p className="mia-profile-notice" role="status">{profileNotice}</p>}
         <form className="mia-compose" onSubmit={send}>
@@ -369,21 +369,21 @@ export default function MiaStudio() {
             rows={2}
             maxLength={4000}
             disabled={busy || !userId}
-            aria-label="Custom message to MIA"
+            aria-label="Custom message to MIΛ"
           />
           <div className="mia-compose-footer">
             <span>Enter to send · Shift + Enter for a new line · Do not include learner names, IDs or private personal information.</span>
-            <button className="primary-button" type="submit" disabled={busy || !draft.trim() || !userId}><Send size={15}/>{busy ? 'Working…' : 'Send to MIA'}</button>
+            <button className="primary-button" type="submit" disabled={busy || !draft.trim() || !userId}><Send size={15}/>{busy ? 'Working…' : 'Send to MIΛ'}</button>
           </div>
         </form>
-        <p className="mia-disclaimer">Guided choices use academic profile details and registered subjects already in StudySpace. Only selected academic details, the topic and task settings are included in a guided request; learner names and IDs are not sent. MIA does not change accounts, subscriptions, timetables or assessments. Review generated teaching material before sharing it.</p>
+        <p className="mia-disclaimer">Guided choices use academic profile details and registered subjects already in StudySpace. Only selected academic details, the topic and task settings are included in a guided request; learner names and IDs are not sent. MIΛ does not change accounts, subscriptions, timetables or assessments. Review generated teaching material before sharing it.</p>
       </div>
 
       {activeGuide && (
         <div className="mia-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setActiveGuide(null) }}>
           <section className="mia-guided-dialog" role="dialog" aria-modal="true" aria-labelledby="mia-guided-title">
             <header className="mia-guided-header">
-              <div><span className="eyebrow">MIA GUIDED WORKSPACE</span><h2 id="mia-guided-title">{activities.find(item => item.id === activeGuide)?.title}</h2><p>Choose the education level and subject for a lesson. Existing grades, courses and curricula appear automatically; enter a missing detail only when necessary.</p></div>
+              <div><span className="eyebrow">MIΛ GUIDED WORKSPACE</span><h2 id="mia-guided-title">{activities.find(item => item.id === activeGuide)?.title}</h2><p>Choose the education level and subject for a lesson. Existing grades, courses and curricula appear automatically; enter a missing detail only when necessary.</p></div>
               <button type="button" className="mia-dialog-close" onClick={() => setActiveGuide(null)} aria-label="Close guided workspace"><X size={19}/></button>
             </header>
             <div className="mia-guided-body">
@@ -399,7 +399,7 @@ export default function MiaStudio() {
               </div>
               <p className="mia-guided-hint">{guideProfiles.length ? 'These selections match ' + guideProfiles.length + ' active learner profile(s). Registered subjects for this group are included above.' : 'No matching learner profiles are recorded for this combination yet. You can still choose common subjects and continue.'}</p>
 
-              <div className="mia-guided-section-title"><strong>What should MIA work on?</strong><span>One required detail</span></div>
+              <div className="mia-guided-section-title"><strong>What should MIΛ work on?</strong><span>One required detail</span></div>
               <label className="mia-guided-topic">Topic / learning focus<input autoFocus value={guided.topic} onChange={event => setGuideField({ topic: event.target.value })} placeholder="e.g. Linear equations, photosynthesis, essay writing" required/></label>
 
               {activeGuide === 'lesson' && <div className="mia-guided-grid mia-guided-options"><label>Lesson duration<select value={guided.duration} onChange={event => setGuideField({ duration: event.target.value })}>{['30','45','60','75','90','120'].map(value => <option key={value} value={value}>{value} minutes</option>)}</select></label><label>Teaching approach<select value={guided.approach} onChange={event => setGuideField({ approach: event.target.value })}>{['Interactive explanation and guided practice','Direct instruction','Discussion and collaborative learning','Practical / hands-on activity','Revision and exam preparation','Project-based learning'].map(value => <option key={value}>{value}</option>)}</select></label></div>}
@@ -411,7 +411,7 @@ export default function MiaStudio() {
             </div>
             <footer className="mia-guided-footer">
               <span>Select the education level and subject for lessons. Research support is restricted to college and university learners; enter the assignment topic or question.</span>
-              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) || (activeGuide === 'research' && (!/college|university|tertiary/i.test(guided.level) || !guided.subject.trim())) || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIA</button></div>
+              <div><button type="button" className="secondary-button" onClick={() => setActiveGuide(null)}>Cancel</button><button type="button" className="primary-button" disabled={!guided.topic.trim() || (activeGuide === 'lesson' && (!guided.level || !guided.subject.trim())) || (activeGuide === 'research' && (!/college|university|tertiary/i.test(guided.level) || !guided.subject.trim())) || busy || !userId} onClick={submitGuide}><Sparkles size={15}/> Ask MIΛ</button></div>
             </footer>
           </section>
         </div>

@@ -746,7 +746,7 @@ function PinPage() {
   useEffect(() => { void refresh() }, [])
 
   const createPin = async () => {
-    if (!enrolmentOpen) { setError('New learner registration is currently closed. Do not issue PINs until the private invitation route is approved.'); return; }
+    if (!enrolmentOpen) { setError('New learner registration is currently closed. Do not issue PINs until the server-side registration gate is reopened.'); return; }
     if (!supabase) { setError('Connect Supabase before creating enrolment PINs.'); return }
     setBusy(true); setError(''); setNotice(''); setNewPin(null)
     try {
@@ -774,7 +774,7 @@ function PinPage() {
   const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }
 
   return <div className="subpage">
-    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Issue single-use invitations only when the enrolment service is enabled. Existing learners sign in with their Student ID and password; they do not need a new PIN.</p>
+    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Issue single-use Student ID and PIN credentials to eligible new learners. Learners use these details to complete first-time registration in the Student app; existing learners continue to sign in with their Student ID and password.</p>
     {!enrolmentOpen && <div className="security-note"><LockKeyhole size={17}/><p><strong>New enrolment is currently closed.</strong> Public registration remains off and the server-side PIN redemption route has not been approved for private invitation use. You can review existing PIN records, but do not issue or send new invitations until this control is reopened.</p></div>}
     <div className="panel pin-create-panel">
       <div className="panel-heading"><div><h2>{enrolmentOpen ? "Create learner access" : "Learner invitations paused"}</h2><p>{enrolmentOpen ? "Requires an authenticated administrator with MFA verified." : "PIN creation is disabled while the server rejects all new registrations."}</p></div><KeyRound size={20}/></div>
@@ -914,7 +914,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="settings-divider"/>
       <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Public learner enrolment</strong><p>Public and invitation enrolment remain closed while the server-side invitation route and legal readiness are pending. Enabling a front-end switch would not override the server-side enrolment block.</p></div><span className="connection-pill"><i/> Closed</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>First-time registration is available through the Student app with a single-use Student ID and PIN issued by an authenticated Monitor administrator. Minimum age 9, Terms v8, guardian verification for under-18 learners, rate limits and the 100-learner capacity control remain enforced by the server.</p></div><span className="connection-pill"><i/> PIN-gated</span></div>
     </div>
 
     <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Deliver Student IDs, one-time PINs and reset passwords directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>

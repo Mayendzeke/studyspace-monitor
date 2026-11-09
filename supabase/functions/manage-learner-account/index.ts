@@ -138,6 +138,8 @@ Deno.serve(async (request) => {
     confirmation?: string;
     paymentConfirmed?: boolean;
     paymentTransactionReference?: string;
+    dateOfBirth?: string;
+    administratorConfirmed?: boolean;
   };
   try {
     body = await request.json();
@@ -150,18 +152,50 @@ Deno.serve(async (request) => {
   const paymentTransactionReference = String(body.paymentTransactionReference ?? "").trim();
   if (!UUID_PATTERN.test(learnerId)) return json(400, { error: "A valid learner account ID is required." });
   if (learnerId === authData.user.id) return json(400, { error: "An administrator cannot manage or delete their own account as a learner." });
-  if (!["disable", "enable", "reset_password", "update_profile", "delete"].includes(action)) {
+  if (!["disable", "enable", "reset_password", "update_profile", "verify_age", "delete"].includes(action)) {
     return json(400, { error: "Unsupported account action." });
   }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin
     .from("profiles")
-    .select("id,role,account_status,student_id,full_name,preferred_name,subscription_tier,subscription_expires_at")
+    .select("id,role,account_status,student_id,full_name,preferred_name,date_of_birth,subscription_tier,subscription_expires_at")
     .eq("id", learnerId)
     .single();
   if (learnerError || !learner || learner.role !== "learner") {
     return json(404, { error: "Learner account not found." });
+  }
+
+  if (action === "verify_age") {
+    if (body.administratorConfirmed !== true) return json(400, { error: "Confirm that the date of birth was checked using the approved age-verification method." });
+    if (learner.date_of_birth) return json(409, { error: "This learner already has a recorded date of birth. It cannot be changed through this workflow." });
+    const dateOfBirth = String(body.dateOfBirth ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
+    const [year, month, day] = dateOfBirth.split("-").map(Number);
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return json(400, { error: "Enter a valid calendar date." });
+    const localParts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const part = (key: string) => Number(localParts.find(item => item.type === key)?.value || 0);
+    let age = part("year") - year;
+    if (part("month") < month || (part("month") === month && part("day") < day)) age--;
+    if (age < 9) return json(400, { error: "StudySpace can only verify learner records for ages 9 and older." });
+    const { data: updated, error: updateError } = await admin.from("profiles")
+      .update({ date_of_birth: dateOfBirth, updated_at: new Date().toISOString() })
+      .eq("id", learnerId).eq("role", "learner").is("date_of_birth", null)
+      .select("id,student_id,date_of_birth,account_status").maybeSingle();
+    if (updateError || !updated) return json(409, { error: "The age record could not be saved. It may already have been recorded; refresh and check the learner profile." });
+    const { error: auditError } = await admin.from("audit_events").insert({
+      actor_id: authData.user.id,
+      event_type: "learner_age_verified_by_admin",
+      target_type: "profile",
+      target_id: learnerId,
+      details: { verification_method: "approved_age_verification_method", age_band: age >= 18 ? "adult" : "under_18", date_of_birth_recorded_once: true },
+    });
+    if (auditError) {
+      await admin.from("profiles").update({ date_of_birth: null, updated_at: new Date().toISOString() }).eq("id", learnerId).eq("date_of_birth", dateOfBirth);
+      return json(500, { error: "The age verification audit could not be recorded, so the date-of-birth update was rolled back." });
+    }
+    return json(200, { success: true, learner: updated, message: "Date of birth recorded once after administrator confirmation of the approved age-verification method." });
   }
 
   if (action === "update_profile") {

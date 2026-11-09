@@ -15,7 +15,7 @@ export type ProviderStatus = {
   gemini: { configured: boolean; model: string };
   gemma: { configured: boolean; model: string };
 };
-type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string };
+type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[] };
 class ProviderSafetyError extends Error { constructor(message: string) { super(message); this.name = "ProviderSafetyError"; } }
 class ProviderRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message); this.name = "ProviderRequestError"; }
@@ -38,14 +38,16 @@ function cleanJsonText(text: string): string {
   return text.trim().replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
     .replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
 }
-function validateOutput(text: string, jsonMode: boolean, provider: string): string {
+function validateOutput(text: string, jsonMode: boolean, provider: string, requiredKeys: string[] = []): string {
   const clean = text.trim();
   if (!clean) throw new Error(provider + " returned an empty response.");
   if (jsonMode) {
     const candidate = cleanJsonText(clean);
     try {
       const value = JSON.parse(candidate);
-      if (!value || typeof value !== "object") throw new Error("Expected a JSON object.");
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected a JSON object.");
+      const missing = requiredKeys.filter(key => !Object.prototype.hasOwnProperty.call(value, key));
+      if (missing.length) throw new Error("Missing required fields: " + missing.join(", "));
       return candidate;
     } catch {
       throw new Error(provider + " returned malformed structured output. Automatic backup will be attempted.");
@@ -116,7 +118,7 @@ async function callGemini(messages: ProviderMessage[], options: Required<Generat
     const message = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new ProviderRequestError("Gemini API returned HTTP " + response.status + (message ? ": " + message : "."), response.status);
   }
-  return validateOutput(parseGeminiText(payload), options.jsonMode, "Gemini");
+  return validateOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys);
 }
 function cloudflareText(payload: any): string {
   const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
@@ -157,13 +159,14 @@ async function callCloudflareModel(model: string, messages: ProviderMessage[], o
     const details = Array.isArray(payload?.errors) ? payload.errors.map((item: any) => String(item?.message ?? "")).filter(Boolean).join("; ").slice(0, 200) : String(payload?.error?.message ?? "").slice(0, 200);
     throw new ProviderRequestError(model + " returned HTTP " + response.status + (details ? ": " + details : "."), response.status);
   }
-  return validateOutput(cloudflareText(payload), options.jsonMode, model);
+  return validateOutput(cloudflareText(payload), options.jsonMode, model, options.requiredJsonKeys);
 }
 export async function generateWithFallback(messages: ProviderMessage[], options: GenerationOptions = {}): Promise<ProviderResult> {
   const config: Required<GenerationOptions> = {
     maxTokens: Math.max(64, Math.min(4000, Math.floor(options.maxTokens ?? 1800))),
     jsonMode: options.jsonMode === true,
     systemPrompt: String(options.systemPrompt ?? "").trim().slice(0, 12000),
+    requiredJsonKeys: Array.isArray(options.requiredJsonKeys) ? options.requiredJsonKeys.filter(key => typeof key === "string").slice(0, 20) : [],
   };
   const status = getProviderStatus();
   const failures: string[] = [];

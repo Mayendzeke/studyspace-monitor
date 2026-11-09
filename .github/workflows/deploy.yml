@@ -303,6 +303,8 @@ jobs:
           if (!migration.includes('terms_version')) throw new Error('Database access helper must retain a current-terms condition.')
           const lessonRecap = readFileSync('supabase/functions/generate-lesson-recap/index.ts', 'utf8')
           if (!lessonRecap.includes('for educational purposes only')) throw new Error('Lesson recap generation must remain education-only.')
+          const announcementsPanel = readFileSync('src/components/SystemAnnouncementsPanel.tsx', 'utf8')
+          if (!announcementsPanel.includes('studyspace_announcements') || !announcementsPanel.includes('Publish to learners')) throw new Error('System announcement publishing is missing.')
           const homeworkBuilder = readFileSync('src/components/HomeworkBuilder.tsx', 'utf8')
           const homeworkFunction = readFileSync('supabase/functions/generate-homework/index.ts', 'utf8')
           const homeworkInbox = readFileSync('src/components/HomeworkHelpInbox.tsx', 'utf8')

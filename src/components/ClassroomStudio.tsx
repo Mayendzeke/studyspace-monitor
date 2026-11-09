@@ -241,7 +241,7 @@ export default function ClassroomStudio() {
   const completePoints = useMemo(() => draft.checkpoints.map(x => x.trim()).filter(Boolean).slice(0,5), [draft.checkpoints])
   const update = (patch: Partial<LessonPlan>) => setDraft(current => ({ ...current, ...patch, updatedAt: new Date().toISOString() }))
   const checkAiConnection = async () => {
-    if (!adminAiEnabled) { setAiConnection('error'); setAiConnectionMessage('AI tools are unavailable. Check the Cloudflare Workers AI connection and try again.'); return; }
+    if (!adminAiEnabled) { setAiConnection('error'); setAiConnectionMessage('AI tools are unavailable. Check the Gemini primary and Gemma backup connections.'); return; }
     if (!supabase) {
       setAiConnection('error');
       setAiConnectionMessage('Studyspace is not connected to the AI service.');
@@ -250,11 +250,14 @@ export default function ClassroomStudio() {
     setAiConnection('checking');
     setAiConnectionMessage('Checking provider credentials and model availability…');
     try {
-      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } }), 35000, 'The AI connection test timed out after 35 seconds. Check the connection and try again.');
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } }), 85000, 'The AI connection test timed out after 85 seconds. Check both provider connections and try again.');
       if (error) throw error;
       if (!data?.success || data?.verified !== true) throw new Error(data?.error || 'The AI connection could not be verified.');
       setAiConnection('ready');
-      setAiConnectionMessage('AI is ready · ' + String(data.provider || 'Provider') + ' · ' + String(data.model || 'Configured model'));
+      const geminiState = data.providers?.gemini?.configured === true ? 'configured' : 'not configured';
+      const gemmaState = data.providers?.gemma?.configured === true ? 'configured' : 'not configured';
+      const activeProvider = String(data.provider || 'AI provider');
+      setAiConnectionMessage('Gemini primary: ' + geminiState + ' · Gemma 4 backup: ' + gemmaState + ' · Test used ' + activeProvider + (data.fallbackUsed ? ' (automatic backup active)' : ''));
     } catch (reason) {
       setAiConnection('error');
       setAiConnectionMessage(await describeEdgeFunctionError(reason, 'The AI connection could not be verified.'));
@@ -262,7 +265,7 @@ export default function ClassroomStudio() {
   };
 
   const generateRecap = async () => {
-    if (!adminAiEnabled) { setNotice('AI lesson recap is unavailable. Check the Cloudflare Workers AI connection and try again.'); return; }
+    if (!adminAiEnabled) { setNotice('AI lesson recap is unavailable. Check the Gemini primary and Gemma automatic backup connections and try again.'); return; }
     if (!supabase) { setNotice('Connect Supabase before using AI lesson recaps.'); return }
     setAiBusy(true); setNotice('Preparing a concise lesson recap…')
     try {
@@ -459,7 +462,7 @@ export default function ClassroomStudio() {
         <div className="classroom-points-heading"><div><strong>Lesson checkpoints</strong><small>Only 3–5 memorable points. Avoid overloading the learner.</small></div><span>{completePoints.length}/5</span></div>
         <div className="classroom-checkpoints">{Array.from({length:Math.max(3,draft.checkpoints.length)},(_,i)=><label key={i}><span>{i+1}</span><input value={draft.checkpoints[i]||''} maxLength={180} onChange={e=>update({checkpoints:draft.checkpoints.map((v,j)=>j===i?e.target.value:v).concat(i>=draft.checkpoints.length?Array(i-draft.checkpoints.length+1).fill(''):[])})} placeholder={i===0?'First key idea':i===1?'Worked example':i===2?'Quick understanding check':'Optional extra point'}/></label>)}</div>
         <label className="classroom-wide-field">Source material / teacher notes<textarea rows={5} value={draft.sourceNotes} onChange={e=>update({sourceNotes:e.target.value})} placeholder="Paste the relevant notes, topic extract or teacher guidance that the AI should use. Do not include unrelated material."/></label>
-        {adminAiEnabled ? <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generate a concise explanation, up to five key points, a worked example where relevant, and an understanding-check question from the teacher's material. Review all generated content before sharing it with learners.</p><small>Use anonymised lesson material only. Do not submit learner names, IDs, contact details or other personal information to an external AI provider.</small><div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiConnection==='checking'} onClick={() => void checkAiConnection()}><ShieldCheck size={14}/>{aiConnection==='checking'?'Checking AI…':'Test AI connection'}</button><button type="button" className="primary-button" disabled={aiBusy || ![draft.title,draft.subject,draft.grade,draft.curriculum,draft.objectives,draft.sourceNotes].some(value=>value.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div>{aiConnectionMessage&&<small className={'classroom-ai-status '+(aiConnection==='ready'?'is-ready':aiConnection==='error'?'has-error':'')} role="status">{aiConnection==='ready'?<CheckCircle2 size={13}/>:aiConnection==='error'?<FileText size={13}/>:<ShieldCheck size={13}/>} {aiConnectionMessage}</small>}</div></div> : <div className="classroom-ai-paused" role="status"><Sparkles size={19}/><div><strong>AI lesson recap unavailable</strong><p>Check the Cloudflare Workers AI connection before generating a recap. Submit anonymised lesson material only.</p></div></div>}
+        {adminAiEnabled ? <div className="classroom-ai-card"><Sparkles size={19}/><div><strong>AI lesson recap</strong><p>Generate a concise explanation, up to five key points, a worked example where relevant, and an understanding-check question from the teacher's material. Review all generated content before sharing it with learners.</p><small>Use anonymised lesson material only. Do not submit learner names, IDs, contact details or other personal information to an external AI provider.</small><div className="classroom-ai-actions"><button type="button" className="subtle-button" disabled={aiConnection==='checking'} onClick={() => void checkAiConnection()}><ShieldCheck size={14}/>{aiConnection==='checking'?'Checking AI…':'Test AI connection'}</button><button type="button" className="primary-button" disabled={aiBusy || ![draft.title,draft.subject,draft.grade,draft.curriculum,draft.objectives,draft.sourceNotes].some(value=>value.trim())} onClick={() => void generateRecap()}>{aiBusy ? 'Generating…' : 'Generate lesson recap'}</button></div>{aiConnectionMessage&&<small className={'classroom-ai-status '+(aiConnection==='ready'?'is-ready':aiConnection==='error'?'has-error':'')} role="status">{aiConnection==='ready'?<CheckCircle2 size={13}/>:aiConnection==='error'?<FileText size={13}/>:<ShieldCheck size={13}/>} {aiConnectionMessage}</small>}</div></div> : <div className="classroom-ai-paused" role="status"><Sparkles size={19}/><div><strong>AI lesson recap unavailable</strong><p>Check the Gemini primary and Gemma automatic backup before generating a recap. Submit anonymised lesson material only.</p></div></div>}
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>

@@ -236,11 +236,13 @@ Deno.serve(async request => {
 
   let generated: Awaited<ReturnType<typeof generateWithFallback>>;
   let result: any;
+  let reply = "";
   try {
     generated = await generateWithFallback(messages, { maxTokens: action === "chat" ? 1800 : 2400, jsonMode: true });
     result = parseModelResponse(generated.text);
     if (!result.reply?.trim()) throw new Error("The AI providers returned no readable educational answer.");
     result.reply = String(result.reply).slice(0, 1200);
+    reply = result.reply;
   } catch (error) {
     await admin.from("ai_generation_usage").delete().eq("id", usage.data.id).eq("actor_id", learnerId);
     const detail = error instanceof Error ? error.message : "Unknown AI provider failure.";

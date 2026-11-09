@@ -22,7 +22,7 @@ import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
-  SlidersHorizontal, Users, X, KeyRound, Sparkles, Moon, Sun,
+  SlidersHorizontal, Users, X, KeyRound, Sparkles, Brain, Moon, Sun,
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
@@ -32,7 +32,7 @@ type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Pro
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
-  { label: 'MIΛ', icon: Sparkles },
+  { label: 'MIΛ', icon: Brain },
   { label: 'Learners', icon: Users },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Messages', icon: MessageCircle },

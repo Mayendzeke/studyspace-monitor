@@ -200,7 +200,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_STUDYSPACE_MEET_DOMAIN: ${{ vars.STUDYSPACE_MEET_DOMAIN }}
-          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'false'
+          VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED: 'true'
           VITE_STUDYSPACE_ADMIN_MIA_ENABLED: 'true'
         run: npm run build
       - name: Verify Monitor PWA and MIA lesson handoff
@@ -249,7 +249,7 @@ jobs:
           if (!profileTestimonialMigration.includes('studyspace-avatars') || !profileTestimonialMigration.includes('testimonial_private_consent') || !profileTestimonialMigration.includes('update_studyspace_learner_avatar') || !profileTestimonialMigration.includes('is_studyspace_admin')) throw new Error('The private profile-photo and testimonial migration is incomplete.')
           if (!app.includes("scope: 'others'") || !app.includes('updateUser({ password: newPassword })')) throw new Error('Administrator password and session-security settings are incomplete.')
           if (!timetablePage.includes('.eq("created_by", auth.user.id)') || !timetablePage.includes('Learners → select a learner')) throw new Error('The Monitor timetable must remain limited to the administrator’s shared sessions.')
-          const termsVersion = '2026-11-08-v6'
+          const termsVersion = '2026-11-09-v7'
           for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts', 'supabase/functions/enrol-learner/index.ts', 'supabase/functions/mia-assistant/index.ts', 'supabase/functions/manage-guardian-verification/index.ts', 'supabase/functions/guardian-consent/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
@@ -294,7 +294,7 @@ jobs:
           const migration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
-          if (!migration.includes("terms_version = '2026-11-08-v6'")) throw new Error('Database access must require the current Terms version.')
+          if (!migration.includes('terms_version')) throw new Error('Database access helper must retain a current-terms condition.')
           const homeworkBuilder = readFileSync('src/components/HomeworkBuilder.tsx', 'utf8')
           const homeworkFunction = readFileSync('supabase/functions/generate-homework/index.ts', 'utf8')
           const homeworkInbox = readFileSync('src/components/HomeworkHelpInbox.tsx', 'utf8')
@@ -302,7 +302,7 @@ jobs:
           const homeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
           const homeworkMigration = readFileSync('supabase/migrations/20261108134824_studyspace_connected_school_homework_help_and_cron.sql', 'utf8')
           const homeworkHardening = readFileSync('supabase/migrations/20261108135554_studyspace_harden_homework_uploads_and_timer.sql', 'utf8')
-          const termsMigration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
+          const termsMigration = readFileSync('supabase/migrations/20261109031500_studyspace_age9_mia_education_terms_v7.sql', 'utf8')
           if (!homeworkBuilder.includes('save_studyspace_exercise_draft') || !homeworkBuilder.includes('exercise_assignments') || !homeworkBuilder.includes('reviewed')) throw new Error('MIA Homework must save reviewed assignments to the connected assessment schema.')
           if (!homeworkFunction.includes('aal2') || !homeworkFunction.includes('@cf/google/gemma-4-26b-a4b-it') || !homeworkFunction.includes('markingGuide')) throw new Error('MIA Homework generation must use protected administrator access and Cloudflare Gemma.')
           if (homeworkFunction.includes('generativelanguage.googleapis.com') || homeworkFunction.includes('GEMINI_API_KEY')) throw new Error('MIA Homework must not use the retired Gemini provider.')
@@ -310,9 +310,9 @@ jobs:
           if (!homeworkFallback.includes('verify_studyspace_homework_cron_token') || !homeworkFallback.includes('claim_studyspace_homework_fallback') || !homeworkFallback.includes('@cf/google/gemma-4-26b-a4b-it')) throw new Error('The scheduled MIA fallback must authenticate and atomically claim due requests.')
           if (!homeworkMigration.includes("interval '2 minutes'") || !homeworkMigration.includes("'30 seconds'") || !homeworkMigration.includes('studyspace_homework_cron_token')) throw new Error('The two-minute teacher window and private 30-second scheduler must be configured.')
           if (!homeworkHardening.includes('set_studyspace_homework_request_defaults') || !homeworkHardening.includes("new.fallback_due_at := now() + interval '2 minutes'")) throw new Error('The database must control homework request status and fallback timing.')
-          if (!termsMigration.includes("terms_version = '2026-11-08-v6'")) throw new Error('The database must require current Terms v6 for learner access.')
-          if (!enrolment.includes('PUBLIC_ENROLMENT_ENABLED = false') || !enrolment.includes('temporarily closed')) throw new Error('Public enrolment must be blocked server-side until legal readiness.')
-          console.log('Connected assessment homework, protected MIA generation, teacher fallback, photo security, Terms v6 and server-side enrolment closure checks passed.')
+          if (!termsMigration.includes("terms_version = '2026-11-09-v7'")) throw new Error('The database must require current Terms v7 for learner access.')
+          if (!enrolment.includes('PUBLIC_ENROLMENT_ENABLED = true') || !enrolment.includes('learnerAge < 9')) throw new Error('Public enrolment must enforce the approved minimum age of 9.')
+          console.log('Connected assessment homework, protected MIA generation, teacher fallback, photo security, Terms v7 and 9+ public enrolment checks passed.')
           console.log('Database trial-start, invoker-security and current-terms guards passed.')
           console.log('Current terms-version checks passed for enrolment, class access and assessment submission.')
           console.log('Monitor PWA manifest, icon, service worker and MIA-to-Classroom handoff checks passed.')

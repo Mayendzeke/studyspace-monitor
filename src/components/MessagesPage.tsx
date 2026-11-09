@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, AlertCircle, Users } from "lucide-react";
+import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, AlertCircle, Users, Megaphone } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
+import SystemAnnouncementsPanel from "./SystemAnnouncementsPanel";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
 type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null;delivered_at:string|null;edited_at:string|null;unsent_at:string|null;deleted_for_everyone_at:string|null};
@@ -11,7 +12,7 @@ const extensionFor=(file:File)=>({ "image/jpeg":"jpg","image/png":"png","image/w
 
 export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void}){
   const [userId,setUserId]=useState("");
-  const [mailbox,setMailbox]=useState<"inbox"|"sent"|"groups">("inbox");
+  const [mailbox,setMailbox]=useState<"inbox"|"sent"|"groups"|"announcements">("inbox");
   const [presence,setPresence]=useState<Record<string,string>>({});
   const [contacts,setContacts]=useState<Contact[]>([]);
   const [messages,setMessages]=useState<Message[]>([]);
@@ -181,8 +182,9 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
       <button className={mailbox==="inbox"?"is-active":""} onClick={()=>setMailbox("inbox")}><MessageCircle size={14}/> Inbox</button>
       <button className={mailbox==="sent"?"is-active":""} onClick={()=>setMailbox("sent")}><Send size={14}/> Sent</button>
       <button className={mailbox==="groups"?"is-active":""} onClick={()=>setMailbox("groups")}><Users size={14}/> Groups</button>
+      <button className={mailbox==="announcements"?"is-active":""} onClick={()=>setMailbox("announcements")}><Megaphone size={14}/> Announcements</button>
     </nav>
-    {mailbox==="groups"?<StudyspaceGroupsPanel/>:
+    {mailbox==="announcements"?<SystemAnnouncementsPanel/>:mailbox==="groups"?<StudyspaceGroupsPanel/>:
     <section className="monitor-messages-shell">
       <aside className="monitor-contact-panel">
         <div className="monitor-contact-heading"><strong>Learners</strong><span>{contacts.length}</span></div>

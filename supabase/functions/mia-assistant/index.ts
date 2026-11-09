@@ -234,6 +234,13 @@ Deno.serve(async request => {
   }).select("id").single();
   if (usage.error || !usage.data) return json(503, { error: "MIΛ could not record this request. Try again later." });
 
+  const cloudflareAccountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim();
+  const cloudflareApiToken = Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim();
+  if (!cloudflareAccountId || !cloudflareApiToken) {
+    await admin.from("ai_generation_usage").delete().eq("id", usage.data.id).eq("actor_id", learnerId);
+    return json(503, { error: "MIΛ's protected Cloudflare AI connection is not configured. Ask the StudySpace administrator to check its server-side credentials." });
+  }
+
   let generated: Awaited<ReturnType<typeof generateWithFallback>>;
   let result: any;
   let reply = "";

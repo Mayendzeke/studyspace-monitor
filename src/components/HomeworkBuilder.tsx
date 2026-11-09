@@ -53,7 +53,7 @@ const shuffle = <T,>(items: T[]) => {
 const toQuestion = (raw: Record<string, unknown>, fallbackPoints: number, topic: string, difficulty: string): HomeworkQuestion => {
   const type = String(raw.type || raw.question_type || "short_answer") as QuestionType;
   const allowed: QuestionType[] = ["multiple_choice", "fill_blank", "short_answer", "true_false", "matching"];
-  if (!allowed.includes(type)) throw new Error("MIA returned an unsupported question format.");
+  if (!allowed.includes(type)) throw new Error("MIΛ returned an unsupported question format.");
   const options = Array.isArray(raw.options) ? raw.options.map(String).filter(Boolean).slice(0, 6) : [];
   const pairs = Array.isArray(raw.pairs) ? raw.pairs.filter((p): p is Record<string, unknown> => !!p && typeof p === "object").map(p => ({ left: String(p.left || ""), right: String(p.right || "") })).filter(p => p.left && p.right).slice(0, 8) : [];
   const acceptedAnswers = Array.isArray(raw.acceptedAnswers) ? raw.acceptedAnswers.map(String).filter(Boolean).slice(0, 8) : [];
@@ -123,7 +123,7 @@ export default function HomeworkBuilder() {
         setGroupId("");
         setQuestions([]);
         setReviewed(false);
-        setNotice("Classroom context loaded. Check the subject, grade, topic and recipients, then generate interactive questions with MIA.");
+        setNotice("Classroom context loaded. Check the subject, grade, topic and recipients, then generate interactive questions with MIΛ.");
         localStorage.removeItem(homeworkHandoffKey);
         document.querySelector(".homework-builder")?.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch {
@@ -203,13 +203,13 @@ export default function HomeworkBuilder() {
         body: { subject, topic, educationLevel: level, grade, course, curriculum, format, difficulty, questionCount, pointsPerQuestion: points, instructions }
       });
       if (invokeError) throw invokeError;
-      if (!data?.success || !Array.isArray(data.questions)) throw new Error(data?.error || "MIA did not return a usable question set.");
+      if (!data?.success || !Array.isArray(data.questions)) throw new Error(data?.error || "MIΛ did not return a usable question set.");
       const next = data.questions.map((item: Record<string, unknown>) => toQuestion(item, points, topic, difficulty));
-      if (next.length !== questionCount) throw new Error("MIA returned " + next.length + " questions instead of " + questionCount + ". Please retry.");
+      if (next.length !== questionCount) throw new Error("MIΛ returned " + next.length + " questions instead of " + questionCount + ". Please retry.");
       setQuestions(next); setReviewed(false);
-      setNotice((typeof data.providerNotice === "string" && data.providerNotice ? data.providerNotice + " " : "") + "MIA generated " + next.length + " questions using " + String(data.provider || "the configured AI provider") + (data.model ? " · " + String(data.model) : "") + ". Review and edit the prompts, answers and explanations before assigning.");
+      setNotice((typeof data.providerNotice === "string" && data.providerNotice ? data.providerNotice + " " : "") + "MIΛ generated " + next.length + " questions using " + String(data.provider || "the configured AI provider") + (data.model ? " · " + String(data.model) : "") + ". Review and edit the prompts, answers and explanations before assigning.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "MIA could not generate this homework.");
+      setError(reason instanceof Error ? reason.message : "MIΛ could not generate this homework.");
     } finally { setGenerating(false); }
   };
 
@@ -306,10 +306,10 @@ export default function HomeworkBuilder() {
 
   return <section className="panel homework-builder">
     <div className="panel-heading">
-      <div><h2><Sparkles size={18}/> MIA Homework</h2><p>Generate, review and assign interactive homework through the existing assessment system.</p></div>
+      <div><h2><Sparkles size={18}/> MIΛ Homework</h2><p>Generate, review and assign interactive homework through the existing assessment system.</p></div>
       <BookOpen size={20}/>
     </div>
-    <div className="homework-privacy-note"><strong>Teacher review is required.</strong> MIA creates a private draft. Learners cannot see the answer keys. Only publish after checking each question.</div>
+    <div className="homework-privacy-note"><strong>Teacher review is required.</strong> MIΛ creates a private draft. Learners cannot see the answer keys. Only publish after checking each question.</div>
     {error && <div className="homework-message error" role="alert">{error}</div>}
     {notice && <div className="homework-message success" role="status">{notice}</div>}
     <div className="homework-grid">
@@ -339,7 +339,7 @@ export default function HomeworkBuilder() {
     </div>
     <label className="homework-instructions">Instructions for learners<textarea rows={3} maxLength={2000} value={instructions} onChange={e=>setInstructions(e.target.value)}/></label>
     <div className="homework-generate-row">
-      <button className="primary-button" type="button" disabled={generating || loadingLearners} onClick={()=>void generate()}><Sparkles size={16}/>{generating?"Generating with MIA…":"Generate with MIA"}</button>
+      <button className="primary-button" type="button" disabled={generating || loadingLearners} onClick={()=>void generate()}><Sparkles size={16}/>{generating?"Generating with MIΛ…":"Generate with MIΛ"}</button>
       <span>{loadingLearners?"Loading active learner list…":groupLoading?"Loading classroom roster…":matchingLearners.length+" active learner(s) "+(groupId?"in this classroom roster":"match the selected grade/course filters")+"."}</span>
     </div>
     <div className="homework-recipients">
@@ -378,6 +378,6 @@ export default function HomeworkBuilder() {
       <label className="homework-review-confirm"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/><span>I have reviewed the question prompts, answers, marks and explanations, and approve this homework for the selected learners.</span></label>
       <div className="homework-publish-row"><span><Clock3 size={15}/> {recipients.length} learner(s) · {dueDate?"Due "+dueDate:"No due date"}</span><button className="primary-button" type="button" onClick={()=>void publish()} disabled={publishing||groupLoading||!reviewed||recipients.length===0}>{publishing?"Saving and assigning…":"Publish homework"}</button></div>
     </div>}
-    {!questions.length && <div className="homework-empty"><BookOpen size={23}/><strong>Your questions will appear here.</strong><span>Generate a set with MIA or add questions after generating a set.</span></div>}
+    {!questions.length && <div className="homework-empty"><BookOpen size={23}/><strong>Your questions will appear here.</strong><span>Generate a set with MIΛ or add questions after generating a set.</span></div>}
   </section>;
 }

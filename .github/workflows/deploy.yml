@@ -275,22 +275,25 @@ jobs:
           const paymentReferenceMigration = readFileSync('supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql', 'utf8')
           if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
           const learnerAI = readFileSync('supabase/functions/mia-assistant/index.ts', 'utf8')
+          const learnerHomeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
           if (!learnerAI.includes('CLOUDFLARE_ACCOUNT_ID') || !learnerAI.includes('CLOUDFLARE_API_TOKEN')) throw new Error('Learner MIΛ must use protected Cloudflare Workers AI credentials.')
           if (!learnerAI.includes('CURRENT_TERMS_VERSION') || !learnerAI.includes('trial_expires_at') || !learnerAI.includes('subscription_expires_at')) throw new Error('Learner MIΛ must enforce current terms and active trial/paid access.')
           if (!learnerAI.includes('image_url') || !learnerAI.includes('usage_status')) throw new Error('Learner MIΛ image processing or usage-status contract is missing.')
-          for (const path of ['supabase/functions/mia-assistant/index.ts', 'supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
-            const source = readFileSync(path, 'utf8')
-            if (!source.includes('CLOUDFLARE_ACCOUNT_ID') || !source.includes('CLOUDFLARE_API_TOKEN') || !source.includes('@cf/google/gemma-4-26b-a4b-it')) {
-              throw new Error(path + ' must use the configured Cloudflare Workers AI model and protected credentials.')
-            }
-            if (source.includes('generativelanguage.googleapis.com') || source.includes('GEMINI_API_KEY') || source.includes('gemini-3.8-flash')) throw new Error(path + ' must not retain the retired Gemini API connection.')
+          if (learnerAI.includes('GEMINI_API_KEY') || learnerAI.includes('generativelanguage.googleapis.com') || learnerHomeworkFallback.includes('GEMINI_API_KEY') || learnerHomeworkFallback.includes('generativelanguage.googleapis.com')) {
+            throw new Error('Gemini must never receive learner-facing MIA or homework-fallback requests for the under-18 Student app.')
           }
-          for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts']) {
+          for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts', 'supabase/functions/generate-homework/index.ts']) {
             const source = readFileSync(path, 'utf8')
-            if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) throw new Error(path + ' must enforce administrator role and MFA.')
+            const directory = path.slice(0, path.lastIndexOf('/'))
+            const provider = readFileSync(directory + '/provider.ts', 'utf8')
+            if (!source.includes('./provider.ts') || !provider.includes('GEMINI_API_KEY') || !provider.includes('generativelanguage.googleapis.com') || !provider.includes('GEMINI_MODEL')) throw new Error(path + ' must use the server-side Gemini primary provider adapter.')
+            if (!provider.includes('CLOUDFLARE_API_TOKEN') || !provider.includes('GEMMA_MODEL') || !provider.includes('generateWithFallback')) throw new Error(path + ' must retain Gemma as the automatic backup.')
+            if (!provider.includes('ProviderSafetyError') || !provider.includes('assertNoPersonalIdentifiers')) throw new Error(path + ' must preserve safety refusals and reject common learner identifiers.')
+            if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) throw new Error(path + ' must enforce adult administrator role and MFA.')
             if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
-          console.log('Cloudflare Workers AI integration, learner terms/access, administrator MFA and AI usage audit checks passed.')
+          console.log('Gemini primary / Gemma backup is restricted to adult administrator tools; Student MIA and homework fallback remain Gemma-only.')
+          console.log('Both provider credentials stay server-side; common learner identifiers are screened before administrator AI calls.')
           const migration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')

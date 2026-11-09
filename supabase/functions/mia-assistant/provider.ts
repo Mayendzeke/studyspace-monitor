@@ -38,8 +38,8 @@ export function getProviderStatus(): ProviderStatus {
   };
 }
 function cleanJsonText(text: string): string {
-  return text.trim().replace(/<think>[\\s\\S]*?<\\/think>/gi, "").trim()
-    .replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "").trim();
+  return text.trim().replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
 }
 function validateOutput(text: string, jsonMode: boolean, provider: string): string {
   const clean = text.trim();
@@ -78,7 +78,7 @@ function parseGeminiText(payload: any): string {
     throw new ProviderSafetyError("Gemini declined this request under its safety rules. Review the educational request and try again.");
   }
   const parts = candidate?.content?.parts;
-  const text = Array.isArray(parts) ? parts.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\\n").trim() : "";
+  const text = Array.isArray(parts) ? parts.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\n").trim() : "";
   if (!text) throw new Error("Gemini returned no readable text.");
   return text;
 }
@@ -116,7 +116,7 @@ async function callGemini(messages: ProviderMessage[], options: Required<Generat
   let payload: any = {};
   try { payload = JSON.parse(raw); } catch { /* Normalised below. */ }
   if (!response.ok) {
-    const message = String(payload?.error?.message ?? "").replace(/\\s+/g, " ").slice(0, 220);
+    const message = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new ProviderRequestError("Gemini API returned HTTP " + response.status + (message ? ": " + message : "."), response.status);
   }
   return validateOutput(parseGeminiText(payload), options.jsonMode, "Gemini");
@@ -125,7 +125,7 @@ function cloudflareText(payload: any): string {
   const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
   const raw = choice?.message?.content;
   return typeof raw === "string" ? raw.trim()
-    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\\n").trim()
+    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
     : typeof choice?.text === "string" ? choice.text.trim() : "";
 }
 async function callCloudflareModel(model: string, messages: ProviderMessage[], options: Required<GenerationOptions>): Promise<string> {

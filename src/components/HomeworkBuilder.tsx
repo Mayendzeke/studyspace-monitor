@@ -207,7 +207,7 @@ export default function HomeworkBuilder() {
       const next = data.questions.map((item: Record<string, unknown>) => toQuestion(item, points, topic, difficulty));
       if (next.length !== questionCount) throw new Error("MIA returned " + next.length + " questions instead of " + questionCount + ". Please retry.");
       setQuestions(next); setReviewed(false);
-      setNotice("MIA generated " + next.length + " questions. Review and edit the prompts, answers and explanations before assigning.");
+      setNotice((typeof data.providerNotice === "string" && data.providerNotice ? data.providerNotice + " " : "") + "MIA generated " + next.length + " questions using " + String(data.provider || "the configured AI provider") + (data.model ? " · " + String(data.model) : "") + ". Review and edit the prompts, answers and explanations before assigning.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "MIA could not generate this homework.");
     } finally { setGenerating(false); }

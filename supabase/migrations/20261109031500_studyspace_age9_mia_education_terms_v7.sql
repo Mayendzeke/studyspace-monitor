@@ -15,7 +15,7 @@ begin
   definition_text := replace(
     definition_text,
     'and account_status = ''active''',
-    'and account_status = ''active''\n      and date_of_birth is not null\n      and extract(year from age((now() at time zone ''Africa/Mbabane'')::date, date_of_birth)) >= 9'
+    E'and account_status = ''active''\n      and date_of_birth is not null\n      and extract(year from age((now() at time zone ''Africa/Mbabane'')::date, date_of_birth)) >= 9'
   );
   execute definition_text;
 
@@ -50,7 +50,7 @@ begin
   definition_text := replace(definition_text, '2026-11-08-v6', '2026-11-09-v7');
   definition_text := replace(
     definition_text,
-    'or extract(year from age(local_today, learner_dob)) >= 18 then',
+    E'or extract(year from age(local_today, learner_dob)) >= 18 then',
     'or extract(year from age(local_today, learner_dob)) < 9\n     or extract(year from age(local_today, learner_dob)) >= 18 then'
   );
   execute definition_text;
@@ -75,7 +75,7 @@ begin
   end if;
   definition_text := replace(
     definition_text,
-    'and fallback_attempts < 5',
+    E'and fallback_attempts < 5',
     'and fallback_attempts < 5\n    and exists (\n      select 1 from public.profiles as learner\n      where learner.id = homework_help_requests.learner_id\n        and learner.role = ''learner''\n        and learner.account_status = ''active''\n        and learner.date_of_birth is not null\n        and extract(year from age((now() at time zone ''Africa/Mbabane'')::date, learner.date_of_birth)) >= 9\n    )'
   );
   execute definition_text;

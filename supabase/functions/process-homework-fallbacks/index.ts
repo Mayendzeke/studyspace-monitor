@@ -11,7 +11,7 @@ async function generate(prompt:string,imageUrl?:string):Promise<string>{
  const response=await fetch("https://api.cloudflare.com/client/v4/accounts/"+encodeURIComponent(account)+"/ai/v1/chat/completions",{
   method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},signal:AbortSignal.timeout(65000),
   body:JSON.stringify({model:MODEL,messages:[
-   {role:"system",content:"You are MIA, a careful and supportive StudySpace homework tutor. This service is for educational purposes only: answer school or university coursework questions and explain concepts, methods and worked steps. If the request is not clearly educational or is unrelated to school or academic learning, refuse briefly and redirect the learner to a coursework question. Do not provide general personal, medical, legal, financial, political, relationship or other non-educational advice. Explain the method step by step at the learner's level, help them understand rather than encouraging copying, and state assumptions if a photo is unclear. Never invent a source or citation. Keep the answer focused and practical."},
+   {role:"system",content:"You are MIΛ, a careful and supportive StudySpace homework tutor. This service is for educational purposes only: answer school or university coursework questions and explain concepts, methods and worked steps. If the request is not clearly educational or is unrelated to school or academic learning, refuse briefly and redirect the learner to a coursework question. Do not provide general personal, medical, legal, financial, political, relationship or other non-educational advice. Explain the method step by step at the learner's level, help them understand rather than encouraging copying, and state assumptions if a photo is unclear. Never invent a source or citation. Keep the answer focused and practical."},
    {role:"user",content}
   ],max_completion_tokens:1800,temperature:0.25,stream:false,store:false,chat_template_kwargs:{enable_thinking:false,clear_thinking:true}})
  });
@@ -20,7 +20,7 @@ async function generate(prompt:string,imageUrl?:string):Promise<string>{
  if(!response.ok)throw new Error("Cloudflare Workers AI returned HTTP "+response.status+". Reference: "+ray);
  const choice=Array.isArray(payload?.choices)?payload.choices[0]:undefined,body=choice?.message?.content;
  const value=typeof body==="string"?body.trim():Array.isArray(body)?body.map((part:any)=>typeof part==="string"?part:typeof part?.text==="string"?part.text:"").join("\n").trim():typeof choice?.text==="string"?choice.text.trim():"";
- if(!value)throw new Error("MIA returned no readable explanation. Reference: "+ray);
+ if(!value)throw new Error("MIΛ returned no readable explanation. Reference: "+ray);
  return value.slice(0,9000);
 }
 Deno.serve(async request=>{
@@ -46,7 +46,7 @@ Deno.serve(async request=>{
    const prompt=["A learner has requested help with a school or university homework question.","Explain the relevant concept and a sensible method, with a worked step or example where helpful.","Do not claim certainty if the image is unreadable. Ask the learner to upload a clearer photo or type missing details.","For higher education, be appropriately technical. Do not fabricate references, authors, DOIs or URLs.","Learner's written question:",String(row.question_text||"(The learner supplied an image rather than typed text.)").slice(0,5000),"Give an understandable explanation, not an answer-only response."].join("\n");
    const answer=await generate(prompt,imageUrl);
    const {data:saved,error:saveError}=await admin.from("homework_help_requests").update({status:"mia_replied",mia_response:answer,mia_replied_at:new Date().toISOString(),last_fallback_error:null,updated_at:new Date().toISOString()}).eq("id",row.id).eq("status","mia_generating").select("id").maybeSingle();
-   if(saveError)throw new Error("MIA's explanation could not be delivered to the learner.");if(saved?.id)answeredCount++;else skippedCount++;
+   if(saveError)throw new Error("MIΛ's explanation could not be delivered to the learner.");if(saved?.id)answeredCount++;else skippedCount++;
   }catch(error){
    const attempts=Number(row.fallback_attempts||1);
    await admin.from("homework_help_requests").update({status:attempts>=5?"mia_failed":"waiting_for_teacher",last_fallback_error:(error instanceof Error?error.message:"AI fallback failed.").slice(0,350),updated_at:new Date().toISOString()}).eq("id",row.id).eq("status","mia_generating");

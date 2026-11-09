@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, AlertCircle, Users, Megaphone } from "lucide-react";
+import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, AlertCircle, Users, Megaphone, Plus, X, UserRound } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
 import SystemAnnouncementsPanel from "./SystemAnnouncementsPanel";
@@ -28,6 +28,8 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
   const [sending,setSending]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [composeOpen,setComposeOpen]=useState(false);
+  const [composeSearch,setComposeSearch]=useState("");
   const bottomRef=useRef<HTMLDivElement>(null);
   const fileRef=useRef<HTMLInputElement>(null);
 
@@ -76,6 +78,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     return()=>{window.clearInterval(timer);window.removeEventListener("focus",heartbeat);document.removeEventListener("visibilitychange",heartbeat);};
   },[userId,mailbox]);
   const visibleContacts=useMemo(()=>contacts.filter(c=>(mailbox!=="sent"||messages.some(m=>m.sender_id===userId&&m.recipient_id===c.contact_id))&&(c.display_name+" "+c.grade).toLowerCase().includes(query.trim().toLowerCase())),[contacts,query,messages,mailbox,userId]);
+  const composeContacts=useMemo(()=>contacts.filter(c=>(c.display_name+" "+c.grade).toLowerCase().includes(composeSearch.trim().toLowerCase())),[contacts,composeSearch]);
   const draftWords=draft.trim()?draft.trim().split(/\s+/).length:0;
   const thread=messages.filter(m=>!hiddenMessageIds.includes(m.id)&&((m.sender_id===userId&&m.recipient_id===selected)||(m.sender_id===selected&&m.recipient_id===userId)));
   const selectedContact=contacts.find(c=>c.contact_id===selected);
@@ -187,7 +190,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
     {mailbox==="announcements"?<SystemAnnouncementsPanel/>:mailbox==="groups"?<StudyspaceGroupsPanel/>:
     <section className="monitor-messages-shell">
       <aside className="monitor-contact-panel">
-        <div className="monitor-contact-heading"><strong>Learners</strong><span>{contacts.length}</span></div>
+        <div className="monitor-contact-heading"><div><strong>Learners</strong><span>{contacts.length} available</span></div><button type="button" className="monitor-compose-button" onClick={()=>{setComposeSearch("");setComposeOpen(true);}} aria-label="Compose a new message" title="Compose a new message"><Plus size={17}/><span>New</span></button></div>
         <label className="monitor-contact-search"><Search size={14}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find a learner"/></label>
         <div className="monitor-contact-list">
           {visibleContacts.map(c=>{
@@ -215,5 +218,27 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
         </>:<div className="monitor-message-empty"><MessageCircle size={28}/><strong>{loading?"Opening your inbox…":"Select a learner"}</strong><span>Choose a learner from the list to view or start a conversation.</span></div>}
       </section>
     </section>}
+    {composeOpen&&<div className="monitor-compose-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setComposeOpen(false);}}>
+      <section className="monitor-compose-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-compose-title">
+        <header className="monitor-compose-dialog-head">
+          <div><span className="eyebrow">NEW CONVERSATION</span><h2 id="monitor-compose-title">Who would you like to message?</h2><p>Start a private learner conversation or open your group spaces.</p></div>
+          <button type="button" className="icon-button" onClick={()=>setComposeOpen(false)} aria-label="Close new message"><X size={18}/></button>
+        </header>
+        <div className="monitor-compose-type-switch" role="group" aria-label="Conversation type">
+          <button type="button" className="is-active" aria-pressed="true"><UserRound size={16}/> Individual</button>
+          <button type="button" onClick={()=>{setMailbox("groups");setComposeOpen(false);}}><Users size={16}/> Group conversation</button>
+        </div>
+        <label className="monitor-compose-search"><Search size={16}/><input autoFocus value={composeSearch} onChange={event=>setComposeSearch(event.target.value)} placeholder="Search learners by name or grade"/></label>
+        <div className="monitor-compose-contacts">
+          {composeContacts.map(contact=><button type="button" key={contact.contact_id} onClick={()=>{setSelected(contact.contact_id);setMailbox("inbox");setComposeOpen(false);setComposeSearch("");}}>
+            <span className="monitor-contact-avatar">{contact.display_name.trim().slice(0,1).toUpperCase()}</span>
+            <span><strong>{contact.display_name}</strong><small>{contact.grade||"Studyspace learner"} · Private conversation</small></span>
+            <MessageCircle size={16}/>
+          </button>)}
+          {!composeContacts.length&&<p>{loading?"Loading learner directory…":"No learners match that search."}</p>}
+        </div>
+        <footer>Direct messages are private to the selected learner and authorised StudySpace administrators.</footer>
+      </section>
+    </div>}
   </div>;
 }

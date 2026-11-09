@@ -45,16 +45,6 @@ function wrapCanvasText(ctx: CanvasRenderingContext2D, value: string, maxWidth: 
   }
   return lines.length ? lines : [" "];
 }
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
-}
 
 
 export default function TestimonialsInbox() {
@@ -185,10 +175,10 @@ export default function TestimonialsInbox() {
       const measure = canvas.getContext('2d');
       if (!measure) throw new Error('This browser could not create the testimonial image.');
       measure.font = '44px Georgia, serif';
-      const lines = wrapCanvasText(measure, item.message, 840);
+      const lines = wrapCanvasText(measure, item.message, 900);
       const lineHeight = 62;
       const attributionHeight = (preferredName ? 82 : 0) + (schoolName ? 54 : 0);
-      canvas.height = Math.max(1050, 390 + lines.length * lineHeight + attributionHeight + 190);
+      canvas.height = Math.max(1050, 420 + lines.length * lineHeight + attributionHeight + 230);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser could not render the testimonial image.');
 
@@ -209,11 +199,6 @@ export default function TestimonialsInbox() {
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = 'rgba(104, 226, 196, 0.13)';
-      ctx.beginPath(); ctx.arc(940, 120, 230, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(125, 164, 255, 0.10)';
-      ctx.beginPath(); ctx.arc(60, canvas.height - 80, 260, 0, Math.PI * 2); ctx.fill();
-
       // Compact StudySpace brand mark in the top-right corner.
       ctx.save();
       ctx.translate(810, 58);
@@ -230,31 +215,35 @@ export default function TestimonialsInbox() {
       ctx.fillText('studyspace', 98, 43);
       ctx.restore();
 
-      const cardX = 58, cardY = 180, cardW = 964, cardH = canvas.height - 260;
-      roundRect(ctx, cardX, cardY, cardW, cardH, 34);
-      ctx.fillStyle = '#f8fbff';
-      ctx.fill();
-
-      ctx.fillStyle = '#1c2a3c';
+      // The learner-selected palette is the whole canvas; no white card or unrelated overlays.
+      const lightTextPalettes = new Set(['ocean','violet','emerald','rose','midnight']);
+      const textColor = lightTextPalettes.has(item.testimonial_background || 'ocean') ? '#f8fbff' : '#1c2a3c';
+      ctx.fillStyle = textColor;
       ctx.font = '44px Georgia, serif';
-      ctx.textAlign = 'left';
-      let y = cardY + 155;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      const quoteTop = 235;
+      const quoteBottom = canvas.height - attributionHeight - 230;
+      const quoteHeight = lines.length * lineHeight;
+      let y = quoteTop + Math.max(0, (quoteBottom - quoteTop - quoteHeight) / 2) + 46;
       for (const line of lines) {
-        if (line) ctx.fillText(line, cardX + 70, y, 825);
+        if (line) ctx.fillText(line, canvas.width / 2, y, 900);
         y += lineHeight;
       }
 
-      let attributionY = Math.max(y + 55, cardY + cardH - attributionHeight - 95);
+      // Keep the student's chosen display name and institution together, centred near the bottom.
+      let attributionY = canvas.height - attributionHeight - 105;
+      ctx.textAlign = 'center';
       if (preferredName) {
-        ctx.fillStyle = '#193653';
-        ctx.font = '700 30px Arial, sans-serif';
-        ctx.fillText(preferredName, cardX + 70, attributionY);
+        ctx.fillStyle = textColor;
+        ctx.font = '700 32px Arial, sans-serif';
+        ctx.fillText(preferredName, canvas.width / 2, attributionY, 900);
         attributionY += 52;
       }
       if (schoolName) {
-        ctx.fillStyle = '#64748b';
-        ctx.font = '22px Arial, sans-serif';
-        ctx.fillText(schoolName, cardX + 70, attributionY);
+        ctx.fillStyle = lightTextPalettes.has(item.testimonial_background || 'ocean') ? 'rgba(248,251,255,.86)' : 'rgba(28,42,60,.84)';
+        ctx.font = '23px Arial, sans-serif';
+        ctx.fillText(schoolName, canvas.width / 2, attributionY, 900);
       }
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));

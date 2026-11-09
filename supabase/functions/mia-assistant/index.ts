@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN") ?? "https://mayendzeke.github.io";
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const BACKUP_MODEL = "@cf/qwen/qwen3.8-27b";
 const CURRENT_TERMS_VERSION = "2026-11-09-v8";
 const cors = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
@@ -26,9 +27,42 @@ function cleanList(value: unknown, max = 8): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((x): x is string => typeof x === "string").map(x => x.trim().slice(0, 120)).filter(Boolean).slice(0, max);
 }
-function parseJson(text: string): any {
-  const clean = text.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
-  return JSON.parse(clean);
+function parseModelResponse(text: string): { reply: string; memory?: any; timetableDraft?: any[] } {
+  const clean = text.replace(/<think>[\\s\\S]*?<\\/think>/gi, "").trim()
+    .replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "").trim();
+  const parseCandidate = (value: string) => {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch { /* Some model responses include a short lead-in around JSON. */ }
+    return null;
+  };
+  let parsed = parseCandidate(clean);
+  if (!parsed) {
+    const first = clean.indexOf("{");
+    const last = clean.lastIndexOf("}");
+    if (first >= 0 && last > first) parsed = parseCandidate(clean.slice(first, last + 1));
+  }
+  if (parsed) {
+    const candidate = [parsed.reply, parsed.answer, parsed.response, parsed.content, parsed.explanation]
+      .find(value => typeof value === "string" && value.trim());
+    const hasTimetable = Array.isArray(parsed.timetableDraft);
+    const reply = typeof candidate === "string" ? candidate.trim()
+      : hasTimetable ? "I’ve read the timetable image. Please review the detected entries below before saving." : "";
+    if (reply) return { reply: reply.slice(0, 4000), memory: parsed.memory && typeof parsed.memory === "object" ? parsed.memory : undefined, timetableDraft: hasTimetable ? parsed.timetableDraft : undefined };
+  }
+  // A readable answer is better than discarding it because the model missed JSON formatting.
+  return { reply: clean.slice(0, 4000) };
+}
+function extractCompletionText(payload: any): string {
+  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
+  const raw = choice?.message?.content;
+  return typeof raw === "string" ? raw.trim()
+    : Array.isArray(raw) ? raw.map((part: any) => typeof part?.text === "string" ? part.text : typeof part === "string" ? part : "").join("\\n").trim()
+    : typeof choice?.text === "string" ? choice.text.trim() : "";
+}
+class WorkersAIError extends Error {
+  constructor(message: string, readonly status: number) { super(message); this.name = "WorkersAIError"; }
 }
 
 Deno.serve(async request => {
@@ -206,50 +240,86 @@ Deno.serve(async request => {
     ? [{ role: "system", content: system }, ...history, { role: "user", content: userContent.length === 1 ? userContent[0].text : userContent }]
     : [{ role: "system", content: system }, { role: "user", content: userContent }];
   const prompt = JSON.stringify(messages);
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim();
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim();
+  if (!accountId || !apiToken) return json(503, { error: "MIΛ's Cloudflare Workers AI connection is not configured. Ask the StudySpace administrator to check its server-side credentials." });
+
   const usage = await admin.from("ai_generation_usage").insert({
     actor_id: learnerId, provider: "cloudflare-workers-ai",
     purpose: action === "chat" ? (body.attachment?.data ? "mia_chat_with_image" : "mia_chat") : "mia_timetable_image",
     input_characters: prompt.length, output_characters: 0,
   }).select("id").single();
   if (usage.error || !usage.data) return json(503, { error: "MIΛ could not record this request. Try again later." });
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim();
-  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim();
-  if (!accountId || !apiToken) return json(503, { error: "MIΛ's Cloudflare Workers AI connection is not configured. Add the account ID and API token to Supabase Edge Function secrets." });
-  let response: Response;
-  try {
-    response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
-      method: "POST", headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, max_tokens: action === "chat" ? 900 : 1800, temperature: 0.25, stream: false, store: false }),
-      signal: AbortSignal.timeout(60000),
-    });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return json(504, { error: "MIΛ's AI provider did not respond within 60 seconds. Please retry." });
-    return json(502, { error: "MIΛ could not reach Cloudflare Workers AI. Check the connection and retry." });
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 429) return json(429, { error: "MIΛ is temporarily at its AI usage or capacity limit. Please try again later." });
-    if ([401, 403].includes(response.status)) return json(503, { error: "MIΛ's Cloudflare AI credentials or permissions are not valid. Check the Workers AI API token." });
-    const detail = Array.isArray(payload?.errors) ? payload.errors.map((item: any) => item?.message || "").filter(Boolean).join("; ") : "";
-    return json(response.status >= 500 ? 503 : 502, { error: (detail || "MIΛ's AI provider returned HTTP " + response.status + ".").slice(0, 450) });
-  }
-  const generated = payload?.choices?.[0]?.message?.content;
-  const generatedText = typeof generated === "string" ? generated.trim() : Array.isArray(generated) ? generated.map((item: any) => typeof item?.text === "string" ? item.text : "").join("").trim() : "";
-  if (!generatedText) return json(502, { error: "MIΛ received an empty response from its AI provider. Please retry." });
-  let result: any;
-  try { result = parseJson(generatedText); } catch { return json(502, { error: "MIΛ returned an unreadable response. Please retry." }); }
-  const reply = typeof result.reply === "string" ? result.reply.slice(0, 1200) : "";
-  if (!reply) return json(502, { error: "MIΛ could not form a useful reply." });
 
-  const nextMemory = {
-    strengths: cleanList(result.memory?.strengths),
-    difficulties: cleanList(result.memory?.difficulties),
-    goals: cleanList(result.memory?.goals),
-    recent_topics: cleanList(result.memory?.recent_topics, 10),
-    explanation_preference: typeof result.memory?.explanation_preference === "string" ? result.memory.explanation_preference.slice(0, 160) : "",
-    updated_at: new Date().toISOString(),
-  };
-  await admin.from("mia_learning_memory").upsert({ learner_id: learnerId, ...nextMemory }, { onConflict: "learner_id" });
+  const modelChain = [MODEL, BACKUP_MODEL];
+  const modelFailures: string[] = [];
+  let result: { reply: string; memory?: any; timetableDraft?: any[] } | null = null;
+  let usedModel = MODEL;
+
+  for (const modelName of modelChain) {
+    try {
+      const response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelName,
+          messages,
+          max_completion_tokens: action === "chat" ? 1800 : 2400,
+          temperature: 0.25,
+          stream: false,
+          store: false,
+          ...(modelName === MODEL ? { chat_template_kwargs: { enable_thinking: false, clear_thinking: true } } : { reasoning_effort: "low" }),
+        }),
+        signal: AbortSignal.timeout(55000),
+      });
+      const responseText = await response.text();
+      let payload: any = {};
+      try { payload = JSON.parse(responseText); } catch { /* Convert malformed upstream output into a retryable model failure. */ }
+      if (!response.ok) {
+        const detail = Array.isArray(payload?.errors)
+          ? payload.errors.map((item: any) => String(item?.message ?? "")).filter(Boolean).join("; ").slice(0, 180)
+          : String(payload?.error?.message ?? "").slice(0, 180);
+        throw new WorkersAIError(modelName + " returned HTTP " + response.status + (detail ? ": " + detail : "."), response.status);
+      }
+      const generatedText = extractCompletionText(payload);
+      if (!generatedText) throw new WorkersAIError(modelName + " returned an empty response.", 502);
+      const parsed = parseModelResponse(generatedText);
+      if (!parsed.reply.trim()) throw new WorkersAIError(modelName + " returned no readable answer.", 502);
+      result = parsed;
+      usedModel = modelName;
+      break;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown provider failure.";
+      modelFailures.push(detail);
+      // A bad/missing Cloudflare credential affects both models; don't waste a second call.
+      if (error instanceof WorkersAIError && [401, 403].includes(error.status)) break;
+    }
+  }
+
+  if (!result?.reply.trim()) {
+    await admin.from("ai_generation_usage").delete().eq("id", usage.data.id).eq("actor_id", learnerId);
+    console.error("[MIΛ] Both configured Workers AI models failed:", modelFailures.join(" | ").slice(0, 700));
+    const lastFailure = modelFailures[modelFailures.length - 1] ?? "No provider response was received.";
+    const status = modelFailures.some(item => /HTTP 401|HTTP 403/.test(item)) ? 503
+      : modelFailures.every(item => /HTTP 429/.test(item)) ? 429 : 502;
+    return json(status, { error: "MIΛ could not complete this answer using its available AI models. " + lastFailure + " Your failed attempt was not charged against the daily allowance. Please retry shortly." });
+  }
+  const providerNotice = usedModel !== MODEL
+    ? "Gemma 4 was unavailable for this request. MIΛ completed the answer with its secondary Qwen 3.8 model."
+    : null;
+  let memoryUpdated = false;
+  if (result.memory && typeof result.memory === "object") {
+    const nextMemory = {
+      strengths: cleanList(result.memory.strengths),
+      difficulties: cleanList(result.memory.difficulties),
+      goals: cleanList(result.memory.goals),
+      recent_topics: cleanList(result.memory.recent_topics, 10),
+      explanation_preference: typeof result.memory.explanation_preference === "string" ? result.memory.explanation_preference.slice(0, 160) : "",
+      updated_at: new Date().toISOString(),
+    };
+    const { error: memoryError } = await admin.from("mia_learning_memory").upsert({ learner_id: learnerId, ...nextMemory }, { onConflict: "learner_id" });
+    memoryUpdated = !memoryError;
+  }
 
   if (action === "chat") {
     await admin.from("mia_messages").insert([
@@ -279,5 +349,5 @@ Deno.serve(async request => {
       && x.ends_at > x.starts_at && typeof x.title === "string")
       .map((x: any) => ({ day_of_week: x.day_of_week, subject_name: String(x.subject_name ?? "").slice(0,100), title: x.title.slice(0,120), starts_at: x.starts_at, ends_at: x.ends_at, location: String(x.location ?? "").slice(0,120), notes: String(x.notes ?? "").slice(0,300) }))
     : [];
-  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated: true, remainingDailyRequests: Math.max(0, 19 - (count ?? 0)), provider: "Cloudflare Workers AI", model });
+  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated, remainingDailyRequests: Math.max(0, 19 - (count ?? 0)), provider: "Cloudflare Workers AI", model: usedModel, providerNotice });
 });

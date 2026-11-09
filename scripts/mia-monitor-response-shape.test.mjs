@@ -7,6 +7,9 @@ const provider = readFileSync("supabase/functions/mia-monitor-assistant/provider
 
 test("Monitor MIA delegates provider response normalization to its shared adapter", () => {
   assert.ok(source.includes("generateWithFallback(prompt"), "Monitor MIA must use the shared provider adapter.");
+  assert.ok(source.includes("systemPrompt: system"), "MIA policy must be passed separately from chat history.");
+  assert.ok(provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }'), "Gemini must receive a trusted system instruction.");
+  assert.ok(provider.includes('role: "system", content: options.systemPrompt'), "Gemma must receive a trusted system message.");
   assert.ok(provider.includes("const raw = choice?.message?.content"), "Gemma message content must be read.");
   assert.ok(provider.includes('typeof raw === "string"'), "MIA must support plain string content.");
   assert.ok(provider.includes("Array.isArray(raw)"), "MIA must support structured message content arrays.");

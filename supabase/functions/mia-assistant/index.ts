@@ -26,9 +26,31 @@ function cleanList(value: unknown, max = 8): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((x): x is string => typeof x === "string").map(x => x.trim().slice(0, 120)).filter(Boolean).slice(0, max);
 }
-function parseJson(text: string): any {
-  const clean = text.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
-  return JSON.parse(clean);
+function parseModelResponse(text: string): { reply: string; memory?: any; timetableDraft?: any[] } {
+  const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
+  const parseCandidate = (value: string) => {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch { /* Some model responses include a short lead-in around JSON. */ }
+    return null;
+  };
+  let parsed = parseCandidate(clean);
+  if (!parsed) {
+    const first = clean.indexOf("{");
+    const last = clean.lastIndexOf("}");
+    if (first >= 0 && last > first) parsed = parseCandidate(clean.slice(first, last + 1));
+  }
+  if (parsed) {
+    const candidate = [parsed.reply, parsed.answer, parsed.response, parsed.content, parsed.explanation]
+      .find(value => typeof value === "string" && value.trim());
+    const hasTimetable = Array.isArray(parsed.timetableDraft);
+    const reply = typeof candidate === "string" ? candidate.trim()
+      : hasTimetable ? "I’ve read the timetable image. Please review the detected entries below before saving." : "";
+    if (reply) return { reply: reply.slice(0, 4000), memory: parsed.memory && typeof parsed.memory === "object" ? parsed.memory : undefined, timetableDraft: hasTimetable ? parsed.timetableDraft : undefined };
+  }
+  return { reply: clean.slice(0, 4000) };
 }
 
 Deno.serve(async request => {
@@ -218,6 +240,7 @@ Deno.serve(async request => {
     generated = await generateWithFallback(messages, { maxTokens: action === "chat" ? 1800 : 2400, jsonMode: true });
     result = parseModelResponse(generated.text);
     if (!result.reply?.trim()) throw new Error("The AI providers returned no readable educational answer.");
+    result.reply = String(result.reply).slice(0, 1200);
   } catch (error) {
     await admin.from("ai_generation_usage").delete().eq("id", usage.data.id).eq("actor_id", learnerId);
     const detail = error instanceof Error ? error.message : "Unknown AI provider failure.";
@@ -228,15 +251,19 @@ Deno.serve(async request => {
     return json(status, { error: "MIΛ could not complete this answer using its available AI providers. " + detail.slice(0, 400) + " Your failed attempt was not charged against the daily allowance. Please retry shortly." });
   }
 
-  const nextMemory = {
-    strengths: cleanList(result.memory?.strengths),
-    difficulties: cleanList(result.memory?.difficulties),
-    goals: cleanList(result.memory?.goals),
-    recent_topics: cleanList(result.memory?.recent_topics, 10),
-    explanation_preference: typeof result.memory?.explanation_preference === "string" ? result.memory.explanation_preference.slice(0, 160) : "",
-    updated_at: new Date().toISOString(),
-  };
-  await admin.from("mia_learning_memory").upsert({ learner_id: learnerId, ...nextMemory }, { onConflict: "learner_id" });
+  let memoryUpdated = false;
+  if (result.memory && typeof result.memory === "object") {
+    const nextMemory = {
+      strengths: cleanList(result.memory.strengths),
+      difficulties: cleanList(result.memory.difficulties),
+      goals: cleanList(result.memory.goals),
+      recent_topics: cleanList(result.memory.recent_topics, 10),
+      explanation_preference: typeof result.memory.explanation_preference === "string" ? result.memory.explanation_preference.slice(0, 160) : "",
+      updated_at: new Date().toISOString(),
+    };
+    const { error: memoryError } = await admin.from("mia_learning_memory").upsert({ learner_id: learnerId, ...nextMemory }, { onConflict: "learner_id" });
+    memoryUpdated = !memoryError;
+  }
 
   if (action === "chat") {
     await admin.from("mia_messages").insert([

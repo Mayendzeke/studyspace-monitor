@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2, ClipboardCheck, FileText, X, Library } from 'lucide-react'
+import { Activity, Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2, ClipboardCheck, FileText, X, Library } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 type AcademicProfile = { id: string; education_level: string | null; grade: string | null; curriculum: string | null; course: string | null }
 type SubjectRow = { learner_id: string; name: string }
 type MiaActivity = 'lesson' | 'assessment' | 'schedule' | 'worksheet' | 'teaching' | 'support' | 'research'
+type ProviderHealthSnapshot = { provider?: string; model?: string; fallbackUsed?: boolean; providerNotice?: string | null; providers?: { gemini?: { configured: boolean; model: string }; gemma?: { configured: boolean; model: string }; primary?: string; backup?: string; secondaryModel?: string }; verified?: boolean };
 type LessonHandoff = { title: string; subject: string; level: string; grade: string; course: string; curriculum: string; duration: number; content: string }
 type HomeworkHandoff = { level: string; grade: string; course: string; subject: string; curriculum: string; topic: string; instructions: string; dueDate?: string; questionCount?: number; pointsPerQuestion?: number }
 const lessonHandoffKey = 'studyspace-monitor-mia-lesson-handoff-v1'
@@ -95,6 +96,9 @@ export default function MiaStudio() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [remaining, setRemaining] = useState<number | null>(null)
+  const [providerHealth, setProviderHealth] = useState<ProviderHealthSnapshot | null>(null)
+  const [providerHealthError, setProviderHealthError] = useState('')
+  const [checkingProviders, setCheckingProviders] = useState(false)
   const [profiles, setProfiles] = useState<AcademicProfile[]>([])
   const [subjectRows, setSubjectRows] = useState<SubjectRow[]>([])
   const [profileNotice, setProfileNotice] = useState('')
@@ -151,6 +155,23 @@ export default function MiaStudio() {
       catch { /* The conversation remains available for this session. */ }
     }
   }
+
+  const checkProviderHealth = async () => {
+    if (!supabase || !userId || checkingProviders) return;
+    setCheckingProviders(true);
+    setProviderHealthError('');
+    try {
+      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', { body: { action: 'healthcheck' } }), 80000, 'The provider health check timed out. Try again.');
+      if (invokeError) throw new Error(await edgeError(invokeError));
+      if (!data?.success || !data?.verified) throw new Error(typeof data?.error === 'string' ? data.error : 'The AI providers did not return a verified test response.');
+      setProviderHealth(data as ProviderHealthSnapshot);
+    } catch (reason) {
+      setProviderHealth(null);
+      setProviderHealthError(await edgeError(reason));
+    } finally {
+      setCheckingProviders(false);
+    }
+  };
 
   const sendMessage = async (value: string, includeHistory = true, lessonContext?: Omit<LessonHandoff, 'content'>, homeworkContext?: HomeworkHandoff) => {
     const clean = value.trim()
@@ -315,6 +336,15 @@ export default function MiaStudio() {
         <span>Available to authorised adult administrators in Monitor only. Use anonymised, non-confidential teaching material. Never submit learner names, Student IDs, contact details or sensitive records.</span>
       </div>
 
+      {providerHealth && <div className="mia-provider-health-panel" role="status">
+        <div className="mia-provider-health-top"><strong><Activity size={16}/> Live AI provider test passed</strong><span>{providerHealth.provider} · {providerHealth.model}</span></div>
+        <div className="mia-provider-health-grid">
+          <span><strong>Gemini primary</strong><small>{providerHealth.providers?.gemini?.configured ? 'Configured and eligible for requests' : 'Not enabled — check API key and paid-service confirmation'}</small></span>
+          <span><strong>Gemma 4 backup</strong><small>{providerHealth.providers?.gemma?.configured ? 'Cloudflare credentials configured' : 'Cloudflare credentials missing'}</small></span>
+        </div>
+        {providerHealth.providerNotice && <p>{providerHealth.providerNotice}</p>}
+      </div>}
+      {providerHealthError && <p className="mia-error" role="alert">{providerHealthError}</p>}
       <div className="mia-capabilities">
         <article><BookOpen size={18}/><strong>Lesson preparation</strong><span>Objectives, timed teaching steps, learner activities, differentiation and checks for understanding.</span></article>
         <article><Brain size={18}/><strong>Assessments</strong><span>Quizzes, class tests, exam practice, answer keys and marking guidance.</span></article>
@@ -327,6 +357,7 @@ export default function MiaStudio() {
           <div><strong><Bot size={18}/> MIΛ conversation</strong><small>Choose a guided task below, or type a custom request when you need to.</small></div>
           <div className="mia-chat-tools">
             {remaining !== null && <span className="mia-remaining">{remaining} requests left today</span>}
+            <button type="button" className="secondary-button" onClick={() => void checkProviderHealth()} disabled={checkingProviders || !userId}><Activity size={14}/>{checkingProviders ? 'Checking AI…' : 'Test AI providers'}</button>
             <button type="button" className="secondary-button" onClick={clearConversation}><Trash2 size={14}/> Clear chat</button>
           </div>
         </div>

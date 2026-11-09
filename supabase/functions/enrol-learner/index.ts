@@ -53,6 +53,7 @@ Deno.serve(async request => {
     fullName?: string;
     preferredName?: string;
     dateOfBirth?: string;
+    sex?: string;
     termsAccepted?: boolean;
     termsVersion?: string;
     acceptedByName?: string;
@@ -68,7 +69,9 @@ Deno.serve(async request => {
   const fullName = String(body.fullName ?? "").trim().replace(/\s+/g, " ");
   const preferredName = String(body.preferredName ?? "").trim().replace(/\s+/g, " ");
   const dateOfBirth = String(body.dateOfBirth ?? "");
+  const sex = String(body.sex ?? "");
   if (fullName.length < 2 || fullName.length > 120) return json(400, { error: "Enter the learner’s full name." });
+  if (sex !== "male" && sex !== "female") return json(400, { error: "Select Male or Female to complete registration." });
   if (preferredName.length > 80) return json(400, { error: "The preferred name is too long." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return json(400, { error: "Enter a valid date of birth." });
   const birthDate = new Date(dateOfBirth + "T00:00:00.000Z");
@@ -126,7 +129,7 @@ Deno.serve(async request => {
   const email = studentId.toLowerCase() + "@students.studyspace.invalid";
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
-    user_metadata: { student_id: studentId, full_name: fullName, preferred_name: preferredName || fullName, date_of_birth: dateOfBirth },
+    user_metadata: { student_id: studentId, full_name: fullName, preferred_name: preferredName || fullName, date_of_birth: dateOfBirth, sex },
   });
   if (createError || !created.user) {
     await admin.from("student_auth_attempts").insert({ identifier_hash: identifierHash, source_hash: sourceHash, action: "enrol", was_successful: false });
@@ -149,6 +152,7 @@ Deno.serve(async request => {
     p_full_name: fullName,
     p_preferred_name: preferredName || fullName,
     p_date_of_birth: dateOfBirth,
+    p_sex: sex,
     p_accepted_by_name: isAdult ? acceptedByName : null,
     p_acceptance_role: isAdult ? "adult_learner" : null,
   });

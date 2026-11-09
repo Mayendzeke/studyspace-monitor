@@ -28,8 +28,8 @@ function cleanList(value: unknown, max = 8): string[] {
   return value.filter((x): x is string => typeof x === "string").map(x => x.trim().slice(0, 120)).filter(Boolean).slice(0, max);
 }
 function parseModelResponse(text: string): { reply: string; memory?: any; timetableDraft?: any[] } {
-  const clean = text.replace(/<think>[\\s\\S]*?<\\/think>/gi, "").trim()
-    .replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "").trim();
+  const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
   const parseCandidate = (value: string) => {
     try {
       const parsed = JSON.parse(value);

@@ -32,7 +32,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant. MIA is for educational purposes only: lesson planning, subject explanations, assessments, worksheets, revision schedules and learner-support methods. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },

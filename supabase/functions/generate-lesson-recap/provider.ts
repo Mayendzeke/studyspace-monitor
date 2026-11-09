@@ -60,11 +60,11 @@ export function assertNoPersonalIdentifiers(value: string): void {
   ];
   for (const [pattern, label] of checks) {
     if (pattern.test(value)) {
-      throw new Error("Remove " + label + " before using administrator MIA. Submit anonymised lesson material only; never send identifiable learner or guardian information to an AI provider.");
+      throw new Error("Remove " + label + " before using administrator MIΛ. Submit anonymised lesson material only; never send identifiable learner or guardian information to an AI provider.");
     }
   }
   if (/\b(?:password|passcode|one[- ]time pin|otp)\s*[:=]/i.test(value)) {
-    throw new Error("Remove credentials and security codes before using administrator MIA.");
+    throw new Error("Remove credentials and security codes before using administrator MIΛ.");
   }
 }
 

@@ -16,7 +16,7 @@ export type ProviderStatus = {
   gemma: { configured: boolean; model: string };
 };
 
-type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string };
+type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[] };
 
 class ProviderSafetyError extends Error {
   constructor(message: string) {
@@ -68,13 +68,15 @@ export function assertNoPersonalIdentifiers(value: string): void {
   }
 }
 
-function validateStructuredOutput(text: string, enabled: boolean, provider: string): string {
+function validateStructuredOutput(text: string, enabled: boolean, provider: string, requiredKeys: string[] = []): string {
   const clean = text.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
   if (!clean) throw new Error(provider + " returned an empty response.");
   if (enabled) {
     try {
       const parsed = JSON.parse(clean);
-      if (!parsed || typeof parsed !== "object") throw new Error("Expected a JSON object.");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object.");
+      const missing = requiredKeys.filter(key => !Object.prototype.hasOwnProperty.call(parsed, key));
+      if (missing.length) throw new Error("Missing required fields: " + missing.join(", "));
       return clean;
     } catch {
       throw new Error(provider + " returned malformed structured output. The automatic backup will be tried.");
@@ -130,7 +132,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     const providerMessage = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new Error("Gemini API returned HTTP " + response.status + (providerMessage ? ": " + providerMessage : "."));
   }
-  return validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini");
+  return validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys);
 }
 
 async function callGemma(prompt: string, options: Required<GenerationOptions>): Promise<string> {
@@ -175,7 +177,7 @@ async function callGemma(prompt: string, options: Required<GenerationOptions>): 
   const text = typeof raw === "string" ? raw.trim()
     : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
     : typeof choice?.text === "string" ? choice.text.trim() : "";
-  return validateStructuredOutput(text, options.jsonMode, "Gemma backup");
+  return validateStructuredOutput(text, options.jsonMode, "Gemma backup", options.requiredJsonKeys);
 }
 
 export async function generateWithFallback(prompt: string, options: GenerationOptions = {}): Promise<ProviderResult> {
@@ -183,6 +185,7 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
     maxTokens: Math.max(16, Math.min(8000, Math.floor(options.maxTokens ?? 2800))),
     jsonMode: options.jsonMode === true,
     systemPrompt: String(options.systemPrompt ?? "").trim().slice(0, 12000),
+    requiredJsonKeys: Array.isArray(options.requiredJsonKeys) ? options.requiredJsonKeys.filter(key => typeof key === "string").slice(0, 20) : [],
   };
   const status = getProviderStatus();
   let primaryFailure = "";

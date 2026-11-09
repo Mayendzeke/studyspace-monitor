@@ -217,7 +217,8 @@ export default function TestimonialsInbox() {
 
       // The learner-selected palette is the whole canvas; no white card or unrelated overlays.
       const lightTextPalettes = new Set(['ocean','violet','emerald','rose','midnight']);
-      ctx.fillStyle = lightTextPalettes.has(item.testimonial_background || 'ocean') ? '#f8fbff' : '#1c2a3c';
+      const textColor = lightTextPalettes.has(item.testimonial_background || 'ocean') ? '#f8fbff' : '#1c2a3c';
+      ctx.fillStyle = textColor;
       ctx.font = '44px Georgia, serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
@@ -234,7 +235,7 @@ export default function TestimonialsInbox() {
       let attributionY = canvas.height - attributionHeight - 105;
       ctx.textAlign = 'center';
       if (preferredName) {
-        ctx.fillStyle = '#f8fbff';
+        ctx.fillStyle = textColor;
         ctx.font = '700 32px Arial, sans-serif';
         ctx.fillText(preferredName, canvas.width / 2, attributionY, 900);
         attributionY += 52;

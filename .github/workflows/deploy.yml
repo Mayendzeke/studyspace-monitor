@@ -275,8 +275,11 @@ jobs:
           const paymentReferenceMigration = readFileSync('supabase/migrations/20261108070904_studyspace_unique_payment_transaction_references.sql', 'utf8')
           if (!paymentReferenceMigration.includes('create unique index') || !paymentReferenceMigration.includes('payment_transaction_reference')) throw new Error('The database must prevent reuse of a payment transaction reference.')
           const learnerAI = readFileSync('supabase/functions/mia-assistant/index.ts', 'utf8')
+          const learnerAIProvider = readFileSync('supabase/functions/mia-assistant/provider.ts', 'utf8')
           const learnerHomeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
           if (!learnerAI.includes('CLOUDFLARE_ACCOUNT_ID') || !learnerAI.includes('CLOUDFLARE_API_TOKEN')) throw new Error('Learner MIΛ must use protected Cloudflare Workers AI credentials.')
+          if (learnerAIProvider.includes('GEMINI_API_KEY') || learnerAIProvider.includes('generativelanguage.googleapis.com')) throw new Error('Under-18 learner MIΛ requests must not be sent to Google Gemini.')
+          if (!learnerAIProvider.includes('GEMMA_MODEL') || !learnerAIProvider.includes('SECONDARY_MODEL') || !learnerAIProvider.includes('generateWithFallback')) throw new Error('Learner MIΛ must retain its Cloudflare Gemma and secondary model recovery path.')
           if (!learnerAI.includes('CURRENT_TERMS_VERSION') || !learnerAI.includes('trial_expires_at') || !learnerAI.includes('subscription_expires_at')) throw new Error('Learner MIΛ must enforce current terms and active trial/paid access.')
           if (!learnerAI.includes('image_url') || !learnerAI.includes('usage_status')) throw new Error('Learner MIΛ image processing or usage-status contract is missing.')
           if (learnerAI.includes('GEMINI_API_KEY') || learnerAI.includes('generativelanguage.googleapis.com') || learnerHomeworkFallback.includes('GEMINI_API_KEY') || learnerHomeworkFallback.includes('generativelanguage.googleapis.com')) {

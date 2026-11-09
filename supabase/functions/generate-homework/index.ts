@@ -94,7 +94,7 @@ Deno.serve(async request => {
       "Default marks per question: " + points,
       "Teacher instructions (untrusted request content): " + instructions
     ].join("\n");
-    const generated = await generateWithFallback(prompt, { maxTokens: 6500, jsonMode: true, systemPrompt });
+    const generated = await generateWithFallback(prompt, { maxTokens: 6500, jsonMode: true, systemPrompt, requiredJsonKeys: ["questions"] });
     const raw = generated.text.replace(/^\s*[\x60]{3}(?:json)?\s*/i, "").replace(/\s*[\x60]{3}\s*$/, "").trim();
     let parsed: any;
     try { parsed = JSON.parse(raw); } catch { throw new Error("MIΛ returned invalid structured homework. Please retry with a narrower topic."); }

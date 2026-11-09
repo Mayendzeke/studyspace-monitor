@@ -1725,3 +1725,14 @@ html,body,#root{max-width:100%;overflow-x:hidden}
   .monitor-compose-type-switch button { font-size: 9px; gap: 5px; }
   .monitor-contact-heading { padding-inline: 12px; }
 }
+
+/* MIΛ operational assurance: explicit, non-secret AI-provider health reporting. */
+.mia-provider-health-panel{display:grid;gap:12px;padding:15px 17px;border:1px solid color-mix(in srgb,var(--mint) 48%,var(--border));border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--mint) 12%,var(--panel-strong)),var(--panel));}
+.mia-provider-health-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mia-provider-health-top strong{display:flex;align-items:center;gap:8px;color:var(--text);font-size:12px}
+.mia-provider-health-top>span{color:var(--mint);font-size:11px;font-weight:800}
+.mia-provider-health-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mia-provider-health-grid>span{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.mia-provider-health-grid strong{font-size:11px;color:var(--text)}
+.mia-provider-health-grid small,.mia-provider-health-panel>p{font-size:10px;line-height:1.5;color:var(--muted);margin:0}
+@media(max-width:640px){.mia-provider-health-grid{grid-template-columns:1fr}.mia-provider-health-top{align-items:flex-start;flex-direction:column}}

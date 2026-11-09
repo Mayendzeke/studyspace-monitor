@@ -163,7 +163,7 @@ export default function TestimonialsInbox() {
   function canExportMarketingImage(item: Testimonial): boolean {
     const learner = profiles[item.learner_id];
     const consent = guardianMarketingConsents[item.learner_id];
-    if (!learner?.preferred_name?.trim() || !learner.institution?.trim() || !item.testimonial_marketing_consent || !consent || consent.is_minor === null) return false;
+    if (!learner?.preferred_name?.trim() || !learner.institution?.trim() || !item.testimonial_marketing_consent || !item.testimonial_background || !consent || consent.is_minor === null) return false;
     if (consent.is_minor === false) return true;
     return consent.approval_status === 'approved' && consent.testimonial_marketing_consent === true;
   }

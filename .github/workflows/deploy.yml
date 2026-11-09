@@ -312,7 +312,7 @@ jobs:
           const homeworkFallback = readFileSync('supabase/functions/process-homework-fallbacks/index.ts', 'utf8')
           const homeworkMigration = readFileSync('supabase/migrations/20261108134824_studyspace_connected_school_homework_help_and_cron.sql', 'utf8')
           const homeworkHardening = readFileSync('supabase/migrations/20261108135554_studyspace_harden_homework_uploads_and_timer.sql', 'utf8')
-          const termsMigration = readFileSync('supabase/migrations/20261109043000_studyspace_terms_v8_gemini_admin_provider_disclosure.sql', 'utf8')
+          const termsMigration = readFileSync('supabase/migrations/20261109014303_studyspace_terms_v8_gemini_admin_provider_disclosure.sql', 'utf8')
           if (!homeworkBuilder.includes('save_studyspace_exercise_draft') || !homeworkBuilder.includes('exercise_assignments') || !homeworkBuilder.includes('reviewed')) throw new Error('MIA Homework must save reviewed assignments to the connected assessment schema.')
           const homeworkProvider = readFileSync('supabase/functions/generate-homework/provider.ts', 'utf8')
           if (!homeworkFunction.includes('aal2') || !homeworkFunction.includes('./provider.ts') || !homeworkFunction.includes('markingGuide') || !homeworkProvider.includes('GEMMA_MODEL')) throw new Error('MIA Homework generation must use protected administrator access and the shared provider adapter.')

@@ -84,7 +84,7 @@ Deno.serve(async request => {
       "Do not add markdown fences, extra commentary or additional top-level keys.",
     ].join("\n");
     const generated = await generateWithFallback(prompt, { maxTokens: 6500, jsonMode: true });
-    const raw = generated.text.replace(/^\\s*\\`\\`\\`(?:json)?\\s*/i, "").replace(/\\s*\\`\\`\\`\\s*$/, "").trim();
+    const raw = generated.text.replace(/^\s*[\x60]{3}(?:json)?\s*/i, "").replace(/\s*[\x60]{3}\s*$/, "").trim();
     let parsed: any;
     try { parsed = JSON.parse(raw); } catch { throw new Error("MIA returned invalid structured homework. Please retry with a narrower topic."); }
     if (!Array.isArray(parsed?.questions)) throw new Error("MIA's homework response did not contain a question list.");

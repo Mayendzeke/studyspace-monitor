@@ -19,6 +19,7 @@ const required = [
   "20261108190000_studyspace_guardian_verifications_verified_by_index.sql",
   "20261109012204_studyspace_age9_mia_education_terms_v7.sql",
   "20261109014303_studyspace_terms_v8_gemini_admin_provider_disclosure.sql",
+  "20261109060047_studyspace_announcement_creator_index.sql",
 ];
 
 const superseded = [

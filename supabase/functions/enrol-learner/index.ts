@@ -38,7 +38,7 @@ async function pinDigest(value: string, pepper: string) {
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
-  const PUBLIC_ENROLMENT_ENABLED = false;
+  const PUBLIC_ENROLMENT_ENABLED = true;
   if (!PUBLIC_ENROLMENT_ENABLED) return json(503, { error: "New learner enrolment is temporarily closed while StudySpace completes the required data-controller registration and legal launch requirements." });
   const origin = request.headers.get("Origin");
   if (!allowedOrigin || !origin || origin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
@@ -85,12 +85,13 @@ Deno.serve(async request => {
   let learnerAge = today.getUTCFullYear() - birthDate.getUTCFullYear();
   const monthDelta = today.getUTCMonth() - birthDate.getUTCMonth();
   if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < birthDate.getUTCDate())) learnerAge--;
+  if (learnerAge < 9) return json(400, { error: "StudySpace registration is not available for children under 9 years old." });
   const isAdult = learnerAge >= 18;
 
   const acceptedByName = String(body.acceptedByName ?? "").trim();
   const acceptanceRole = String(body.acceptanceRole ?? "");
   if (isAdult) {
-    if (body.termsAccepted !== true || body.termsVersion !== "2026-11-08-v6") {
+    if (body.termsAccepted !== true || body.termsVersion !== "2026-11-09-v7") {
       return json(400, { error: "Read and personally accept the current StudySpace Terms and Conditions before creating your account." });
     }
     if (acceptedByName !== fullName || acceptanceRole !== "adult_learner") {

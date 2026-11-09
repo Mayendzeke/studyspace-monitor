@@ -32,7 +32,7 @@ type GuidedDraft = {
 const welcome: ChatMessage = {
   id: 'mia-welcome',
   role: 'assistant',
-  content: "Hello. I’m MIA, your StudySpace teaching assistant, powered by Cloudflare Workers AI · Gemma 4. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Review generated teaching material before sharing it.",
+  content: "Hello. I’m MIA, your StudySpace teaching assistant. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. I can help prepare lessons, assessments, worksheets, revision schedules and learner-support ideas. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
 }
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
@@ -165,7 +165,7 @@ export default function MiaStudio() {
     try {
       const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
         body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
-      }), 70000, 'MIA did not respond within 70 seconds. Your message has been restored so you can retry.');
+      }), 90000, 'MIA did not respond within 90 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'MIA did not return a usable response.')
@@ -308,6 +308,11 @@ export default function MiaStudio() {
           <p>Your teaching assistant for lesson planning, assessments, worksheets, study schedules and learner support. Choose an activity and complete a few selections; type only the topic or details that are not already in StudySpace.</p>
         </div>
         <div className="mia-availability"><i/> Administrator assistant</div>
+      </div>
+
+      <div className="mia-provider-banner" role="note">
+        <strong>Gemini primary · Gemma 4 automatic backup</strong>
+        <span>Available to authorised adult administrators in Monitor only. Use anonymised, non-confidential teaching material. Never submit learner names, Student IDs, contact details or sensitive records.</span>
       </div>
 
       <div className="mia-capabilities">

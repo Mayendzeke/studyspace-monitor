@@ -68,6 +68,20 @@ export function assertNoPersonalIdentifiers(value: string): void {
   }
 }
 
+function validateStructuredOutput(text: string, enabled: boolean, provider: string): string {
+  const clean = text.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
+  if (!clean) throw new Error(provider + " returned an empty response.");
+  if (enabled) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (!parsed || typeof parsed !== "object") throw new Error("Expected a JSON object.");
+      return clean;
+    } catch {
+      throw new Error(provider + " returned malformed structured output. The automatic backup will be tried.");
+    }
+  }
+  return clean;
+}
 function parseGeminiText(payload: any): string {
   const candidate = Array.isArray(payload?.candidates) ? payload.candidates[0] : undefined;
   const finishReason = String(candidate?.finishReason ?? "").toUpperCase();
@@ -116,7 +130,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     const providerMessage = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new Error("Gemini API returned HTTP " + response.status + (providerMessage ? ": " + providerMessage : "."));
   }
-  return parseGeminiText(payload);
+  return validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini");
 }
 
 async function callGemma(prompt: string, options: Required<GenerationOptions>): Promise<string> {
@@ -161,8 +175,7 @@ async function callGemma(prompt: string, options: Required<GenerationOptions>): 
   const text = typeof raw === "string" ? raw.trim()
     : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
     : typeof choice?.text === "string" ? choice.text.trim() : "";
-  if (!text) throw new Error("Gemma backup returned no readable text.");
-  return text;
+  return validateStructuredOutput(text, options.jsonMode, "Gemma backup");
 }
 
 export async function generateWithFallback(prompt: string, options: GenerationOptions = {}): Promise<ProviderResult> {

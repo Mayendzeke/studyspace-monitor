@@ -80,12 +80,20 @@ Deno.serve(async request => {
       : { data: [], error: null };
     if (guardianRowsError) return json(503, { error: "Guardian consent submissions could not be loaded." });
     const guardianByLearner = new Map((guardianRows ?? []).map(row => [row.learner_id, row]));
-    const today = new Date();
+    const localParts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const part = (key: string) => localParts.find(item => item.type === key)?.value || "";
+    const localToday = new Date(part("year") + "-" + part("month") + "-" + part("day") + "T00:00:00Z");
     const learners = (data ?? []).map(row => {
-      const dob = new Date(String(row.date_of_birth) + "T00:00:00Z");
-      let age = today.getUTCFullYear() - dob.getUTCFullYear();
-      const monthDelta = today.getUTCMonth() - dob.getUTCMonth();
-      if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < dob.getUTCDate())) age--;
+      const dateOfBirth = String(row.date_of_birth ?? "");
+      const dob = /^\\d{4}-\\d{2}-\\d{2}$/.test(dateOfBirth) ? new Date(dateOfBirth + "T00:00:00Z") : null;
+      let age = -1;
+      if (dob && !Number.isNaN(dob.getTime()) && dob.toISOString().slice(0, 10) === dateOfBirth) {
+        age = localToday.getUTCFullYear() - dob.getUTCFullYear();
+        const monthDelta = localToday.getUTCMonth() - dob.getUTCMonth();
+        if (monthDelta < 0 || (monthDelta === 0 && localToday.getUTCDate() < dob.getUTCDate())) age--;
+      }
       return { ...row, age, guardianSubmission: guardianByLearner.get(row.id) ?? null };
     });
     return json(200, { success: true, learners });

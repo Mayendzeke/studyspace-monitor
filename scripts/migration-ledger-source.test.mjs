@@ -31,6 +31,9 @@ const superseded = [
   "20261108160000_studyspace_harden_homework_uploads_and_timer.sql",
   "20261108161000_studyspace_fix_homework_photo_extension_pattern.sql",
   "20261108162000_studyspace_terms_v6_homework_ai_disclosure.sql",
+  "20261109031500_studyspace_age9_mia_education_terms_v7.sql",
+  "20261109043000_studyspace_terms_v8_gemini_admin_provider_disclosure.sql",
+  "20261109060200_studyspace_announcement_creator_index.sql",
 ];
 
 test("migration files use applied Supabase versions and retain every applied migration", () => {

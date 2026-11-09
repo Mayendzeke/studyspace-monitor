@@ -238,7 +238,7 @@ Deno.serve(async request => {
   let result: any;
   let reply = "";
   try {
-    generated = await generateWithFallback(messages, { maxTokens: action === "chat" ? 1800 : 2400, jsonMode: true });
+    generated = await generateWithFallback(messages, { maxTokens: action === "chat" ? 1800 : 2400, jsonMode: true, requiredJsonKeys: ["reply"] });
     result = parseModelResponse(generated.text);
     if (!result.reply?.trim()) throw new Error("The AI providers returned no readable educational answer.");
     result.reply = String(result.reply).slice(0, 1200);

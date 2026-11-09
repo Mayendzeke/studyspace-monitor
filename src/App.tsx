@@ -26,13 +26,13 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIA' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
-  { label: 'MIA', icon: Sparkles },
+  { label: 'MIΛ', icon: Sparkles },
   { label: 'Learners', icon: Users },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Messages', icon: MessageCircle },
@@ -275,7 +275,7 @@ function App() {
           {page === 'Messages' && <MessagesPage onOpenHomework={() => setPage('Classroom Studio')} />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}
           {page === 'Subscriptions' && <SubscriptionsPage />}
-          {page === 'MIA' && <MiaStudio />}
+          {page === 'MIΛ' && <MiaStudio />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
@@ -591,14 +591,14 @@ function AcademicProgressPage() {
               {assessmentRecords.length?assessmentRecords.map(x=><article key={x.id}><div><strong>{x.title}</strong><span>{x.subject_name} · {x.submitted_at?new Date(x.submitted_at).toLocaleDateString():'Date not recorded'}</span>{x.teacher_feedback&&<small>Teacher feedback: {x.teacher_feedback}</small>}</div><b>{x.total_points?Math.round(x.score/x.total_points*100)+'%':'Awaiting score'}</b></article>):<p>No past test records yet.</p>}
             </div>
             <div className="monitor-record-mia">
-              <strong><Sparkles size={15}/> MIA learning observations</strong>
+              <strong><Sparkles size={15}/> MIΛ learning observations</strong>
               <div className="monitor-record-mia-grid">
                 <article><b>Strengths</b>{arrayText(learningMemory?.strengths).length?<ul>{arrayText(learningMemory?.strengths).map((x,i)=><li key={i}>{x}</li>)}</ul>:<p>No strengths have been recorded yet.</p>}</article>
                 <article><b>Areas to focus on</b>{arrayText(learningMemory?.difficulties).length?<ul>{arrayText(learningMemory?.difficulties).map((x,i)=><li key={i}>{x}</li>)}</ul>:<p>No focus areas have been recorded yet.</p>}</article>
               </div>
               {arrayText(learningMemory?.goals).length>0&&<p><b>Goals:</b> {arrayText(learningMemory?.goals).join(' · ')}</p>}
               {arrayText(learningMemory?.recent_topics).length>0&&<p><b>Recent topics:</b> {arrayText(learningMemory?.recent_topics).join(' · ')}</p>}
-              <small>{learningMemory?.updated_at?'MIA notes last updated '+new Date(learningMemory.updated_at).toLocaleString():'MIA has not saved a learning summary for this learner yet.'}</small>
+              <small>{learningMemory?.updated_at?'MIΛ notes last updated '+new Date(learningMemory.updated_at).toLocaleString():'MIΛ has not saved a learning summary for this learner yet.'}</small>
             </div>
             <div className="monitor-record-events"><strong>Other learning records</strong>{recordEvents.length?recordEvents.slice(0,12).map(x=><article key={x.id}><span>{x.event_type.replaceAll('_',' ')}</span><time>{new Date(x.created_at).toLocaleString()}</time>{x.score!==null&&x.max_score? <b>{x.score}/{x.max_score}</b>:null}</article>):<p>No other learning records recorded yet.</p>}</div>
           </>}

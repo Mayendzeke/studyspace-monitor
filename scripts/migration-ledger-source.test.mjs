@@ -17,6 +17,7 @@ const required = [
   "20261108161203_studyspace_realtime_homework_notifications.sql",
   "20261108182736_student_feedback_realtime_inbox.sql",
   "20261108190000_studyspace_guardian_verifications_verified_by_index.sql",
+  "20261109031500_studyspace_age9_mia_education_terms_v7.sql",
 ];
 
 const superseded = [

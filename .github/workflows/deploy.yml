@@ -289,6 +289,7 @@ jobs:
             const provider = readFileSync(directory + '/provider.ts', 'utf8')
             if (!source.includes('./provider.ts') || !provider.includes('GEMINI_API_KEY') || !provider.includes('generativelanguage.googleapis.com') || !provider.includes('GEMINI_MODEL')) throw new Error(path + ' must use the server-side Gemini primary provider adapter.')
             if (!provider.includes('CLOUDFLARE_API_TOKEN') || !provider.includes('GEMMA_MODEL') || !provider.includes('generateWithFallback')) throw new Error(path + ' must retain Gemma as the automatic backup.')
+            if (!source.includes('systemPrompt') || !provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }') || !provider.includes('role: "system", content: options.systemPrompt')) throw new Error(path + ' must separate trusted system instructions from user content for both providers.')
             if (!provider.includes('GEMINI_API_PAID_SERVICE_CONFIRMED') || !provider.includes('geminiPaidServiceConfirmed')) throw new Error(path + ' must require confirmed paid Gemini API billing before primary-provider use.')
             if (!provider.includes('ProviderSafetyError') || !provider.includes('assertNoPersonalIdentifiers')) throw new Error(path + ' must preserve safety refusals and reject common learner identifiers.')
             if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) throw new Error(path + ' must enforce adult administrator role and MFA.')

@@ -158,6 +158,7 @@ These are public client values. Never add a Supabase secret key, service-role ke
 Before configuring the Student Planner, confirm its current Supabase client code and build workflow use `VITE_SUPABASE_PUBLISHABLE_KEY`; do not assume the variable name alone completes the integration.
 
 ## 7. Operating notes
+- New learner enrolment is currently closed at the production Edge Function. Do not issue or distribute new Student IDs/PINs until the live endpoint is verified as open. When re-enabled, registration remains invitation/PIN-gated and retains the minimum age 9, current Terms v8, parent/guardian verification for under-18 learners, rate limits and 100-learner capacity limit.
 
 - One Supabase project is shared by both apps.
 - Keep the `studyspace-resources` Storage bucket private.

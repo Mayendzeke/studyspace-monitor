@@ -1606,7 +1606,10 @@ html,body,#root{max-width:100%;overflow-x:hidden}
   border-radius: 10px;
   color: var(--muted, #858da0);
   background: transparent;
-  font: 750 10px/1 inherit;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
   cursor: pointer;
   transition: background .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
@@ -1631,4 +1634,94 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 @media(max-width:640px) {
   .theme-options { width: 100%; }
   .theme-options button { flex: 1; min-width: 0; }
+}
+
+
+/* Compose a message without searching through the conversation list. */
+.monitor-contact-heading > div:first-child { display: grid; gap: 3px; }
+.monitor-compose-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--accent, #786bd8) 32%, var(--border));
+  border-radius: 10px;
+  color: var(--accent, #786bd8);
+  background: color-mix(in srgb, var(--accent, #786bd8) 9%, var(--panel-strong));
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.monitor-compose-button:hover { background: color-mix(in srgb, var(--accent, #786bd8) 16%, var(--panel-strong)); }
+.monitor-compose-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(8, 12, 27, .66);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.monitor-compose-dialog {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  width: min(520px, 100%);
+  max-height: min(820px, calc(100dvh - 36px));
+  min-height: 340px;
+  overflow: hidden;
+  padding: 21px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--panel-strong);
+  color: var(--text);
+  box-shadow: 0 28px 90px rgba(0,0,0,.34);
+}
+.monitor-compose-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.monitor-compose-dialog-head > div { min-width: 0; }
+.monitor-compose-dialog-head .eyebrow { margin: 0 0 8px; }
+.monitor-compose-dialog-head h2 { margin: 0; color: var(--text); font: 800 19px/1.25 Manrope,sans-serif; letter-spacing: -.45px; }
+.monitor-compose-dialog-head p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.monitor-compose-dialog-head .icon-button { flex: 0 0 auto; }
+.monitor-compose-type-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.monitor-compose-type-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 43px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.monitor-compose-type-switch button.is-active {
+  color: var(--accent, #786bd8);
+  border-color: color-mix(in srgb, var(--accent, #786bd8) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent, #786bd8) 12%, var(--panel-strong));
+}
+.monitor-compose-search { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--panel); color: var(--muted); }
+.monitor-compose-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 11px; }
+.monitor-compose-contacts { display: grid; align-content: start; gap: 5px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
+.monitor-compose-contacts > button { display: flex; align-items: center; gap: 11px; width: 100%; min-width: 0; padding: 10px; border: 1px solid transparent; border-radius: 12px; background: var(--panel); color: var(--text); text-align: left; }
+.monitor-compose-contacts > button:hover { border-color: color-mix(in srgb, var(--accent, #786bd8) 35%, var(--border)); background: color-mix(in srgb, var(--accent, #786bd8) 8%, var(--panel-strong)); }
+.monitor-compose-contacts > button > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.monitor-compose-contacts > button strong { font-size: 10px; overflow-wrap: anywhere; }
+.monitor-compose-contacts > button small { color: var(--muted); font-size: 9px; }
+.monitor-compose-contacts > button > svg { color: var(--accent, #786bd8); flex: 0 0 auto; }
+.monitor-compose-contacts > p { margin: 12px; color: var(--muted); font-size: 10px; text-align: center; }
+.monitor-compose-dialog > footer { padding-top: 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9px; line-height: 1.5; }
+@media(max-width:640px) {
+  .monitor-compose-backdrop { padding: 10px; }
+  .monitor-compose-dialog { min-height: min(420px, calc(100dvh - 20px)); max-height: calc(100dvh - 20px); padding: 16px; border-radius: 16px; }
+  .monitor-compose-dialog-head h2 { font-size: 17px; }
+  .monitor-compose-type-switch button { font-size: 9px; gap: 5px; }
+  .monitor-contact-heading { padding-inline: 12px; }
 }

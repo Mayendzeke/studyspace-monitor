@@ -162,7 +162,7 @@ export default function TestimonialsInbox() {
   function canExportMarketingImage(item: Testimonial): boolean {
     const learner = profiles[item.learner_id];
     const consent = guardianMarketingConsents[item.learner_id];
-    if (!learner || !item.testimonial_marketing_consent || !consent || consent.is_minor === null) return false;
+    if (!learner?.preferred_name?.trim() || !learner.institution?.trim() || !item.testimonial_marketing_consent || !consent || consent.is_minor === null) return false;
     if (consent.is_minor === false) return true;
     return consent.approval_status === 'approved' && consent.testimonial_marketing_consent === true;
   }
@@ -172,12 +172,17 @@ export default function TestimonialsInbox() {
       setError('This testimonial is private only. Separate learner and, where applicable, approved guardian marketing permission is required.');
       return;
     }
+    const learner = profiles[item.learner_id];
+    const preferredName = learner?.preferred_name?.trim();
+    const schoolName = learner?.institution?.trim();
+    if (!preferredName || !schoolName) {
+      setError('A preferred name and school must be present on the learner profile before this testimonial can be exported.');
+      return;
+    }
     setExportingId(item.id);
     setError('');
     setNotice('');
     try {
-      const learner = profiles[item.learner_id];
-      const displayName = learner?.preferred_name?.trim() || 'A StudySpace learner';
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       const measure = canvas.getContext('2d');
@@ -185,7 +190,7 @@ export default function TestimonialsInbox() {
       measure.font = '42px Georgia, serif';
       const lines = wrapCanvasText(measure, item.message, 820);
       const lineHeight = 58;
-      canvas.height = Math.max(1350, 570 + lines.length * lineHeight + 245);
+      canvas.height = Math.max(1050, 500 + lines.length * lineHeight + 260);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser could not render the testimonial image.');
 
@@ -201,53 +206,35 @@ export default function TestimonialsInbox() {
       ctx.fillStyle = 'rgba(125, 164, 255, 0.10)';
       ctx.beginPath(); ctx.arc(60, canvas.height - 80, 260, 0, Math.PI * 2); ctx.fill();
 
-      ctx.fillStyle = '#8be4cf';
-      ctx.font = '800 27px Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('STUDYSPACE', 82, 92);
-      ctx.fillStyle = '#c8d7eb';
-      ctx.font = '700 15px Arial, sans-serif';
-      ctx.fillText('LEARNER STORY', 82, 134);
+      // Use the repository's real StudySpace mark, positioned in the top-right corner.
+      const logo = new Image();
+      logo.src = `${import.meta.env.BASE_URL}studyspace-monitor.svg`;
+      await logo.decode();
+      ctx.drawImage(logo, canvas.width - 174, 48, 112, 112);
 
-      const cardX = 58, cardY = 185, cardW = 964, cardH = canvas.height - 300;
+      const cardX = 58, cardY = 190, cardW = 964, cardH = canvas.height - 260;
       roundRect(ctx, cardX, cardY, cardW, cardH, 34);
       ctx.fillStyle = '#f8fbff';
       ctx.fill();
 
-      ctx.fillStyle = '#76cdb9';
-      roundRect(ctx, cardX + 56, cardY + 54, 66, 7, 4);
-      ctx.fill();
-
-      ctx.fillStyle = '#29415b';
-      ctx.font = '700 18px Arial, sans-serif';
-      ctx.fillText('REAL LEARNING. REAL PROGRESS.', cardX + 58, cardY + 112);
-
-      ctx.fillStyle = '#3b7290';
-      ctx.font = '100px Georgia, serif';
-      ctx.fillText('“', cardX + 45, cardY + 230);
-
       ctx.fillStyle = '#1c2a3c';
       ctx.font = '42px Georgia, serif';
-      let y = cardY + 245;
+      ctx.textAlign = 'left';
+      let y = cardY + 145;
       for (const line of lines) {
         if (line) ctx.fillText(line, cardX + 70, y, 825);
         y += lineHeight;
       }
 
-      const attributionY = Math.max(y + 45, cardY + cardH - 135);
+      const attributionY = Math.max(y + 60, cardY + cardH - 150);
       ctx.fillStyle = '#5d718b';
       ctx.fillRect(cardX + 70, attributionY - 42, 824, 2);
       ctx.fillStyle = '#193653';
-      ctx.font = '700 25px Arial, sans-serif';
-      ctx.fillText('— ' + displayName, cardX + 70, attributionY + 12);
+      ctx.font = '700 30px Arial, sans-serif';
+      ctx.fillText(preferredName, cardX + 70, attributionY + 18);
       ctx.fillStyle = '#64748b';
-      ctx.font = '16px Arial, sans-serif';
-      ctx.fillText('StudySpace learner', cardX + 70, attributionY + 45);
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#dbe9f8';
-      ctx.font = '600 16px Arial, sans-serif';
-      ctx.fillText('LEARN • PRACTISE • GROW', 540, canvas.height - 62);
+      ctx.font = '22px Arial, sans-serif';
+      ctx.fillText(schoolName, cardX + 70, attributionY + 58, 820);
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('The testimonial image could not be saved.');
@@ -259,7 +246,7 @@ export default function TestimonialsInbox() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-      setNotice('Testimonial PNG generated. Review the image before sharing it in marketing.');
+      setNotice('Testimonial PNG generated with the StudySpace logo, testimonial, preferred name and school only.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'The testimonial image could not be generated.');
     } finally {
@@ -313,7 +300,7 @@ export default function TestimonialsInbox() {
             <footer className="testimonial-card-footer">
               <label>Status<select value={item.status} disabled={busyId === item.id} onChange={event => void updateStatus(item.id, event.target.value)}><option value="new">New</option><option value="reviewing">Reviewing</option><option value="resolved">Reviewed</option></select></label>
               <span className="testimonial-private-tag"><CheckCircle2 size={13}/> Private inbox</span>
-              <button type="button" className="secondary-button" disabled={!canExportMarketingImage(item) || exportingId === item.id} title={canExportMarketingImage(item) ? 'Download a consented marketing PNG without student IDs, contact details or profile photos' : 'Separate marketing permission is missing or guardian approval has not been verified'} onClick={() => void downloadTestimonialImage(item)}><Download size={14}/>{exportingId === item.id ? 'Preparing…' : 'Download PNG'}</button>
+              <button type="button" className="secondary-button" disabled={!canExportMarketingImage(item) || exportingId === item.id} title={canExportMarketingImage(item) ? 'Download the logo, testimonial, preferred name and school only' : 'Marketing permission, guardian approval or required preferred name/school is missing'} onClick={() => void downloadTestimonialImage(item)}><Download size={14}/>{exportingId === item.id ? 'Preparing…' : 'Download PNG'}</button>
             </footer>
           </article>;
         })}

@@ -108,6 +108,14 @@ Deno.serve(async request => {
     if (learnerError || !learner || learner.account_status !== "pending_guardian_verification" || !learner.date_of_birth) {
       return json(409, { error: "This learner is not awaiting guardian verification." });
     }
+    const birthDate = new Date(String(learner.date_of_birth) + "T00:00:00.000Z");
+    const localParts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Mbabane", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const part = (key: string) => Number(localParts.find(item => item.type === key)?.value || 0);
+    let age = birthDate.getUTCFullYear() ? part("year") - birthDate.getUTCFullYear() : -1;
+    if (age >= 0 && (part("month") < birthDate.getUTCMonth() + 1 || (part("month") === birthDate.getUTCMonth() + 1 && part("day") < birthDate.getUTCDate()))) age--;
+    if (Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== String(learner.date_of_birth) || age < 9 || age >= 18) {
+      return json(409, { error: "Guardian verification is available only for learners aged 9 to 17 with a verified date of birth." });
+    }
     const { data: existingConsent, error: consentError } = await admin.from("guardian_verifications")
       .select("id").eq("learner_id", learnerId).maybeSingle();
     if (consentError) return json(503, { error: "The existing guardian record could not be checked." });
@@ -211,7 +219,7 @@ Deno.serve(async request => {
   if (relationship === "other" && (relationshipDetails.length < 2 || relationshipDetails.length > 100)) return json(400, { error: "Describe the guardian’s relationship to the learner." });
   if (!/^\+?[0-9][0-9 ()-]{5,28}$/.test(guardianPhone)) return json(400, { error: "Enter a valid guardian contact number." });
   if (!guardianConsent) return json(400, { error: "The guardian must personally agree to the Terms and Conditions and give consent before activation." });
-  if (termsVersion !== "2026-11-08-v6") return json(400, { error: "The current Terms and Conditions must be reviewed before activation." });
+  if (termsVersion !== "2026-11-09-v7") return json(400, { error: "The current Terms and Conditions must be reviewed before activation." });
 
   const { data: activated, error: activationError } = await admin.rpc("activate_studyspace_minor_learner", {
     p_learner_id: learnerId,

@@ -282,6 +282,7 @@ jobs:
           if (learnerAI.includes('GEMINI_API_KEY') || learnerAI.includes('generativelanguage.googleapis.com') || learnerHomeworkFallback.includes('GEMINI_API_KEY') || learnerHomeworkFallback.includes('generativelanguage.googleapis.com')) {
             throw new Error('Gemini must never receive learner-facing MIA or homework-fallback requests for the under-18 Student app.')
           }
+          if (!learnerAI.includes('educational purposes only') || !learnerHomeworkFallback.includes('educational purposes only') || !learnerHomeworkFallback.includes('not clearly educational')) throw new Error('Student MIA and automated homework help must remain education-only.')
           for (const path of ['supabase/functions/mia-monitor-assistant/index.ts', 'supabase/functions/generate-lesson-recap/index.ts', 'supabase/functions/generate-homework/index.ts']) {
             const source = readFileSync(path, 'utf8')
             const directory = path.slice(0, path.lastIndexOf('/'))
@@ -299,6 +300,8 @@ jobs:
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')
           if (!migration.includes('trial_started_at <= now()')) throw new Error('Database access must not begin before the trial start time.')
           if (!migration.includes('terms_version')) throw new Error('Database access helper must retain a current-terms condition.')
+          const lessonRecap = readFileSync('supabase/functions/generate-lesson-recap/index.ts', 'utf8')
+          if (!lessonRecap.includes('for educational purposes only')) throw new Error('Lesson recap generation must remain education-only.')
           const homeworkBuilder = readFileSync('src/components/HomeworkBuilder.tsx', 'utf8')
           const homeworkFunction = readFileSync('supabase/functions/generate-homework/index.ts', 'utf8')
           const homeworkInbox = readFileSync('src/components/HomeworkHelpInbox.tsx', 'utf8')

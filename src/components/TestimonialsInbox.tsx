@@ -11,6 +11,7 @@ type Testimonial = {
   contact_email: string | null;
   testimonial_private_consent: boolean;
   testimonial_marketing_consent: boolean;
+  testimonial_background: string | null;
 };
 type LearnerProfile = {
   id: string;
@@ -76,7 +77,7 @@ export default function TestimonialsInbox() {
     try {
       const { data, error: feedbackError } = await supabase
         .from('student_feedback')
-        .select('id,learner_id,message,created_at,status,contact_email,testimonial_private_consent,testimonial_marketing_consent')
+        .select('id,learner_id,message,created_at,status,contact_email,testimonial_private_consent,testimonial_marketing_consent,testimonial_background')
         .eq('category', 'Testimonial')
         .eq('testimonial_private_consent', true)
         .order('created_at', { ascending: false })
@@ -191,10 +192,20 @@ export default function TestimonialsInbox() {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser could not render the testimonial image.');
 
+      const backgroundPalettes: Record<string, [string, string, string]> = {
+        ocean: ['#0b6477', '#123b65', '#0b172b'],
+        violet: ['#7650ad', '#493278', '#21183e'],
+        sunset: ['#f08a52', '#c85c69', '#6c294f'],
+        emerald: ['#18856d', '#17645c', '#103b3b'],
+        rose: ['#d66b91', '#a34e78', '#572b55'],
+        gold: ['#d6a63d', '#a87535', '#543b2b'],
+        midnight: ['#536581', '#293b58', '#101827'],
+      };
+      const chosenPalette = backgroundPalettes[item.testimonial_background || 'ocean'] || backgroundPalettes.ocean;
       const background = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      background.addColorStop(0, '#101e3a');
-      background.addColorStop(0.55, '#193d56');
-      background.addColorStop(1, '#0b172b');
+      background.addColorStop(0, chosenPalette[0]);
+      background.addColorStop(0.55, chosenPalette[1]);
+      background.addColorStop(1, chosenPalette[2]);
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 

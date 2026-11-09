@@ -16,7 +16,7 @@ export type ProviderStatus = {
   gemma: { configured: boolean; model: string };
 };
 
-type GenerationOptions = { maxTokens?: number; jsonMode?: boolean };
+type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string };
 
 class ProviderSafetyError extends Error {
   constructor(message: string) {
@@ -94,6 +94,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
+        ...(options.systemPrompt ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } } : {}),
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: options.maxTokens,
@@ -129,7 +130,10 @@ async function callGemma(prompt: string, options: Required<GenerationOptions>): 
       signal: AbortSignal.timeout(45000),
       body: JSON.stringify({
         model: GEMMA_MODEL,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          ...(options.systemPrompt ? [{ role: "system", content: options.systemPrompt }] : []),
+          { role: "user", content: prompt },
+        ],
         max_completion_tokens: options.maxTokens,
         stream: false,
         store: false,
@@ -165,6 +169,7 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
   const config: Required<GenerationOptions> = {
     maxTokens: Math.max(16, Math.min(8000, Math.floor(options.maxTokens ?? 2800))),
     jsonMode: options.jsonMode === true,
+    systemPrompt: String(options.systemPrompt ?? "").trim().slice(0, 12000),
   };
   const status = getProviderStatus();
   let primaryFailure = "";

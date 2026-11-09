@@ -172,25 +172,22 @@ export default function TestimonialsInbox() {
       setError('This testimonial is private only. Separate learner and, where applicable, approved guardian marketing permission is required.');
       return;
     }
-    const learner = profiles[item.learner_id];
-    const preferredName = learner?.preferred_name?.trim();
-    const schoolName = learner?.institution?.trim();
-    if (!preferredName || !schoolName) {
-      setError('A preferred name and school must be present on the learner profile before this testimonial can be exported.');
-      return;
-    }
     setExportingId(item.id);
     setError('');
     setNotice('');
     try {
+      const learner = profiles[item.learner_id];
+      const preferredName = learner?.preferred_name?.trim() || '';
+      const schoolName = learner?.institution?.trim() || '';
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       const measure = canvas.getContext('2d');
       if (!measure) throw new Error('This browser could not create the testimonial image.');
-      measure.font = '42px Georgia, serif';
-      const lines = wrapCanvasText(measure, item.message, 820);
-      const lineHeight = 58;
-      canvas.height = Math.max(1050, 500 + lines.length * lineHeight + 260);
+      measure.font = '44px Georgia, serif';
+      const lines = wrapCanvasText(measure, item.message, 840);
+      const lineHeight = 62;
+      const attributionHeight = (preferredName ? 82 : 0) + (schoolName ? 54 : 0);
+      canvas.height = Math.max(1050, 390 + lines.length * lineHeight + attributionHeight + 190);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser could not render the testimonial image.');
 
@@ -206,35 +203,48 @@ export default function TestimonialsInbox() {
       ctx.fillStyle = 'rgba(125, 164, 255, 0.10)';
       ctx.beginPath(); ctx.arc(60, canvas.height - 80, 260, 0, Math.PI * 2); ctx.fill();
 
-      // Use the repository's real StudySpace mark, positioned in the top-right corner.
-      const logo = new Image();
-      logo.src = `${import.meta.env.BASE_URL}studyspace-monitor.svg`;
-      await logo.decode();
-      ctx.drawImage(logo, canvas.width - 174, 48, 112, 112);
+      // Compact StudySpace brand mark in the top-right corner.
+      ctx.save();
+      ctx.translate(810, 58);
+      ctx.fillStyle = '#8be4cf';
+      ctx.beginPath();
+      ctx.moveTo(0, 28); ctx.lineTo(42, 8); ctx.lineTo(84, 28); ctx.lineTo(42, 48);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#8be4cf';
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(18, 38); ctx.lineTo(18, 62); ctx.quadraticCurveTo(42, 76, 66, 62); ctx.lineTo(66, 38); ctx.stroke();
+      ctx.fillStyle = '#f8fbff';
+      ctx.font = '700 27px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('studyspace', 98, 43);
+      ctx.restore();
 
-      const cardX = 58, cardY = 190, cardW = 964, cardH = canvas.height - 260;
+      const cardX = 58, cardY = 180, cardW = 964, cardH = canvas.height - 260;
       roundRect(ctx, cardX, cardY, cardW, cardH, 34);
       ctx.fillStyle = '#f8fbff';
       ctx.fill();
 
       ctx.fillStyle = '#1c2a3c';
-      ctx.font = '42px Georgia, serif';
+      ctx.font = '44px Georgia, serif';
       ctx.textAlign = 'left';
-      let y = cardY + 145;
+      let y = cardY + 155;
       for (const line of lines) {
         if (line) ctx.fillText(line, cardX + 70, y, 825);
         y += lineHeight;
       }
 
-      const attributionY = Math.max(y + 60, cardY + cardH - 150);
-      ctx.fillStyle = '#5d718b';
-      ctx.fillRect(cardX + 70, attributionY - 42, 824, 2);
-      ctx.fillStyle = '#193653';
-      ctx.font = '700 30px Arial, sans-serif';
-      ctx.fillText(preferredName, cardX + 70, attributionY + 18);
-      ctx.fillStyle = '#64748b';
-      ctx.font = '22px Arial, sans-serif';
-      ctx.fillText(schoolName, cardX + 70, attributionY + 58, 820);
+      let attributionY = Math.max(y + 55, cardY + cardH - attributionHeight - 95);
+      if (preferredName) {
+        ctx.fillStyle = '#193653';
+        ctx.font = '700 30px Arial, sans-serif';
+        ctx.fillText(preferredName, cardX + 70, attributionY);
+        attributionY += 52;
+      }
+      if (schoolName) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '22px Arial, sans-serif';
+        ctx.fillText(schoolName, cardX + 70, attributionY);
+      }
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('The testimonial image could not be saved.');
@@ -246,7 +256,7 @@ export default function TestimonialsInbox() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-      setNotice('Testimonial PNG generated with the StudySpace logo, testimonial, preferred name and school only.');
+      setNotice('Testimonial PNG generated. Review the image before sharing it in marketing.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'The testimonial image could not be generated.');
     } finally {

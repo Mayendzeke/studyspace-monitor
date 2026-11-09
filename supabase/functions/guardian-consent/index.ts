@@ -132,7 +132,7 @@ Deno.serve(async request => {
         name: learner.preferred_name || learner.full_name,
       },
       expiresAt: invite.expires_at,
-      termsVersion: "2026-11-08-v6",
+      termsVersion: "2026-11-09-v7",
     });
   }
 
@@ -149,7 +149,7 @@ Deno.serve(async request => {
     if (relationship === "other" && (relationshipDetails.length < 2 || relationshipDetails.length > 100)) return json(400, { error: "Describe the relationship to the learner." });
     if (!/^\+?[0-9][0-9 ()-]{5,28}$/.test(guardianPhone)) return json(400, { error: "Enter a valid contact number." });
     if (!consent) return json(400, { error: "The parent or legal guardian must personally give consent before submitting this form." });
-    if (termsVersion !== "2026-11-08-v6") return json(400, { error: "The current StudySpace Terms and Conditions must be reviewed." });
+    if (termsVersion !== "2026-11-09-v7") return json(400, { error: "The current StudySpace Terms and Conditions must be reviewed." });
 
     const { data: submitted, error: submitError } = await admin.rpc("submit_studyspace_guardian_link_consent", {
       p_token_hash: tokenHash,

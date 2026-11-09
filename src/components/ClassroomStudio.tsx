@@ -115,7 +115,7 @@ export default function ClassroomStudio() {
         const emptyDraft = blank()
         const next: LessonPlan = {
           ...emptyDraft,
-          title: String(handoff.title || '').trim() || 'MIA lesson draft',
+          title: String(handoff.title || '').trim() || 'MIΛ lesson draft',
           subject: String(handoff.subject || '').trim(),
           level: String(handoff.level || '').trim(),
           grade: String(handoff.grade || '').trim(),
@@ -125,16 +125,16 @@ export default function ClassroomStudio() {
           objectives: extractSection('Learning objectives'),
           checkpoints: checkpointLines.length ? [...checkpointLines, '', '', '', ''].slice(0, 5) : emptyDraft.checkpoints,
           homework: extractSection('Homework'),
-          sourceNotes: 'MIA-generated lesson content — review and edit before publishing.\n\n' + generated,
+          sourceNotes: 'MIΛ-generated lesson content — review and edit before publishing.\n\n' + generated,
         }
         setDraft(next)
         setCourseFilter(next.course || '')
         setSelectedLearners([])
         setSelected(null)
-        setNotice('MIA lesson draft loaded. Review the generated content, complete any missing details, then save or publish when ready.')
+        setNotice('MIΛ lesson draft loaded. Review the generated content, complete any missing details, then save or publish when ready.')
         localStorage.removeItem('studyspace-monitor-mia-lesson-handoff-v1')
       } catch {
-        setNotice('The MIA lesson draft could not be opened. Return to MIA and try creating it again.')
+        setNotice('The MIΛ lesson draft could not be opened. Return to MIΛ and try creating it again.')
       }
     }
     loadMiaDraft()
@@ -466,7 +466,7 @@ export default function ClassroomStudio() {
         {draft.aiRecap && <section className="classroom-generated-recap"><div><strong>AI-generated draft · review before publishing</strong><p>{draft.aiRecap.summary}</p></div><strong>Key points</strong><ul>{draft.aiRecap.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul>{draft.aiRecap.workedExample && <><strong>Worked example</strong><p>{draft.aiRecap.workedExample}</p></>}{draft.aiRecap.exitQuestion && <><strong>Quick understanding check</strong><p>{draft.aiRecap.exitQuestion}</p></>}</section>}
         <label className="classroom-wide-field">Homework / next steps<textarea rows={3} value={draft.homework} onChange={e=>update({homework:e.target.value})} placeholder="A short follow-up task with clear instructions."/></label>
         <label className="classroom-date-field">Homework due date<input type="date" value={draft.homeworkDue} onChange={e=>update({homeworkDue:e.target.value})}/></label>
-        <div className="classroom-ai-actions"><button type="button" className="primary-button" onClick={generateHomeworkFromLesson} ><Sparkles size={15}/> Generate Homework with MIA</button><small>Uses the subject, grade, curriculum, objectives, lesson notes and selected learners above. Opens the interactive question builder below for review and publishing. Select a subject, education level, grade/year and at least one learner first.</small></div>
+        <div className="classroom-ai-actions"><button type="button" className="primary-button" onClick={generateHomeworkFromLesson} ><Sparkles size={15}/> Generate Homework with MIΛ</button><small>Uses the subject, grade, curriculum, objectives, lesson notes and selected learners above. Opens the interactive question builder below for review and publishing. Select a subject, education level, grade/year and at least one learner first.</small></div>
         <section className="classroom-assign-panel"><div><strong>Assign to learners</strong><small>Select from the {draft.level || 'selected'} learners. {scopedLearnerCountLabel}.</small></div>{scopedLearners.length ? <div className="classroom-learner-checks">{scopedLearners.map(learner=><label key={learner.id}><input type="checkbox" checked={selectedLearners.includes(learner.id)} onChange={e=>setSelectedLearners(current=>e.target.checked?[...current,learner.id]:current.filter(id=>id!==learner.id))}/><span><strong>{learner.preferred_name||learner.full_name||'Learner'}</strong><small>{learner.student_id||'Student ID unavailable'} · {learner.grade || 'Grade not set'}{learner.course ? ' · ' + learner.course : ''}</small></span></label>)}</div> : <p>{learners.length ? 'No active learners match this level and group yet. Choose another level, course or grade, or enrol learners with complete profile details.' : 'No active learner accounts are available yet. Enrol learners from the Monitor dashboard first.'}</p>}<button className="primary-button" onClick={()=>void publishSession()} disabled={publishing||learners.length===0||selectedLearners.length===0}>{publishing?'Publishing…':'Publish session to selected learners'}</button>{draft.publishedSessionId&&<small>Published session ID: {draft.publishedSessionId}</small>}{draft.publishedSessionId&&<div className="classroom-live-panel">
         <div className="classroom-live-heading"><div><strong>Shared classroom controls</strong><small>Session status: {sessionStatus||'Loading'}</small></div><div>{sessionStatus==='scheduled'&&<button className="primary-button" onClick={()=>void changeSessionStatus('live')}>Start live class</button>}{sessionStatus==='live'&&<button className="subtle-button" onClick={()=>void changeSessionStatus('ended')}>End class</button>}{sessionStatus==='ended'&&<span className="classroom-session-ended">This lesson has ended. Learners can still review the lesson guide and homework.</span>}</div></div>
         {sessionStatus==='live'&&draft.publishedSessionId&&<LiveClassroomCall sessionId={draft.publishedSessionId} audience="teacher"/>}

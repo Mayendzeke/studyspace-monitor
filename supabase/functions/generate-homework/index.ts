@@ -62,11 +62,11 @@ Deno.serve(async request => {
     const admin = createClient(auth.url, auth.service, { auth: { persistSession: false } });
     const { count: usage, error: usageError } = await admin.from("audit_events").select("id", { count: "exact", head: true })
       .eq("actor_id", auth.userId).eq("event_type", "mia_admin_request").gte("created_at", since.toISOString());
-    if (usageError) throw new Error("The MIA usage control could not be checked.");
-    if ((usage ?? 0) >= 80) return json(429, { error: "The administrator daily MIA limit of 80 requests has been reached." });
+    if (usageError) throw new Error("The MIΛ usage control could not be checked.");
+    if ((usage ?? 0) >= 80) return json(429, { error: "The administrator daily MIΛ limit of 80 requests has been reached." });
 
     const systemPrompt = [
-      "You are MIA, the StudySpace educational homework question generator. This service is for educational purposes only.",
+      "You are MIΛ, the StudySpace educational homework question generator. This service is for educational purposes only.",
       "Create exactly the requested number of age-appropriate, curriculum-aligned homework questions for the supplied subject, topic, education level, grade, course and curriculum.",
       "Allowed question types are multiple_choice, fill_blank, short_answer, true_false and matching.",
       "Return valid JSON only with this exact top-level shape: { \"questions\": [ ... ] }.",
@@ -97,9 +97,9 @@ Deno.serve(async request => {
     const generated = await generateWithFallback(prompt, { maxTokens: 6500, jsonMode: true, systemPrompt });
     const raw = generated.text.replace(/^\s*[\x60]{3}(?:json)?\s*/i, "").replace(/\s*[\x60]{3}\s*$/, "").trim();
     let parsed: any;
-    try { parsed = JSON.parse(raw); } catch { throw new Error("MIA returned invalid structured homework. Please retry with a narrower topic."); }
-    if (!Array.isArray(parsed?.questions)) throw new Error("MIA's homework response did not contain a question list.");
-    if (parsed.questions.length !== count) throw new Error("MIA returned a different number of questions than requested. Please retry.");
+    try { parsed = JSON.parse(raw); } catch { throw new Error("MIΛ returned invalid structured homework. Please retry with a narrower topic."); }
+    if (!Array.isArray(parsed?.questions)) throw new Error("MIΛ's homework response did not contain a question list.");
+    if (parsed.questions.length !== count) throw new Error("MIΛ returned a different number of questions than requested. Please retry.");
     const questions = parsed.questions.map((q: any, index: number) => {
       if (!q || typeof q !== "object") throw new Error("Question " + (index + 1) + " is not valid.");
       const type = String(q.type || "");
@@ -146,6 +146,6 @@ Deno.serve(async request => {
   } catch (error) {
     if (error instanceof Response) return new Response(await error.text(), { status: error.status, headers });
     const message = error instanceof Error ? error.message : "Both AI providers failed to generate homework.";
-    return json(/daily MIA limit/.test(message) ? 429 : /credentials|configuration/.test(message) ? 503 : /timeout|timed out|did not respond/i.test(message) ? 504 : 502, { error: message });
+    return json(/daily MIΛ limit/.test(message) ? 429 : /credentials|configuration/.test(message) ? 503 : /timeout|timed out|did not respond/i.test(message) ? 504 : 502, { error: message });
   }
 });

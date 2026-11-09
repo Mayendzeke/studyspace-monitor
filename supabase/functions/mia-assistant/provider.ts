@@ -1,6 +1,5 @@
 export const GEMINI_MODEL = "gemini-3.8-flash";
 export const GEMMA_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-export const CLOUDFLARE_SECONDARY_MODEL = "@cf/qwen/qwen3.8-27b";
 
 export type ProviderMessage = { role: "system" | "user" | "assistant" | "model"; content: unknown };
 export type ProviderResult = {
@@ -15,7 +14,6 @@ export type ProviderStatus = {
   backup: "Cloudflare Workers AI";
   gemini: { configured: boolean; model: string };
   gemma: { configured: boolean; model: string };
-  secondaryModel: string;
 };
 type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string };
 class ProviderSafetyError extends Error { constructor(message: string) { super(message); this.name = "ProviderSafetyError"; } }
@@ -34,7 +32,6 @@ export function getProviderStatus(): ProviderStatus {
     backup: "Cloudflare Workers AI",
     gemini: { configured: Boolean(geminiKey() && geminiPaidServiceConfirmed()), model: GEMINI_MODEL },
     gemma: { configured: Boolean(cloudflare.accountId && cloudflare.apiToken), model: GEMMA_MODEL },
-    secondaryModel: CLOUDFLARE_SECONDARY_MODEL,
   };
 }
 function cleanJsonText(text: string): string {
@@ -97,7 +94,7 @@ async function callGemini(messages: ProviderMessage[], options: Required<Generat
     response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey() },
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(20000),
       body: JSON.stringify({
         ...(systemMessages.length ? { systemInstruction: { parts: systemMessages.map(text => ({ text })) } } : {}),
         contents,
@@ -109,7 +106,7 @@ async function callGemini(messages: ProviderMessage[], options: Required<Generat
       }),
     });
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Gemini timed out after 30 seconds.");
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("Gemini timed out after 20 seconds.");
     throw new Error("Gemini could not be reached.");
   }
   const raw = await response.text();
@@ -140,7 +137,7 @@ async function callCloudflareModel(model: string, messages: ProviderMessage[], o
     response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(50000),
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         model, messages: apiMessages,
         max_completion_tokens: options.maxTokens,
@@ -187,18 +184,15 @@ export async function generateWithFallback(messages: ProviderMessage[], options:
   if (!cloudflare.accountId || !cloudflare.apiToken) {
     throw new Error(failures.join(" ") + " Gemma backup is not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to Supabase Edge Function secrets.");
   }
-  for (const model of [GEMMA_MODEL, CLOUDFLARE_SECONDARY_MODEL]) {
-    try {
-      const text = await callCloudflareModel(model, messages, config);
-      const primaryFailure = failures[0] || "Gemini was unavailable.";
-      const notice = model === GEMMA_MODEL
-        ? "Gemini was unavailable (" + primaryFailure + "). Gemma 4 handled this request as the automatic backup."
-        : "Gemini and Gemma 4 were unavailable. Qwen 3.8 completed the request as the secondary Cloudflare AI fallback.";
-      return { text, provider: "Cloudflare Workers AI", model, fallbackUsed: true, providerNotice: notice };
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : model + " failed.");
-      if (error instanceof ProviderRequestError && [401, 403].includes(error.status)) break;
-    }
+  try {
+    const text = await callCloudflareModel(GEMMA_MODEL, messages, config);
+    const primaryFailure = failures[0] || "Gemini was unavailable.";
+    return {
+      text, provider: "Cloudflare Workers AI", model: GEMMA_MODEL, fallbackUsed: true,
+      providerNotice: "Gemini was unavailable (" + primaryFailure + "). Gemma 4 handled this request as the automatic backup.",
+    };
+  } catch (error) {
+    failures.push(error instanceof Error ? error.message : "Gemma 4 failed.");
   }
-  throw new Error("All configured MIΛ AI models failed. " + failures.join(" | ").slice(0, 650));
+  throw new Error("Gemini and Gemma 4 are currently unavailable. " + failures.join(" | ").slice(0, 650));
 }

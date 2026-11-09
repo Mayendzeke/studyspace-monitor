@@ -119,7 +119,7 @@ export default function SystemAnnouncementsPanel() {
 
   return <section className="panel settings-card studyspace-announcements-panel">
     <div className="panel-heading">
-      <div><h2><Megaphone size={18}/> System announcements</h2><p>Publish important service and learning notices to eligible learners. Learners can silence this category in their notification controls.</p></div>
+      <div><h2><Megaphone size={18}/> System announcements</h2><p>Publish important service and learning notices to eligible learners. Learners can silence this category in their notification controls. Live alerts require the Student app open, an internet connection and browser notifications enabled; offline learners will not receive a missed alert later.</p></div>
       <ShieldCheck size={19}/>
     </div>
     {error && <p className="inline-message error-message" role="alert"><AlertCircle size={15}/>{error}</p>}

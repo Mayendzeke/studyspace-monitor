@@ -1898,3 +1898,21 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .monitor-engagement-privacy{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.5}
 @media(max-width:1080px){.monitor-engagement-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.monitor-engagement-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.monitor-engagement-header{flex-direction:column}.monitor-engagement-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ss-emoji-picker-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
+
+
+/* Keep the Monitor workspace bar visible while the page content scrolls. */
+html,body,#root{overflow-x:clip!important}
+.app-shell > .main-area > .topbar{
+  position:sticky!important;
+  top:0!important;
+  z-index:1000!important;
+  flex-shrink:0;
+  background:var(--surface,#f2f4fa)!important;
+  background-color:var(--surface,#f2f4fa)!important;
+}
+.access-pin-admin-controls{display:grid;grid-template-columns:minmax(210px,1.5fr) minmax(160px,1fr) auto;gap:12px;align-items:end}
+.access-pin-admin-controls>label{display:grid;gap:7px;color:var(--muted);font-size:10px;font-weight:700}
+.access-pin-admin-controls select{width:100%;min-width:0;min-height:42px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font:inherit}
+.access-pin-admin-controls .primary-button{min-height:42px;white-space:nowrap}
+.pin-create-panel>.subtle-note{margin-top:12px}
+@media(max-width:780px){.access-pin-admin-controls{grid-template-columns:1fr}.access-pin-admin-controls .primary-button{width:100%}}

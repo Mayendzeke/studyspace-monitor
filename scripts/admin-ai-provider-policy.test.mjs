@@ -16,6 +16,8 @@ for (const name of adminFunctions) {
     assert.ok(provider.includes("gemini: { configured: Boolean(geminiKey()), model: GEMINI_MODEL }"));
     assert.ok(!provider.includes("GEMINI_API_PAID_SERVICE_CONFIRMED"));
     assert.ok(provider.includes("if (status.gemini.configured)"));
+    assert.ok(provider.includes("AbortSignal.timeout(60000)"), "Gemini must have enough time to answer before fallback.");
+    assert.ok(provider.includes("[StudySpace AI provider fallback]"), "Provider fallback reason should be visible in server diagnostics.");
   });
 
   test(`${name} automatically falls back to Gemma after a non-safety Gemini failure`, () => {
@@ -43,4 +45,7 @@ test("learner MIΛ remains separate from the Gemini administrator provider", () 
   const source = readFileSync("supabase/functions/mia-assistant/index.ts", "utf8");
   assert.ok(!source.includes("GEMINI_API_KEY"));
   assert.ok(!source.includes("mia-monitor-assistant"));
+  assert.ok(!source.includes(">= 20"), "Learner MIΛ must not add an application-level daily cap.");
+  assert.ok(!source.includes("remainingDailyRequests"));
+  assert.ok(source.includes("quotaManagedByProvider"), "Only the AI provider's own quota should govern learner requests.");
 });

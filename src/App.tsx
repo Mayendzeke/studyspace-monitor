@@ -26,7 +26,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -42,6 +42,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Enrolment PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
+  { label: 'Learning engagement', icon: Sparkles },
   { label: 'Testimonials', icon: Users },
   { label: 'Settings', icon: Settings },
 ]
@@ -280,6 +281,7 @@ function App() {
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Enrolment PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
+          {page === 'Learning engagement' && <LearnerEngagementPage />}
           {page === 'Testimonials' && <TestimonialsInbox />}
           {page === 'Settings' && <SettingsPage supabaseConfigured={isSupabaseConfigured} theme={theme} onThemeChange={setTheme} onOpenTimetable={() => navigate('Timetable')} />}
 

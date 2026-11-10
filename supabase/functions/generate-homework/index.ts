@@ -58,12 +58,7 @@ Deno.serve(async request => {
     if (!subject || !topic || !level || !grade) return json(400, { error: "Subject, topic, education level and grade/year are required." });
     if (requestedFormat !== "mixed" && !allowedTypes.includes(requestedFormat)) return json(400, { error: "Choose a supported homework format." });
     assertNoPersonalIdentifiers([subject, topic, course, curriculum, instructions].join("\n"));
-    const since = new Date(); since.setUTCHours(0, 0, 0, 0);
     const admin = createClient(auth.url, auth.service, { auth: { persistSession: false } });
-    const { count: usage, error: usageError } = await admin.from("audit_events").select("id", { count: "exact", head: true })
-      .eq("actor_id", auth.userId).eq("event_type", "mia_admin_request").gte("created_at", since.toISOString());
-    if (usageError) throw new Error("The MIΛ usage control could not be checked.");
-    if ((usage ?? 0) >= 80) return json(429, { error: "The administrator daily MIΛ limit of 80 requests has been reached." });
 
     const systemPrompt = [
       "You are MIΛ, the StudySpace educational homework question generator. This service is for educational purposes only.",
@@ -146,6 +141,6 @@ Deno.serve(async request => {
   } catch (error) {
     if (error instanceof Response) return new Response(await error.text(), { status: error.status, headers });
     const message = error instanceof Error ? error.message : "Both AI providers failed to generate homework.";
-    return json(/daily MIΛ limit/.test(message) ? 429 : /credentials|configuration/.test(message) ? 503 : /timeout|timed out|did not respond/i.test(message) ? 504 : 502, { error: message });
+    return json(/HTTP 429|RESOURCE_EXHAUSTED|quota|rate limit|too many requests/i.test(message) ? 429 : /credentials|configuration/.test(message) ? 503 : /timeout|timed out|did not respond/i.test(message) ? 504 : 502, { error: message });
   }
 });

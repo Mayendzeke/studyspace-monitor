@@ -250,7 +250,7 @@ export default function ClassroomStudio() {
     setAiConnection('checking');
     setAiConnectionMessage('Checking provider credentials and model availability…');
     try {
-      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } }), 85000, 'The AI connection test timed out after 85 seconds. Check both provider connections and try again.');
+      const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: { action: 'healthcheck' } }), 120000, 'The AI connection test timed out after 120 seconds. Check both provider connections and try again.');
       if (error) throw error;
       if (!data?.success || data?.verified !== true) throw new Error(data?.error || 'The AI connection could not be verified.');
       setAiConnection('ready');
@@ -272,7 +272,7 @@ export default function ClassroomStudio() {
       const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      } }), 90000, 'AI lesson recap timed out after 90 seconds. Your lesson has not been lost; please retry.');
+      } }), 120000, 'AI lesson recap timed out after 120 seconds. Your lesson has not been lost; please retry.');
       if (error) throw error
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return a recap.')
       update({
@@ -300,7 +300,7 @@ export default function ClassroomStudio() {
       const { data, error } = await withTimeout(supabase.functions.invoke('generate-lesson-recap', { body: {
         title: draft.title, subject: draft.subject, level: draft.level, grade: draft.grade,
         course: draft.course || courseFilter, curriculum: draft.curriculum, objectives: draft.objectives, sourceNotes: draft.sourceNotes
-      }}), 90000, 'AI lesson planning timed out after 90 seconds. Your form is still available; please retry.');
+      }}), 120000, 'AI lesson planning timed out after 120 seconds. Your form is still available; please retry.');
       if (error) throw error;
       if (!data?.success || !data?.recap) throw new Error(data?.error || 'The AI service did not return lesson structure.');
       const recap = data.recap as LessonRecap & { learningObjectives?: string[] };

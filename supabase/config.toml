@@ -51,3 +51,9 @@ verify_jwt = false
 
 [functions.reply-homework-help]
 verify_jwt = true
+
+[functions.create-access-pin]
+verify_jwt = true
+
+[functions.redeem-access-pin]
+verify_jwt = true

@@ -68,7 +68,7 @@ Deno.serve(async request => {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = getPublishableKey();
   const serviceKey = getSecretKey();
-  const pinPepper = Deno.env.get("PIN_PEPPER");
+  const pinPepper = Deno.env.get("PIN_PEPPER") || serviceKey;
   if (!accessToken || !url || !anonKey || !serviceKey || !pinPepper) {
     return json(500, { error: "Access PIN service configuration is incomplete." });
   }

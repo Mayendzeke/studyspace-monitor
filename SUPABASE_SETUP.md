@@ -94,10 +94,15 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 - `JAAS_API_KEY_ID` — the key ID paired with the uploaded JaaS public key.
 - `JAAS_PRIVATE_KEY` — the complete private PEM file downloaded when creating that JaaS key pair. Keep it in Supabase secrets only; never commit it, paste it into chat, or put it in a browser variable.
 - `APP_ORIGIN` — `https://mayendzeke.github.io`
+- `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` — server-side Workers AI credentials for learner MIΛ and the Gemma backup used by administrator AI.
+- `GEMINI_API_KEY` — server-side Google Gemini API key for administrator-only AI.
+- `GEMINI_API_PAID_SERVICE_CONFIRMED` — set to the literal value `true` only after confirming that the Gemini API project has active paid billing. The administrator provider will deliberately skip Gemini until both this flag and `GEMINI_API_KEY` are present.
 
-Keep both peppers private. Do not put them in GitHub, browser environment variables, frontend bundles, or chat.
+Keep both peppers and all provider credentials private. Do not put them in GitHub, browser environment variables, frontend bundles, source code or chat.
 
-The learner-facing The administrator-facing MIA assistant and Classroom Studio lesson-recap/lesson-structure tools are restricted to adult staff accounts in the separate administrator Monitor application and use Google Gemini through Supabase Edge Functions. Do not call the Gemini API from the student Planner or any learner-facing endpoint; Google's Gemini API Additional Terms prohibit use in API clients directed towards or likely to be accessed by under-18s. The learner-facing `mia-assistant` endpoint remains disabled. The model is `gemini-3.8-flash`; the server reads `GEMINI_API_KEY` only from Supabase Edge Function secrets. Never put this key in GitHub, frontend environment variables, source code, browser storage or chat. Both endpoints require a valid JWT, an active administrator profile and AAL2 MFA, restrict requests to the configured StudySpace origin, enforce an 80-request daily per-administrator limit and write a usage audit event. The learner-facing `mia-assistant` endpoint remains disabled until the student AI data-processing and age-appropriate safeguards are separately reviewed.
+The learner-facing `mia-assistant` endpoint uses Cloudflare Workers AI only: Gemma 4 is primary and Qwen 3.8 is the secondary recovery model. It is restricted to active learner accounts aged 9 or older with current Terms acceptance and an active trial or paid subscription, and enforces a 20-request rolling 24-hour allowance. Do not route learner data to Google Gemini or send learner identifiers to an AI provider.
+
+The administrator-facing Monitor MIΛ assistant, Classroom Studio lesson-recap tools and interactive homework generation use Gemini 3.8 Flash as primary with Gemma 4 as automatic backup. Gemini is attempted only when `GEMINI_API_KEY` is present and `GEMINI_API_PAID_SERVICE_CONFIRMED=true`; otherwise, Gemma handles the request. These administrator functions require a valid JWT, an active administrator profile and AAL2 MFA, enforce an 80-request daily per-administrator limit where applicable, screen common personal identifiers, and write usage audit events. All AI functions are restricted to educational purposes. Never expose provider credentials to the browser.
 
 ## 4. Deploy Edge Functions
 
@@ -116,7 +121,7 @@ Deploy these functions to the same Supabase project:
 - `mia-assistant` — learner-facing MIΛ learning companion
 - `mia-monitor-assistant` — administrator-facing MIA teaching and StudySpace assistant
 
-The Monitor MIA and lesson-recap functions remain gateway-JWT protected and accept only active administrators with AAL2 MFA. Gemini requests are made server-side using `GEMINI_API_KEY`. The student-facing `mia-assistant` endpoint remains closed and must not be used by the learner planner until the separate learner-data and age-appropriate safety review is completed. Keep these administrator and learner authorization paths separate.
+The administrator Monitor MIA, lesson-recap and homework-generation functions remain gateway-JWT protected and accept only active administrators with AAL2 MFA. They use Gemini primary only after the paid-service confirmation flag is enabled, with Gemma 4 as automatic backup. The student-facing `mia-assistant` endpoint is active for eligible learners, validates the learner's age, account status, current terms and paid/trial access, and uses Cloudflare Workers AI only. Keep these administrator and learner authorization paths separate.
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 
@@ -158,12 +163,12 @@ These are public client values. Never add a Supabase secret key, service-role ke
 Before configuring the Student Planner, confirm its current Supabase client code and build workflow use `VITE_SUPABASE_PUBLISHABLE_KEY`; do not assume the variable name alone completes the integration.
 
 ## 7. Operating notes
-- New learner enrolment is currently closed at the production Edge Function. Do not issue or distribute new Student IDs/PINs until the live endpoint is verified as open. When re-enabled, registration remains invitation/PIN-gated and retains the minimum age 9, current Terms v8, parent/guardian verification for under-18 learners, rate limits and 100-learner capacity limit.
+- Public learner enrolment is enabled in the production Edge Function. Registration remains invitation/PIN-gated and enforces the minimum age of 9, current Terms v8, parent/guardian verification for under-18 learners, server-side rate limits and the 100-learner capacity limit.
 
 - One Supabase project is shared by both apps.
 - Keep the `studyspace-resources` Storage bucket private.
 - Admin functions require MFA; student enrolment and sign-in have server-side attempt throttling.
-- Student MIΛ and the scheduled learner homework fallback use Cloudflare Workers AI (Gemma 4) only; learner-facing requests are limited to educational support and are not routed to Gemini. Adult administrator MIA, lesson recap and interactive homework generation use Gemini as the primary provider with Gemma 4 automatic backup only after paid Gemini API billing is explicitly confirmed. These administrator endpoints require AAL2, screen common personal identifiers, and separate trusted system instructions from user-supplied material. All AI features are education-only; review AI output before using it in teaching or assessment.
+- Student MIΛ uses Cloudflare Workers AI only (Gemma 4 primary with Qwen 3.8 secondary); learner AI is age-, terms-, subscription- and education-gated and is never routed to Gemini. Adult administrator MIA, lesson recap and interactive homework generation use Gemini 3.8 Flash primary with Gemma 4 automatic backup. Gemini primary requires both `GEMINI_API_KEY` and `GEMINI_API_PAID_SERVICE_CONFIRMED=true` after paid billing is confirmed. Administrator endpoints require AAL2 and active administrator access, screen common personal identifiers, and separate trusted system instructions from user-supplied material. All AI features are education-only; review AI output before using it in teaching or assessment.
 - Live video and audio are served by 8x8 JaaS (`8x8.vc`). Meeting tokens are signed server-side and restricted to the individual Studyspace class; the client never receives the JaaS private key. Meeting room identifiers are not secrets, but do not share class details outside the assigned class.
 - The planner sync migrations add updated timestamps, account-owned personal file records, private Storage policies, and a server-side deletion ledger. The student client synchronises tasks, subjects, sessions, calendar entries, study preferences, test attempts, flashcard progress and personal files while signed in; the browser database remains the offline cache. The Content Studio migration stores assessments, answer keys, review state, resources and assignment records in the shared project. Apply all migrations to the production Supabase project before enabling these newer cloud-sync and assessment workflows.
 

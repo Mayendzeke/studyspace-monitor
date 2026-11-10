@@ -104,7 +104,6 @@ function csvCell(value: unknown): string {
 }
 
 export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void }) {
-  const publicEnrolmentEnabled = import.meta.env.VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED === "true";
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -424,7 +423,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
         <div><strong>{visible.length} learner{visible.length === 1 ? "" : "s"} shown</strong><small>Profile edits and account actions require administrator MFA.</small></div>
         <button type="button" className="subtle-button" onClick={() => void refresh()} disabled={loading || !!busyId}><RefreshCw size={14}/> Refresh</button>
         <button type="button" className="subtle-button" onClick={exportCsv} disabled={!learners.length}><Download size={14}/> Export CSV</button>
-        {publicEnrolmentEnabled ? <button type="button" className="primary-button" onClick={onCreatePin}><KeyRound size={14}/> Create enrolment PIN</button> : <button type="button" className="secondary-button" disabled title="New learner invitations remain paused until registration is complete."><KeyRound size={14}/> New enrolment paused</button>}
+        <button type="button" className="primary-button" onClick={onCreatePin}><KeyRound size={14}/> Manage access PINs</button>
       </div>
 
       <div className="learners-filter-row">
@@ -494,7 +493,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
           <div className="classroom-empty">
             <UserRound size={25}/>
             <strong>{search || statusFilter !== "all" ? "No matching learners" : "No learner accounts yet"}</strong>
-            <span>{search || statusFilter !== "all" ? "Try a different search or account-status filter." : "Generate an enrolment PIN and share the Student ID and PIN privately with a learner."}</span>
+            <span>{search || statusFilter !== "all" ? "Try a different search or account-status filter." : "New learners sign up directly in StudySpace Student without a pre-issued PIN. Use Access PINs only to renew a learner after their trial or paid plan expires."}</span>
           </div>
         )}
       </section>

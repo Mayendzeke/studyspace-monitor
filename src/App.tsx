@@ -703,7 +703,7 @@ function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => 
           <div className="panel-heading"><div><h2>Quick actions</h2><p>Manage your workspace</p></div><SlidersHorizontal size={17} className="muted-icon" /></div>
           <button className="quick-action" onClick={() => navigate('Access PINs')}>
             <span className="quick-icon purple"><KeyRound size={18} /></span>
-            <span><strong>Enrolment PINs</strong><small>Invite a learner to join</small></span>
+            <span><strong>Access PINs</strong><small>Renew an expired learner account</small></span>
             <ArrowUpRight size={16} />
           </button>
           <button className="quick-action" onClick={() => navigate('Learners')}>

@@ -1,94 +1,22 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-function getNamedKey(variable: string): string | undefined {
-  const raw = Deno.env.get(variable);
-  if (!raw) return undefined;
-  try {
-    const parsed = JSON.parse(raw);
-    const value = parsed?.default;
-    return typeof value === "string" && value.length > 0 ? value : undefined;
-  } catch {
-    return undefined;
-  }
-}
-function getPublishableKey(): string {
-  return getNamedKey("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-}
-function getSecretKey(): string {
-  return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-}
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "null",
+const APP_ORIGIN = "https://mayendzeke.github.io";
+const headers = {
+  "Access-Control-Allow-Origin": APP_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
-  "Vary": "Origin",
   "Cache-Control": "no-store",
+  "Vary": "Origin",
 };
 
-function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
-}
-
-async function pinDigest(value: string, pepper: string) {
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(pepper), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-Deno.serve(async request => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (request.method !== "POST") return json(405, { error: "Method not allowed." });
-  const allowedOrigin = Deno.env.get("APP_ORIGIN");
-  const requestOrigin = request.headers.get("Origin");
-  if (!allowedOrigin || !requestOrigin || requestOrigin !== allowedOrigin) return json(403, { error: "This application origin is not allowed." });
-
-  const authorization = request.headers.get("Authorization");
-  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-  const url = Deno.env.get("SUPABASE_URL");
-  const anonKey = getPublishableKey();
-  const serviceKey = getSecretKey();
-  const pinPepper = Deno.env.get("PIN_PEPPER");
-  if (!accessToken || !url || !anonKey || !serviceKey || !pinPepper) return json(500, { error: "Function configuration is incomplete." });
-
-  const caller = createClient(url, anonKey, { global: { headers: { Authorization: authorization! } }, auth: { persistSession: false } });
-  const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
-  if (authError || !authData.user) return json(401, { error: "Sign in is required." });
-  const { data: assurance, error: assuranceError } = await caller.auth.mfa.getAuthenticatorAssuranceLevel(accessToken);
-  if (assuranceError || assurance.currentLevel !== "aal2") return json(403, { error: "Administrator multi-factor authentication is required." });
-
-  const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", authData.user.id).single();
-  if (profileError || profile?.role !== "admin" || profile?.account_status !== "active") return json(403, { error: "Active administrator access is required." });
-
-  // Enrolment invitations always expire exactly 24 hours after generation.
-  // The learner trial is a separate 48-hour period beginning after successful enrolment.
-  try { await request.json(); } catch { /* Empty request bodies are valid. */ }
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-  const { data: capacityAvailable, error: capacityError } = await admin.rpc("studyspace_enrolment_capacity_available");
-  if (capacityError) return json(503, { error: "Enrolment capacity could not be verified. Please try again shortly." });
-  if (capacityAvailable !== true) return json(409, { error: "Study Space has reached its current enrolment limit. Existing learners can continue using their accounts." });
-
-  const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, "0");
-  const studentId = "STU-" + Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => (byte % 36).toString(36)).join("").toUpperCase();
-  const pinHash = await pinDigest(pin, pinPepper);
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const { error: insertError } = await admin.from("enrolment_pins").insert({
-    pin_hash: pinHash,
-    student_id: studentId,
-    created_by: authData.user.id,
-    expires_at: expiresAt,
-  });
-  if (insertError) return json(500, { error: "Could not create the enrolment PIN." });
-
-  await admin.from("audit_events").insert({
-    actor_id: authData.user.id,
-    event_type: "enrolment_pin_created",
-    target_type: "enrolment_pin",
-    details: { expires_at: expiresAt },
-  });
-
-  return json(200, { pin, studentId, expiresAt, message: "Copy the student ID and one-time PIN now. The PIN will not be shown again." });
+Deno.serve(request => {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed." }), { status: 405, headers });
+  }
+  if (request.headers.get("Origin") !== APP_ORIGIN) {
+    return new Response(JSON.stringify({ error: "This StudySpace origin is not allowed." }), { status: 403, headers });
+  }
+  return new Response(JSON.stringify({
+    error: "Pre-registration enrolment PINs are retired. New learners register directly in StudySpace Student; renewal PINs are issued only after an existing learner's 48-hour trial or paid access expires."
+  }), { status: 410, headers });
 });

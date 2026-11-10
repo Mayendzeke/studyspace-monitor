@@ -114,12 +114,7 @@ Deno.serve(async request => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(mime) || !/^[A-Za-z0-9+/=]+$/.test(data) || data.length > 5_600_000) return json(400, { error: "Only JPG, PNG or WebP image attachments are supported." });
   }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await admin.from("ai_generation_usage")
-    .select("id", { count: "exact", head: true }).eq("actor_id", learnerId).gte("created_at", since);
-  if (countError) return json(503, { error: "MIΛ could not check today's free usage allowance. Try again later." });
-  if (action === "usage_status") return json(200, { success: true, remainingDailyRequests: Math.max(0, 20 - (count ?? 0)) });
-  if ((count ?? 0) >= 20) return json(429, { error: "You've reached today's MIΛ allowance. Try again tomorrow." });
+  if (action === "usage_status") return json(200, { success: true, provider: "Cloudflare Workers AI", quotaManagedByProvider: true });
 
   const [subjectsResult, goalResult, memoryResult, assignedResourcesResult] = await Promise.all([
     admin.from("student_subjects").select("name,target_mark").eq("learner_id", learnerId).order("name").limit(30),
@@ -306,5 +301,5 @@ Deno.serve(async request => {
     provider: generated.provider === "Google Gemini API" ? "google-gemini" : "cloudflare-workers-ai",
   }).eq("id", usage.data.id).eq("actor_id", learnerId);
   if (usageUpdateError) console.error("[MIΛ] Could not update AI usage metrics:", usageUpdateError.message);
-  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated, remainingDailyRequests: Math.max(0, 19 - (count ?? 0)), provider: generated.provider, model: generated.model, fallbackUsed: generated.fallbackUsed, providerNotice: generated.providerNotice });
+  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated, provider: generated.provider, model: generated.model, fallbackUsed: generated.fallbackUsed, providerNotice: generated.providerNotice });
 });

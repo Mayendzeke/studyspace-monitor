@@ -29,7 +29,7 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--surface); }
-button { font: inherit; cursor: pointer; }
+button { font: inherit; cursor: pointer; color: inherit; }
 button:focus-visible { outline: 3px solid #a9a1f2; outline-offset: 3px; }
 .app-shell { min-height: 100vh; }
 .sidebar { position: fixed; z-index: 5; inset: 0 auto 0 0; width: 258px; padding: 27px 18px 17px; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid rgba(255,255,255,.55); }
@@ -907,7 +907,7 @@ h1 span { color: #8278d9; }
 .mia-message-bubble{padding:13px 15px}
 .mia-message-bubble small{font-size:9px}
 .mia-message-bubble p{color:#354157;font-size:13px;line-height:1.75}
-.mia-compose textarea{min-height:76px;color:#354157;font-size:13px;line-height:1.65}
+.mia-compose textarea{min-height:76px;color:var(--ink);caret-color:var(--accent);font-size:13px;line-height:1.65}
 .mia-compose-footer span{color:#59677d;font-size:10px;line-height:1.55}
 .mia-disclaimer{color:#657188;font-size:10px;line-height:1.65}
 .mia-profile-notice{margin:0 17px 12px;padding:9px 11px;border-radius:9px;background:#f1f0ff;color:#514a9c;font-size:11px;line-height:1.5}
@@ -1790,4 +1790,24 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 }
 @media(prefers-reduced-motion:reduce){
   .mia-welcome-toast{transition:none}
+}
+
+
+/* Theme-aware form controls: prevent dark text from leaking into dark mode. */
+:root[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  color: var(--ink);
+  caret-color: var(--accent);
+}
+:root:not([data-theme="dark"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  color: var(--ink);
+  caret-color: var(--accent);
+}
+:root[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea)::placeholder,
+:root:not([data-theme="dark"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea)::placeholder {
+  color: color-mix(in srgb, var(--ink) 76%, var(--surface));
+  opacity: 1;
+}
+:root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  outline-offset: 2px;
 }

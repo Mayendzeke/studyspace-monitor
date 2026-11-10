@@ -101,7 +101,7 @@ Do not create or set `GEMINI_API_PAID_SERVICE_CONFIRMED`. Administrator MIΛ use
 
 Keep both peppers and all provider credentials private. Do not put them in GitHub, browser environment variables, frontend bundles, source code or chat.
 
-The learner-facing `mia-assistant` endpoint uses Cloudflare Workers AI only: Gemma 4 is primary and Qwen 3.8 is the secondary recovery model. It is restricted to active learner accounts aged 9 or older with current Terms acceptance and an active trial or paid subscription, and enforces a 20-request rolling 24-hour allowance. Do not route learner data to Google Gemini or send learner identifiers to an AI provider.
+The learner-facing `mia-assistant` endpoint uses Cloudflare Workers AI only: Gemma 4 is primary and Qwen 3.8 is the secondary recovery model. It is restricted to active learner accounts aged 9 or older with current Terms acceptance and an active trial or paid subscription. It does not impose a separate application-level daily request cap; Cloudflare model/account quotas and availability still apply. Do not route learner data to Google Gemini or send learner identifiers to an AI provider.
 
 The administrator-facing Monitor MIΛ assistant, Classroom Studio lesson-recap tools and interactive homework generation use the Gemini 3.8 Flash Developer API Free Tier first, with Gemma 4 on Cloudflare Workers AI as automatic backup. If Gemini reaches a request/token quota, returns an error, times out or is unavailable, the same request is automatically sent to Gemma 4. Administrator AI endpoints do not impose a separate daily request cap; each provider's own quotas and service availability still apply. They require a valid JWT, an active administrator profile and AAL2 MFA, screen common personal identifiers, and write usage audit events. All AI functions are restricted to educational purposes.
 
@@ -124,7 +124,7 @@ Deploy these functions to the same Supabase project:
 - `mia-assistant` — learner-facing MIΛ learning companion
 - `mia-monitor-assistant` — administrator-facing MIA teaching and StudySpace assistant
 
-The administrator Monitor MIA, lesson-recap and homework-generation functions remain gateway-JWT protected and accept only active administrators with AAL2 MFA. They use Gemini primary only after the paid-service confirmation flag is enabled, with Gemma 4 as automatic backup. The student-facing `mia-assistant` endpoint is active for eligible learners, validates the learner's age, account status, current terms and paid/trial access, and uses Cloudflare Workers AI only. Keep these administrator and learner authorization paths separate.
+The administrator Monitor MIA, lesson-recap and homework-generation functions remain gateway-JWT protected and accept only active administrators with AAL2 MFA. They use the Gemini Developer API Free Tier as the primary provider and Gemma 4 on Cloudflare Workers AI as automatic backup; no paid-service confirmation flag is required. The student-facing `mia-assistant` endpoint is active for eligible learners, validates the learner's age, account status, current terms and paid/trial access, and uses Cloudflare Workers AI only. Keep these administrator and learner authorization paths separate.
 
 The legacy `redeem-enrolment-pin` function is retained for compatibility. The current enrolment flow uses `enrol-learner`.
 

@@ -27,7 +27,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Enrolment PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -41,7 +41,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
-  { label: 'Enrolment PINs', icon: KeyRound },
+  { label: 'Access PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
   { label: 'Learning engagement', icon: Sparkles },
   { label: 'Testimonials', icon: Users },
@@ -272,7 +272,7 @@ function App() {
 
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
-          {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Enrolment PINs')} />}
+          {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Access PINs')} />}
           {page === 'Timetable' && <TeacherWeeklyTimetable />}
           {page === 'Messages' && <MessagesPage onOpenHomework={() => setPage('Classroom Studio')} />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}
@@ -280,7 +280,7 @@ function App() {
           {page === 'MIΛ' && <MiaStudio />}
           {page === 'Content Studio' && <ContentStudio />}
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
-          {page === 'Enrolment PINs' && <PinPage />}
+          {page === 'Access PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}
           {page === 'Learning engagement' && <LearnerEngagementPage />}
           {page === 'Testimonials' && <TestimonialsInbox />}
@@ -656,7 +656,7 @@ function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => 
           <h1>Your learning <span>at a glance.</span></h1>
           <p className="page-subtitle">Manage your learners, enrolment access and academic activity from one place.</p>
         </div>
-        <button className="primary-button" onClick={() => navigate('Enrolment PINs')}><Plus size={17} /> Generate PIN</button>
+        <button className="primary-button" onClick={() => navigate('Access PINs')}><Plus size={17} /> Generate PIN</button>
       </div>
 
       <div className="setup-banner">
@@ -701,7 +701,7 @@ function Overview({ navigate, supabaseConfigured }: { navigate: (page: Page) => 
 
         <section className="panel quick-panel">
           <div className="panel-heading"><div><h2>Quick actions</h2><p>Manage your workspace</p></div><SlidersHorizontal size={17} className="muted-icon" /></div>
-          <button className="quick-action" onClick={() => navigate('Enrolment PINs')}>
+          <button className="quick-action" onClick={() => navigate('Access PINs')}>
             <span className="quick-icon purple"><KeyRound size={18} /></span>
             <span><strong>Enrolment PINs</strong><small>Invite a learner to join</small></span>
             <ArrowUpRight size={16} />
@@ -730,68 +730,165 @@ function StatCard({ label, value, detail, icon }: { label: string; value: string
 }
 
 function PinPage() {
-  const enrolmentOpen = import.meta.env.VITE_STUDYSPACE_PUBLIC_ENROLMENT_ENABLED === "true";
-  type PinRecord = { id: string; student_id: string | null; expires_at: string; redeemed_at: string | null; revoked_at: string | null; created_at: string }
-  const [pins, setPins] = useState<PinRecord[]>([])
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
-  const [newPin, setNewPin] = useState<{ pin: string; studentId: string; expiresAt: string } | null>(null)
+  type LegacyPinRecord = { id: string; student_id: string | null; expires_at: string; redeemed_at: string | null; revoked_at: string | null; created_at: string };
+  type ExpiredLearner = {
+    id: string;
+    student_id: string;
+    full_name: string | null;
+    preferred_name: string | null;
+    subscription_tier: string | null;
+    subscription_expires_at: string | null;
+    trial_expires_at: string | null;
+  };
+  type PlanTier = "weekly" | "two_weeks" | "monthly";
+  const [legacyPins, setLegacyPins] = useState<LegacyPinRecord[]>([]);
+  const [expiredLearners, setExpiredLearners] = useState<ExpiredLearner[]>([]);
+  const [selectedLearnerId, setSelectedLearnerId] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>("monthly");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [newPin, setNewPin] = useState<{ pin: string; studentId: string; planTier: PlanTier; expiresAt: string } | null>(null);
 
   const refresh = async () => {
-    if (!supabase) return
-    const { data, error: loadError } = await supabase.from('enrolment_pins')
-      .select('id,student_id,expires_at,redeemed_at,revoked_at,created_at')
-      .order('created_at', { ascending: false }).limit(30)
-    if (loadError) setError('Could not load enrolment records. Check the database migration and administrator permissions.')
-    else setPins((data ?? []) as PinRecord[])
-  }
-  useEffect(() => { void refresh() }, [])
+    if (!supabase) return;
+    const [legacyResult, learnersResult] = await Promise.all([
+      supabase.from("enrolment_pins")
+        .select("id,student_id,expires_at,redeemed_at,revoked_at,created_at")
+        .order("created_at", { ascending: false }).limit(30),
+      supabase.from("profiles")
+        .select("id,student_id,full_name,preferred_name,subscription_tier,subscription_expires_at,trial_expires_at")
+        .eq("role", "learner").eq("account_status", "active")
+        .order("full_name", { ascending: true })
+    ]);
+
+    if (legacyResult.error) setError("Could not load legacy invitation history.");
+    else setLegacyPins((legacyResult.data ?? []) as LegacyPinRecord[]);
+
+    if (learnersResult.error) {
+      setError("Could not load active learner records. Check administrator database permissions.");
+      return;
+    }
+    const eligible = ((learnersResult.data ?? []) as ExpiredLearner[]).filter(learner => {
+      if (!/^STU-[A-Z0-9]{8}$/.test(String(learner.student_id ?? ""))) return false;
+      const expiry = learner.subscription_tier
+        ? learner.subscription_expires_at
+        : learner.trial_expires_at;
+      return !expiry || new Date(expiry).getTime() <= Date.now();
+    });
+    setExpiredLearners(eligible);
+    setSelectedLearnerId(current => eligible.some(learner => learner.id === current) ? current : (eligible[0]?.id ?? ""));
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const selectedLearner = expiredLearners.find(learner => learner.id === selectedLearnerId);
+  const planNames: Record<PlanTier, string> = {
+    weekly: "Weekly · 7 days",
+    two_weeks: "2 weeks · 14 days",
+    monthly: "Monthly · 28 days",
+  };
 
   const createPin = async () => {
-    if (!enrolmentOpen) { setError('New learner registration is currently closed. Do not issue PINs while the live server-side registration function remains closed.'); return; }
-    if (!supabase) { setError('Connect Supabase before creating enrolment PINs.'); return }
-    setBusy(true); setError(''); setNotice(''); setNewPin(null)
+    if (!supabase) { setError("Connect Supabase before issuing an access PIN."); return; }
+    if (!selectedLearner?.student_id) { setError("Select a learner whose trial or current plan has expired."); return; }
+    setBusy(true); setError(""); setNotice(""); setNewPin(null);
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('create-enrolment-pin', { body: {} })
-      if (invokeError) throw invokeError
-      if (!data?.pin || !data?.studentId) throw new Error(data?.error || 'The server did not return the new enrolment details.')
-      setNewPin({ pin: data.pin, studentId: data.studentId, expiresAt: data.expiresAt })
-      setNotice('New learner access created. Copy both values and deliver them privately.')
-      await refresh()
-    } catch (reason) { setError(await describeFunctionError(reason, 'PIN creation failed.')) }
-    finally { setBusy(false) }
-  }
-  const revokePin = async (id: string) => {
-    if (!supabase || !window.confirm('Revoke this unused enrolment PIN? It cannot be redeemed afterwards.')) return
-    setBusy(true); setError(''); setNotice('')
+      const { data, error: invokeError } = await supabase.functions.invoke("create-access-pin", {
+        body: { studentId: selectedLearner.student_id, planTier: selectedPlan }
+      });
+      if (invokeError) throw invokeError;
+      if (data?.success !== true || !data?.pin || !data?.studentId || !data?.expiresAt) {
+        throw new Error(data?.error || "The server did not return a new access PIN.");
+      }
+      setNewPin({
+        pin: String(data.pin),
+        studentId: String(data.studentId),
+        planTier: selectedPlan,
+        expiresAt: String(data.expiresAt),
+      });
+      setNotice("Renewal PIN issued. Copy it once and deliver it privately to the learner.");
+      await refresh();
+    } catch (reason) {
+      setError(await describeFunctionError(reason, "Access PIN creation failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revokeLegacyPin = async (id: string) => {
+    if (!supabase || !window.confirm("Revoke this unused legacy enrolment PIN? It cannot be redeemed afterwards.")) return;
+    setBusy(true); setError(""); setNotice("");
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('manage-enrolment-pin', { body: { pinId: id } })
-      if (invokeError) throw invokeError
-      if (!data?.success) throw new Error(data?.error || 'The PIN could not be revoked.')
-      setNotice(data.message || 'PIN revoked.')
-      await refresh()
-    } catch (reason) { setError(await describeFunctionError(reason, 'PIN revocation failed.')) }
-    finally { setBusy(false) }
-  }
-  const copy = (value: string) => { void navigator.clipboard?.writeText(value).then(() => setNotice('Copied. Deliver this information privately.')).catch(() => setNotice('Clipboard access is unavailable. Select and copy the value manually.')) }
+      const { data, error: invokeError } = await supabase.functions.invoke("manage-enrolment-pin", { body: { pinId: id } });
+      if (invokeError) throw invokeError;
+      if (!data?.success) throw new Error(data?.error || "The legacy PIN could not be revoked.");
+      setNotice(data.message || "Legacy PIN revoked.");
+      await refresh();
+    } catch (reason) {
+      setError(await describeFunctionError(reason, "Legacy PIN revocation failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice("Copied. Deliver this information privately.");
+    } catch {
+      setNotice("Clipboard access is unavailable. Select and copy the value manually.");
+    }
+  };
 
   return <div className="subpage">
-    <div className="eyebrow">ACCESS MANAGEMENT</div><h1>Enrolment PINs</h1><p className="page-subtitle">Review existing enrolment records. New Student IDs and PINs remain disabled until the live registration service is confirmed active.</p>
-    {!enrolmentOpen && <div className="security-note"><LockKeyhole size={17}/><p><strong>New enrolment is currently closed.</strong> Public registration remains off and the server-side PIN redemption route has not been approved for private invitation use. You can review existing PIN records, but do not issue or send new invitations until this control is reopened.</p></div>}
-    <div className="panel pin-create-panel">
-      <div className="panel-heading"><div><h2>{enrolmentOpen ? "Create learner access" : "Learner invitations paused"}</h2><p>{enrolmentOpen ? "Requires an authenticated administrator with MFA verified." : "PIN creation is disabled while the server rejects all new registrations."}</p></div><KeyRound size={20}/></div>
-      <div className="pin-create-controls"><p className="subtle-note">When enrolment is enabled, each PIN expires after 24 hours and the learner’s 48-hour trial begins only after successful registration.</p><button className="primary-button" onClick={()=>void createPin()} disabled={busy || !enrolmentOpen}>{busy?'Working…':enrolmentOpen ? 'Generate Student ID + PIN' : 'Enrolment closed'}</button></div>
-      {newPin && <div className="pin-issued-card"><strong>New learner credentials · shown once</strong><div><span>Student ID</span><code>{newPin.studentId}</code><button className="subtle-button" onClick={()=>copy(newPin.studentId)}>Copy ID</button></div><div><span>One-time PIN</span><code>{newPin.pin}</code><button className="subtle-button" onClick={()=>copy(newPin.pin)}>Copy PIN</button></div><small>Expires {new Date(newPin.expiresAt).toLocaleString()}. Keep these details private and deliver them directly to the learner.</small></div>}
-      {notice&&<p className="inline-message" role="status">{notice}</p>}{error&&<p className="inline-message error-message" role="alert">{error}</p>}
-    </div>
-    <div className="panel pin-history-panel">
-      <div className="panel-heading"><div><h2>Recent invitations</h2><p>{pins.length} recent record(s)</p></div><button className="subtle-button" onClick={()=>void refresh()}>Refresh</button></div>
-      {pins.length ? <div className="pin-history-list">{pins.map(pin=>{const status=pin.redeemed_at?'Redeemed':pin.revoked_at?'Revoked':new Date(pin.expires_at).getTime()<Date.now()?'Expired':'Unused';return <article key={pin.id}><div><strong>{pin.student_id || 'Student ID unavailable'}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={'pin-status '+status.toLowerCase()}>{status}</span>{status==='Unused'&&<button className="text-button" disabled={busy} onClick={()=>void revokePin(pin.id)}>Revoke</button>}</article>})}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No invitations yet</strong><span>{enrolmentOpen ? "Create a PIN to invite your first learner." : "New invitations are unavailable until the server-side registration route is approved."}</span></div>}
-    </div>
-  </div>
-}
+    <div className="eyebrow">ACCESS MANAGEMENT</div>
+    <h1>Student Access PINs</h1>
+    <p className="page-subtitle">New learners register directly in StudySpace Student. Issue a one-time PIN only for an existing learner after their 48-hour trial or current paid plan has expired.</p>
 
+    <div className="panel pin-create-panel">
+      <div className="panel-heading"><div><h2>Issue a renewal PIN</h2><p>Requires an active administrator session with MFA verified. The PIN is tied to one Student ID.</p></div><KeyRound size={20}/></div>
+      {expiredLearners.length ? <>
+        <div className="pin-create-controls access-pin-admin-controls">
+          <label>Expired learner
+            <select value={selectedLearnerId} onChange={event => { setSelectedLearnerId(event.target.value); setNewPin(null); }}>
+              {expiredLearners.map(learner => <option key={learner.id} value={learner.id}>{learner.student_id} · {learner.preferred_name || learner.full_name || "Learner"}</option>)}
+            </select>
+          </label>
+          <label>Access plan
+            <select value={selectedPlan} onChange={event => { setSelectedPlan(event.target.value as PlanTier); setNewPin(null); }}>
+              <option value="weekly">Weekly · 7 days</option>
+              <option value="two_weeks">2 weeks · 14 days</option>
+              <option value="monthly">Monthly · 28 days</option>
+            </select>
+          </label>
+          <button type="button" className="primary-button" onClick={() => void createPin()} disabled={busy || !selectedLearner}>
+            {busy ? "Working…" : "Generate renewal PIN"}
+          </button>
+        </div>
+        <p className="subtle-note">Issue this PIN only after the learner’s payment has been verified. The PIN expires 24 hours after it is created; the selected access period starts when the learner redeems it.</p>
+      </> : <div className="classroom-empty"><LockKeyhole size={24}/><strong>No expired learner accounts</strong><span>New learners can register without a PIN. Renewal PINs become available here after a learner’s free trial or paid plan ends.</span></div>}
+
+      {newPin && <div className="pin-issued-card">
+        <strong>Renewal PIN · shown once</strong>
+        <div><span>Student ID</span><code>{newPin.studentId}</code><button type="button" className="subtle-button" onClick={() => void copy(newPin.studentId)}>Copy ID</button></div>
+        <div><span>Access PIN</span><code>{newPin.pin}</code><button type="button" className="subtle-button" onClick={() => void copy(newPin.pin)}>Copy PIN</button></div>
+        <small>{planNames[newPin.planTier]} · Expires {new Date(newPin.expiresAt).toLocaleString()}. The learner redeems it from the Subscription page using the same Student ID account.</small>
+      </div>}
+      {notice && <p className="inline-message" role="status">{notice}</p>}
+      {error && <p className="inline-message error-message" role="alert">{error}</p>}
+      <div className="setting-row"><div><strong>Refresh learner eligibility</strong><span>The list includes active learner accounts whose current trial or plan has ended.</span></div><button type="button" className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15}/> Refresh</button></div>
+    </div>
+
+    <div className="panel pin-history-panel">
+      <div className="panel-heading"><div><h2>Legacy enrolment invitation history</h2><p>{legacyPins.length} older record(s) · retained for audit and revocation</p></div><button type="button" className="subtle-button" onClick={() => void refresh()}>Refresh</button></div>
+      {legacyPins.length ? <div className="pin-history-list">{legacyPins.map(pin => {
+        const status = pin.redeemed_at ? "Redeemed" : pin.revoked_at ? "Revoked" : new Date(pin.expires_at).getTime() < Date.now() ? "Expired" : "Unused";
+        return <article key={pin.id}><div><strong>{pin.student_id || "Student ID unavailable"}</strong><small>Created {new Date(pin.created_at).toLocaleDateString()} · Expires {new Date(pin.expires_at).toLocaleDateString()}</small></div><span className={"pin-status " + status.toLowerCase()}>{status}</span>{status === "Unused" && <button type="button" className="text-button" disabled={busy} onClick={() => void revokeLegacyPin(pin.id)}>Revoke</button>}</article>;
+      })}</div> : <div className="classroom-empty"><KeyRound size={24}/><strong>No legacy invitations</strong><span>New learner registration is now self-service and does not use pre-issued Student IDs or PINs.</span></div>}
+    </div>
+  </div>;
+}
 
 function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetable }: {
   supabaseConfigured: boolean;
@@ -917,10 +1014,10 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="settings-divider"/>
       <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learner registration and PIN issuance are currently disabled because the live server-side enrolment function remains closed. Existing learners can continue to sign in. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Closed</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learners self-register without a pre-issued Student ID or PIN. The server generates each Student ID and starts a 48-hour trial for adult learners. After a trial or paid plan expires, an authorised administrator can issue a one-time renewal PIN tied to that learner. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Closed</span></div>
     </div>
 
-    <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Deliver Student IDs, one-time PINs and reset passwords directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>
+    <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Student IDs are generated automatically. Deliver renewal PINs and reset credentials directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>
   </div>
 }
 

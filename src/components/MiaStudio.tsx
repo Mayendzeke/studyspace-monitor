@@ -30,11 +30,7 @@ type GuidedDraft = {
   worksheetType: string
   questionCount: string
 }
-const welcome: ChatMessage = {
-  id: 'mia-welcome',
-  role: 'assistant',
-  content: "Hello. I’m MIΛ, your StudySpace teaching assistant. MIΛ is for educational purposes only: lesson planning, subject explanations, assessments, worksheets, revision schedules and learner-support methods. Gemini is the primary AI provider, with Gemma 4 as an automatic backup if Gemini is unavailable. Use anonymised, non-confidential teaching material only; never include learner names, Student IDs, contact details or private records.",
-}
+const welcomeText = "Welcome to MIΛ. Your StudySpace assistant helps with lesson planning, assessments, worksheets and learner support. Use anonymised, non-confidential teaching material only."
 const activities = [
   { id: 'lesson' as const, icon: BookOpen, title: 'Prepare a lesson', description: 'Build lesson objectives, teaching steps, activities, timings and a quick assessment.' },
   { id: 'assessment' as const, icon: ClipboardCheck, title: 'Create an assessment', description: 'Generate age-appropriate questions, marks, an answer key and marking guidance.' },
@@ -59,13 +55,13 @@ function loadMessages(userId: string): ChatMessage[] {
     const parsed = JSON.parse(localStorage.getItem(storageKey(userId)) || '[]')
     if (Array.isArray(parsed)) {
       const valid = parsed.filter((item): item is ChatMessage =>
-        item && typeof item.id === 'string' && ['user', 'assistant'].includes(item.role)
-        && typeof item.content === 'string'
+        item && typeof item.id === 'string' && item.id !== 'mia-welcome'
+        && ['user', 'assistant'].includes(item.role) && typeof item.content === 'string'
       ).slice(-30)
-      if (valid.length) return valid
+      return valid
     }
   } catch { /* Start a clean local conversation if storage is unavailable. */ }
-  return [welcome]
+  return []
 }
 function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -91,7 +87,7 @@ const unique = (values: (string | null | undefined)[]) => Array.from(new Set(val
 
 export default function MiaStudio() {
   const [userId, setUserId] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([welcome])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -99,6 +95,9 @@ export default function MiaStudio() {
   const [providerHealth, setProviderHealth] = useState<ProviderHealthSnapshot | null>(null)
   const [providerHealthError, setProviderHealthError] = useState('')
   const [checkingProviders, setCheckingProviders] = useState(false)
+  const [welcomeVisible, setWelcomeVisible] = useState(true)
+  const [welcomeFading, setWelcomeFading] = useState(false)
+  const welcomeDismissTimer = useRef<number | null>(null)
   const [profiles, setProfiles] = useState<AcademicProfile[]>([])
   const [subjectRows, setSubjectRows] = useState<SubjectRow[]>([])
   const [profileNotice, setProfileNotice] = useState('')
@@ -133,6 +132,17 @@ export default function MiaStudio() {
     }
     void restore()
     return () => { alive = false }
+  }, [])
+
+  useEffect(() => {
+    const fadeTimer = window.setTimeout(() => {
+      setWelcomeFading(true)
+      welcomeDismissTimer.current = window.setTimeout(() => setWelcomeVisible(false), 450)
+    }, 4200)
+    return () => {
+      window.clearTimeout(fadeTimer)
+      if (welcomeDismissTimer.current !== null) window.clearTimeout(welcomeDismissTimer.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -314,13 +324,24 @@ export default function MiaStudio() {
     }
   }
 
+  const dismissWelcome = () => {
+    setWelcomeFading(true)
+    if (welcomeDismissTimer.current !== null) window.clearTimeout(welcomeDismissTimer.current)
+    welcomeDismissTimer.current = window.setTimeout(() => setWelcomeVisible(false), 450)
+  }
+
   const clearConversation = () => {
-    saveMessages([welcome])
+    saveMessages([])
     setError('')
   }
 
   return (
     <section className="mia-page">
+      {welcomeVisible && <div className={`mia-welcome-toast${welcomeFading ? ' is-fading' : ''}`} role="status" aria-live="polite">
+        <span className="mia-welcome-toast-mark"><Sparkles size={17}/></span>
+        <div><strong>Welcome to MIΛ</strong><span>{welcomeText}</span></div>
+        <button type="button" onClick={dismissWelcome} aria-label="Dismiss welcome message"><X size={15}/></button>
+      </div>}
       <div className="mia-hero">
         <div className="mia-brand-mark"><Sparkles size={25}/></div>
         <div className="mia-hero-copy">

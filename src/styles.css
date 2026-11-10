@@ -1811,3 +1811,90 @@ html,body,#root{max-width:100%;overflow-x:hidden}
   outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
   outline-offset: 2px;
 }
+
+
+/* Shared StudySpace social, gamification and engagement components. */
+.ss-message-input-wrap{position:relative;flex:1;min-width:0}
+.ss-message-input-wrap>textarea{width:100%;min-width:0}
+.ss-emoji-toggle{flex:0 0 auto;font-size:17px;min-width:36px}
+.ss-emoji-picker{position:absolute;z-index:80;left:0;bottom:calc(100% + 10px);width:min(330px,calc(100vw - 44px));padding:12px;border:1px solid var(--glass-border,var(--border,rgba(128,148,170,.28)));border-radius:15px;background:var(--panel-strong,var(--panel,#fff));box-shadow:0 14px 36px rgba(15,23,42,.2)}
+.ss-emoji-picker-title{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--muted,#718096);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.ss-emoji-picker-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.ss-emoji-picker-grid button{min-width:0;min-height:34px;padding:3px;border:0;border-radius:8px;background:transparent;color:inherit;font-size:19px;cursor:pointer}
+.ss-emoji-picker-grid button:hover,.ss-emoji-picker-grid button:focus-visible{background:var(--surface-2,rgba(110,130,160,.14));outline:2px solid var(--accent,var(--blue,#655bd0));outline-offset:0}
+.student-peer-result-copy{display:grid;gap:4px;min-width:0}
+.student-peer-result-copy small{overflow-wrap:anywhere}
+.ss-group-visibility{cursor:pointer}
+.ss-group-visibility-choice{grid-column:span 2}
+.ss-group-visibility-choice select{width:100%}
+.student-gamification-panel{padding:clamp(16px,2vw,24px);margin:0 0 18px}
+.student-gamification-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.student-gamification-head h3{margin:5px 0;font-size:21px}
+.student-gamification-head p,.student-gamification-note{color:var(--muted);font-size:12px;line-height:1.55;max-width:680px}
+.student-xp-total{display:grid;gap:3px;text-align:right;flex:0 0 auto}
+.student-xp-total strong{font-size:28px;font-variant-numeric:tabular-nums}
+.student-xp-total span,.student-gamification-stats article>span{font-size:10px;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.student-xp-progress{margin:18px 0}
+.student-xp-progress>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:12px;margin-bottom:7px}
+.student-xp-progress strong{font-variant-numeric:tabular-nums}
+.student-xp-track,.student-streak-calendar{border-radius:999px}
+.student-xp-track{height:9px;background:var(--surface-2,rgba(128,148,170,.2));overflow:hidden}
+.student-xp-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--blue,#655bd0),var(--mint,#26866e))}
+.student-gamification-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.student-gamification-stats article{display:grid;gap:6px;padding:12px;border:1px solid var(--glass-border,rgba(128,148,170,.24));border-radius:12px;background:var(--glass-bg,rgba(128,148,170,.05))}
+.student-gamification-stats article strong{font-size:18px;font-variant-numeric:tabular-nums}
+.student-gamification-stats article small,.student-streak-calendar small,.student-referral-panel small{color:var(--muted);font-size:11px;line-height:1.45}
+.student-streak-calendar{margin-top:15px;padding:14px;background:var(--glass-bg,rgba(128,148,170,.05));border:1px solid var(--glass-border,rgba(128,148,170,.24))}
+.student-streak-calendar>div:first-child{display:grid;gap:3px}
+.student-streak-days{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:5px;margin-top:12px}
+.student-streak-days span{display:grid;place-items:center;min-height:26px;border-radius:7px;background:var(--surface-2,rgba(128,148,170,.12));color:var(--muted);font-size:10px}
+.student-streak-days span.is-active{background:color-mix(in srgb,var(--mint,#26866e) 25%,var(--surface-2,rgba(128,148,170,.12)));color:var(--text,var(--ink));font-weight:800;border:1px solid color-mix(in srgb,var(--mint,#26866e) 50%,transparent)}
+.student-xp-milestones{display:grid;gap:9px;margin-top:15px}
+.student-xp-milestones>div{display:flex;gap:7px;flex-wrap:wrap}
+.student-xp-milestones span{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--glass-border,rgba(128,148,170,.24));border-radius:999px;padding:6px 9px;color:var(--muted);font-size:11px}
+.student-xp-milestones span.is-earned{color:var(--text,var(--ink));border-color:color-mix(in srgb,var(--mint,#26866e) 45%,transparent);background:color-mix(in srgb,var(--mint,#26866e) 10%,transparent)}
+.student-referral-panel{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-top:15px;padding:14px;border:1px solid var(--glass-border,rgba(128,148,170,.24));border-radius:12px}
+.student-referral-panel>div:first-child{display:grid;gap:4px}
+.student-referral-code{display:flex;align-items:center;gap:8px}
+.student-referral-code code{font-size:15px;letter-spacing:.1em;font-weight:800}
+.student-referral-counts{grid-column:1/-1;display:flex;gap:8px}
+.student-referral-counts span{font-size:11px;color:var(--muted);border-radius:999px;padding:5px 8px;background:var(--surface-2,rgba(128,148,170,.12))}
+.student-xp-history{display:grid;gap:0;margin-top:15px}
+.student-xp-history>strong{margin-bottom:6px}
+.student-xp-history article{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--glass-border,rgba(128,148,170,.18));font-size:12px}
+.student-xp-history article strong{color:var(--mint,#26866e);font-variant-numeric:tabular-nums}
+.student-xp-history article strong.is-negative{color:var(--danger,#b4233a)}
+.student-xp-history article small{color:var(--muted)}
+.student-gamification-note{display:flex;gap:7px;align-items:flex-start;margin:14px 0 0}
+@media(max-width:760px){.student-gamification-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.student-gamification-head{align-items:flex-start}.student-referral-panel{grid-template-columns:1fr}.student-referral-code{justify-content:space-between}.student-streak-days{grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media(max-width:460px){.student-xp-history article{grid-template-columns:1fr auto}.student-xp-history article small{grid-column:1/-1}.ss-emoji-picker-grid{grid-template-columns:repeat(7,minmax(0,1fr))}.ss-group-visibility-choice{grid-column:span 2}}
+/* Monitor learner-engagement dashboard. */
+.monitor-engagement-page{display:grid;gap:16px}
+.monitor-engagement-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.monitor-engagement-header h2{margin:6px 0;font-size:24px}
+.monitor-engagement-header p,.monitor-engagement-section-head p{margin:0;color:var(--muted);font-size:12px;line-height:1.55;max-width:660px}
+.monitor-engagement-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.monitor-engagement-kpis article{display:grid;gap:7px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.monitor-engagement-kpis article>span{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.04em}
+.monitor-engagement-kpis article strong{font-size:23px;font-variant-numeric:tabular-nums}
+.monitor-engagement-kpis article small{font-size:11px;color:var(--muted);line-height:1.4}
+.monitor-engagement-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.85fr);gap:14px;align-items:start}
+.monitor-engagement-table-panel,.monitor-engagement-adjust-panel{min-width:0;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--panel)}
+.monitor-engagement-section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+.monitor-engagement-section-head h3{margin:0 0 5px;font-size:16px}
+.monitor-engagement-search{display:flex;gap:8px;align-items:center;margin:10px 0;padding:9px 11px;border:1px solid var(--border);border-radius:10px}
+.monitor-engagement-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink)}
+.monitor-engagement-table-wrap{width:100%;overflow:auto}
+.monitor-engagement-table{width:100%;border-collapse:collapse;min-width:600px;font-size:12px}
+.monitor-engagement-table th{text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.monitor-engagement-table th,.monitor-engagement-table td{padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.monitor-engagement-table td:first-child{min-width:145px}
+.monitor-engagement-table td:first-child strong,.monitor-engagement-table td:first-child small,.monitor-engagement-table td:nth-child(2) small,.monitor-engagement-table td:nth-child(3) small{display:block}
+.monitor-engagement-table td small{margin-top:3px;color:var(--muted);font-size:10px}
+.monitor-engagement-adjust-panel form{display:grid;gap:12px}
+.monitor-engagement-adjust-panel label{display:grid;gap:6px;color:var(--muted);font-size:12px}
+.monitor-engagement-adjust-panel input,.monitor-engagement-adjust-panel select,.monitor-engagement-adjust-panel textarea{width:100%;min-width:0;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-strong);color:var(--ink)}
+.monitor-engagement-adjust-panel small{font-size:10px;color:var(--muted);line-height:1.4}
+.monitor-engagement-privacy{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:1080px){.monitor-engagement-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.monitor-engagement-grid{grid-template-columns:1fr}}
+@media(max-width:620px){.monitor-engagement-header{flex-direction:column}.monitor-engagement-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ss-emoji-picker-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}

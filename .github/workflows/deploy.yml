@@ -179,22 +179,47 @@ jobs:
           const url = process.env.VITE_SUPABASE_URL?.trim()
           const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
           const headers = { apikey: key, 'Content-Type': 'application/json', Origin: 'https://mayendzeke.github.io' }
-          for (const name of ['generate-homework', 'reply-homework-help']) {
-            const response = await fetch(url + '/functions/v1/' + name, { method: 'POST', headers, body: JSON.stringify({}) })
-            if (response.status !== 401) {
+          async function expectUnauthenticated401(name, requestHeaders, body, description) {
+            let lastFailure = ''
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              let response
+              try {
+                response = await fetch(url + '/functions/v1/' + name, {
+                  method: 'POST',
+                  headers: requestHeaders,
+                  body: JSON.stringify(body),
+                  signal: AbortSignal.timeout(20000),
+                })
+              } catch (error) {
+                lastFailure = error instanceof Error ? error.message : String(error)
+                if (attempt < 3) {
+                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+                  continue
+                }
+                throw new Error(description + ' could not be verified after 3 attempts: ' + lastFailure)
+              }
+              if (response.status === 401) return
               const detail = (await response.text()).slice(0, 180)
-              throw new Error(name + ' must reject missing authentication with HTTP 401, received HTTP ' + response.status + ': ' + detail)
+              if ([502, 503, 504].includes(response.status)) {
+                lastFailure = 'HTTP ' + response.status + (detail ? ': ' + detail : '')
+                if (attempt < 3) {
+                  await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+                  continue
+                }
+                throw new Error(description + ' was unavailable after 3 attempts; expected HTTP 401, last response ' + lastFailure)
+              }
+              throw new Error(description + ' must reject missing authentication with HTTP 401, received HTTP ' + response.status + ': ' + detail)
             }
           }
-          const fallback = await fetch(url + '/functions/v1/process-homework-fallbacks', {
-            method: 'POST',
-            headers: { apikey: key, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: 'release-smoke-test' }),
-          })
-          if (fallback.status !== 401) {
-            const detail = (await fallback.text()).slice(0, 180)
-            throw new Error('Scheduled homework fallback must reject missing private cron authentication with HTTP 401, received HTTP ' + fallback.status + ': ' + detail)
+          for (const name of ['generate-homework', 'reply-homework-help']) {
+            await expectUnauthenticated401(name, headers, {}, name)
           }
+          await expectUnauthenticated401(
+            'process-homework-fallbacks',
+            { apikey: key, 'Content-Type': 'application/json' },
+            { source: 'release-smoke-test' },
+            'Scheduled homework fallback',
+          )
           console.log('Homework AI generation, teacher replies and scheduled fallback all reject unauthenticated calls.')
           NODE
       - name: Build

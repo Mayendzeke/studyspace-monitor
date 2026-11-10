@@ -1755,3 +1755,39 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .ss-thread-search span{flex:0 0 auto;color:var(--muted);font-size:8px}
 .ss-contact-row:focus-within{outline:2px solid color-mix(in srgb,var(--accent) 42%,transparent);outline-offset:1px}
 @media(max-width:640px){.ss-conversation-filters{grid-template-columns:repeat(4,minmax(0,1fr))}.ss-contact-row-actions{opacity:1}.ss-thread-search{padding-inline:10px}}
+
+
+/* MIΛ welcomes administrators without keeping a large greeting in the chat history. */
+.mia-welcome-toast{
+  display:flex;align-items:center;gap:12px;max-width:100%;margin:0 0 14px;padding:12px 14px;
+  border:1px solid rgba(118,145,202,.28);border-radius:14px;background:var(--surface);
+  box-shadow:var(--raised-small);opacity:1;transform:translateY(0);max-height:120px;overflow:hidden;
+  transition:opacity .42s ease,transform .42s ease,max-height .42s ease,margin .42s ease,padding .42s ease,border-color .42s ease;
+}
+.mia-welcome-toast.is-fading{
+  opacity:0;transform:translateY(-7px);pointer-events:none;max-height:0;margin-bottom:0;
+  padding-top:0;padding-bottom:0;border-color:transparent;
+}
+.mia-welcome-toast-mark{
+  width:34px;height:34px;display:grid;place-items:center;flex:0 0 auto;
+  color:#fff;border-radius:11px;background:linear-gradient(145deg,#8e82ed,#6256c8);
+}
+.mia-welcome-toast>div{min-width:0;flex:1;display:grid;gap:3px}
+.mia-welcome-toast strong{color:var(--text,#273449);font-size:12px}
+.mia-welcome-toast span:not(.mia-welcome-toast-mark){color:var(--muted,#667085);font-size:11px;line-height:1.5}
+.mia-welcome-toast button{
+  width:32px;height:32px;display:grid;place-items:center;flex:0 0 auto;
+  border:1px solid var(--border,#dce1eb);border-radius:10px;color:var(--muted,#667085);background:var(--panel,#f7f8fc);
+}
+.mia-welcome-toast button:hover{color:var(--text,#273449);background:var(--panel-strong,#fff)}
+:root[data-theme='dark'] .mia-welcome-toast{border-color:#3b4158;background:var(--surface,#202638)}
+:root[data-theme='dark'] .mia-welcome-toast strong{color:#e4e8f2}
+:root[data-theme='dark'] .mia-welcome-toast span:not(.mia-welcome-toast-mark){color:#aab3c5}
+@media(max-width:640px){
+  .mia-welcome-toast{align-items:flex-start;gap:9px;padding:10px 11px}
+  .mia-welcome-toast-mark{width:30px;height:30px}
+  .mia-welcome-toast span:not(.mia-welcome-toast-mark){font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .mia-welcome-toast{transition:none}
+}

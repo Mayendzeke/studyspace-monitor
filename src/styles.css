@@ -1736,3 +1736,22 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 .mia-provider-health-grid strong{font-size:11px;color:var(--text)}
 .mia-provider-health-grid small,.mia-provider-health-panel>p{font-size:10px;line-height:1.5;color:var(--muted);margin:0}
 @media(max-width:640px){.mia-provider-health-grid{grid-template-columns:1fr}.mia-provider-health-top{align-items:flex-start;flex-direction:column}}
+
+
+/* StudySpace Monitor inbox refinements. */
+.ss-conversation-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0 10px 10px;padding:4px;border:1px solid var(--border);border-radius:11px;background:var(--panel)}
+.ss-conversation-filters button{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;padding:7px 3px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:9px;font-weight:800;cursor:pointer}
+.ss-conversation-filters button span{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:20px;background:var(--panel-strong);font-size:8px}
+.ss-conversation-filters button.is-active{background:var(--panel-strong);color:var(--accent);box-shadow:var(--raised-small)}
+.monitor-contact-list{flex:1 1 auto;min-height:120px;overscroll-behavior:contain}
+.ss-contact-row{display:flex;align-items:center;gap:2px;min-width:0;border-radius:11px}
+.ss-contact-row>.monitor-contact-item{flex:1;min-width:0}
+.ss-contact-row-actions{display:flex;align-items:center;gap:1px;padding-right:4px;opacity:.72}
+.ss-contact-row-actions button{display:grid;place-items:center;width:27px;height:27px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.ss-contact-row-actions button:hover,.ss-contact-row-actions button:focus-visible{background:var(--panel);color:var(--accent);outline:none}
+.ss-thread-search{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 13px;border-bottom:1px solid var(--border);background:var(--panel-strong)}
+.ss-thread-search label{display:flex;align-items:center;gap:8px;flex:1;min-width:0;color:var(--muted)}
+.ss-thread-search input{width:100%;min-width:0;padding:7px 0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:10px}
+.ss-thread-search span{flex:0 0 auto;color:var(--muted);font-size:8px}
+.ss-contact-row:focus-within{outline:2px solid color-mix(in srgb,var(--accent) 42%,transparent);outline-offset:1px}
+@media(max-width:640px){.ss-conversation-filters{grid-template-columns:repeat(4,minmax(0,1fr))}.ss-contact-row-actions{opacity:1}.ss-thread-search{padding-inline:10px}}

@@ -3,6 +3,7 @@ import { MessageCircle, Send, Paperclip, Search, RefreshCw, FileText, Check, Ale
 import { supabase } from "../lib/supabase";
 import StudyspaceGroupsPanel from "./StudyspaceGroupsPanel";
 import SystemAnnouncementsPanel from "./SystemAnnouncementsPanel";
+import EmojiPicker from "./EmojiPicker";
 
 type Contact={contact_id:string;display_name:string;grade:string;contact_type:string};
 type Message={id:string;sender_id:string;recipient_id:string;body:string;attachment_path:string|null;attachment_name:string;attachment_mime:string;attachment_size:number;created_at:string;read_at:string|null;delivered_at:string|null;edited_at:string|null;unsent_at:string|null;deleted_for_everyone_at:string|null};
@@ -28,6 +29,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
   const [selected,setSelected]=useState("");
   const [query,setQuery]=useState("");
   const [draft,setDraft]=useState("");
+  const [emojiOpen,setEmojiOpen]=useState(false);
   const [file,setFile]=useState<File|null>(null);
   const [signedUrls,setSignedUrls]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(true);
@@ -258,7 +260,7 @@ export default function MessagesPage({onOpenHomework}:{onOpenHomework:()=>void})
           </div>
           <form className="monitor-message-composer" onSubmit={send}>
             {file&&<div className="monitor-message-file"><FileText size={14}/><span>{file.name} · {formatBytes(file.size)}</span><button type="button" onClick={()=>{setFile(null);if(fileRef.current)fileRef.current.value="";}} aria-label="Remove attachment">×</button></div>}
-            <div className="monitor-message-compose-row"><button type="button" className="icon-button" aria-label="Attach file" onClick={()=>fileRef.current?.click()}><Paperclip size={17}/></button><input ref={fileRef} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={e=>setFile(e.target.files?.[0]||null)}/><textarea value={draft} maxLength={2000} rows={2} onChange={e=>setDraft(e.target.value)} placeholder="Write a message…" aria-label="Message text"/><button type="submit" className="primary-button" disabled={sending||(!draft.trim()&&!file)||draftWords>350||draft.length>2000}><Send size={15}/>{sending?"Sending…":"Send"}</button></div><div className="monitor-message-limits"><span>Up to 350 words / 2,000 characters · Attachments up to 5 MB</span><span>{draftWords}/350 words · {draft.length}/2,000</span></div>
+            <div className="monitor-message-compose-row"><button type="button" className="icon-button" aria-label="Attach file" onClick={()=>fileRef.current?.click()}><Paperclip size={17}/></button><input ref={fileRef} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={e=>setFile(e.target.files?.[0]||null)}/><div className="ss-message-input-wrap">{emojiOpen&&<EmojiPicker onSelect={emoji=>{setDraft(value=>value+emoji);setEmojiOpen(false);}}/>}<textarea value={draft} maxLength={2000} rows={2} onChange={e=>setDraft(e.target.value)} placeholder="Write a message…" aria-label="Message text"/></div><button type="button" className="icon-button ss-emoji-toggle" aria-label="Add emoji" title="Add emoji" onClick={()=>setEmojiOpen(v=>!v)}>😊</button><button type="submit" className="primary-button" disabled={sending||(!draft.trim()&&!file)||draftWords>350||draft.length>2000}><Send size={15}/>{sending?"Sending…":"Send"}</button></div><div className="monitor-message-limits"><span>Up to 350 words / 2,000 characters · Attachments up to 5 MB</span><span>{draftWords}/350 words · {draft.length}/2,000</span></div>
           </form>
         </>:<div className="monitor-message-empty"><MessageCircle size={28}/><strong>{loading?"Opening your inbox…":"Select a learner"}</strong><span>Choose a learner from the list to view or start a conversation.</span></div>}
       </section>

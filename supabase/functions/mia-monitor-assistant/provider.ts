@@ -29,10 +29,6 @@ function geminiKey(): string {
   return Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
 }
 
-function geminiPaidServiceConfirmed(): boolean {
-  return Deno.env.get("GEMINI_API_PAID_SERVICE_CONFIRMED")?.trim().toLowerCase() === "true";
-}
-
 function cloudflareCredentials(): { accountId: string; apiToken: string } {
   return {
     accountId: Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim() ?? "",
@@ -45,7 +41,7 @@ export function getProviderStatus(): ProviderStatus {
   return {
     primary: "Google Gemini API",
     backup: "Cloudflare Workers AI",
-    gemini: { configured: Boolean(geminiKey() && geminiPaidServiceConfirmed()), model: GEMINI_MODEL },
+    gemini: { configured: Boolean(geminiKey()), model: GEMINI_MODEL },
     gemma: { configured: Boolean(cloudflare.accountId && cloudflare.apiToken), model: GEMMA_MODEL },
   };
 }
@@ -102,7 +98,6 @@ function parseGeminiText(payload: any): string {
 async function callGemini(prompt: string, options: Required<GenerationOptions>): Promise<string> {
   const key = geminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is not configured.");
-  if (!geminiPaidServiceConfirmed()) throw new Error("Gemini primary is disabled until GEMINI_API_PAID_SERVICE_CONFIRMED=true is set after confirming active billing for a paid Gemini API project.");
   let response: Response;
   try {
     response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent", {
@@ -198,9 +193,7 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
       primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";
     }
   } else {
-    primaryFailure = geminiKey()
-      ? "Gemini is disabled until active paid API billing is confirmed by setting GEMINI_API_PAID_SERVICE_CONFIRMED=true."
-      : "GEMINI_API_KEY is not configured.";
+    primaryFailure = "GEMINI_API_KEY is not configured.";
   }
 
   if (!status.gemma.configured) {

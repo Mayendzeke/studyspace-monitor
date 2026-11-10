@@ -97,7 +97,20 @@ export default function MiaStudio() {
   const [checkingProviders, setCheckingProviders] = useState(false)
   const [welcomeVisible, setWelcomeVisible] = useState(true)
   const [welcomeFading, setWelcomeFading] = useState(false)
+  const welcomeFadeTimer = useRef<number | null>(null)
   const welcomeDismissTimer = useRef<number | null>(null)
+  const dismissWelcome = () => {
+    if (welcomeFadeTimer.current !== null) {
+      window.clearTimeout(welcomeFadeTimer.current)
+      welcomeFadeTimer.current = null
+    }
+    setWelcomeFading(true)
+    if (welcomeDismissTimer.current !== null) window.clearTimeout(welcomeDismissTimer.current)
+    welcomeDismissTimer.current = window.setTimeout(() => {
+      setWelcomeVisible(false)
+      welcomeDismissTimer.current = null
+    }, 450)
+  }
   const [profiles, setProfiles] = useState<AcademicProfile[]>([])
   const [subjectRows, setSubjectRows] = useState<SubjectRow[]>([])
   const [profileNotice, setProfileNotice] = useState('')
@@ -135,12 +148,9 @@ export default function MiaStudio() {
   }, [])
 
   useEffect(() => {
-    const fadeTimer = window.setTimeout(() => {
-      setWelcomeFading(true)
-      welcomeDismissTimer.current = window.setTimeout(() => setWelcomeVisible(false), 450)
-    }, 4200)
+    welcomeFadeTimer.current = window.setTimeout(dismissWelcome, 4200)
     return () => {
-      window.clearTimeout(fadeTimer)
+      if (welcomeFadeTimer.current !== null) window.clearTimeout(welcomeFadeTimer.current)
       if (welcomeDismissTimer.current !== null) window.clearTimeout(welcomeDismissTimer.current)
     }
   }, [])
@@ -322,12 +332,6 @@ export default function MiaStudio() {
     } catch {
       setError('The MIΛ assessment could not be handed to the interactive homework builder. Check browser storage and try again.')
     }
-  }
-
-  const dismissWelcome = () => {
-    setWelcomeFading(true)
-    if (welcomeDismissTimer.current !== null) window.clearTimeout(welcomeDismissTimer.current)
-    welcomeDismissTimer.current = window.setTimeout(() => setWelcomeVisible(false), 450)
   }
 
   const clearConversation = () => {

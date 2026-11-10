@@ -103,7 +103,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         ...(options.systemPrompt ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } } : {}),
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -116,7 +116,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new Error("Gemini timed out after 25 seconds.");
+      throw new Error("Gemini timed out after 60 seconds.");
     }
     throw new Error("Gemini could not be reached.");
   }
@@ -191,6 +191,7 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
     } catch (error) {
       if (error instanceof ProviderSafetyError) throw error;
       primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";
+      console.warn("[StudySpace AI provider fallback] Gemini request unavailable; switching to Gemma backup:", primaryFailure.slice(0, 260));
     }
   } else {
     primaryFailure = "GEMINI_API_KEY is not configured.";

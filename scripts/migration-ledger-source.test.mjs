@@ -23,8 +23,8 @@ const required = [
   "20261110151719_studyspace_public_self_service_enrolment.sql",
   "20261110201714_studyspace_post_trial_access_pins.sql",
   "20261110202759_studyspace_course_profile_rpc_compatibility.sql",
-  "20261110205100_studyspace_profile_setup_dismissal.sql",
-  "20261110205600_studyspace_profile_country_save.sql",
+  "20261110205145_studyspace_profile_setup_dismissal.sql",
+  "20261110205311_studyspace_profile_country_save.sql",
 ];
 
 const superseded = [

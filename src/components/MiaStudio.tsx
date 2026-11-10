@@ -91,7 +91,6 @@ export default function MiaStudio() {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [remaining, setRemaining] = useState<number | null>(null)
   const [providerHealth, setProviderHealth] = useState<ProviderHealthSnapshot | null>(null)
   const [providerHealthError, setProviderHealthError] = useState('')
   const [checkingProviders, setCheckingProviders] = useState(false)
@@ -218,7 +217,6 @@ export default function MiaStudio() {
       saveMessages(completed)
       if (lessonContext) setLessonHandoff({ ...lessonContext, content: data.reply })
       if (homeworkContext) setHomeworkHandoff({ ...homeworkContext, instructions: (homeworkContext.instructions + '\n\nMIA-generated teaching material to use as the source for the interactive questions:\n' + data.reply).slice(0, 2000) })
-      setRemaining(typeof data.remainingDailyRequests === 'number' ? data.remainingDailyRequests : null)
     } catch (reason) {
       setError(await edgeError(reason))
       setDraft(clean)
@@ -357,14 +355,14 @@ export default function MiaStudio() {
       </div>
 
       <div className="mia-provider-banner" role="note">
-        <strong>Gemini primary · Gemma 4 automatic backup</strong>
-        <span>Available to authorised adult administrators in Monitor only. Use anonymised, non-confidential teaching material. Never submit learner names, Student IDs, contact details or sensitive records.</span>
+        <strong>Gemini free-tier API · Gemma 4 automatic backup</strong>
+        <span>Gemini is used first. When its free API quota is reached or the service is unavailable, Gemma 4 takes over automatically. Google may use free-tier API content to improve its services, so submit anonymised, non-confidential teaching material only. Never submit learner names, Student IDs, contact details or sensitive records.</span>
       </div>
 
       {providerHealth && <div className="mia-provider-health-panel" role="status">
         <div className="mia-provider-health-top"><strong><Activity size={16}/> Live AI provider test passed</strong><span>{providerHealth.provider} · {providerHealth.model}</span></div>
         <div className="mia-provider-health-grid">
-          <span><strong>Gemini primary</strong><small>{providerHealth.providers?.gemini?.configured ? 'Configured and eligible for requests' : 'Not enabled — check API key and paid-service confirmation'}</small></span>
+          <span><strong>Gemini primary</strong><small>{providerHealth.providers?.gemini?.configured ? 'Configured and eligible for requests' : 'Not configured — add the Gemini API key in Supabase secrets'}</small></span>
           <span><strong>Gemma 4 backup</strong><small>{providerHealth.providers?.gemma?.configured ? 'Cloudflare credentials configured' : 'Cloudflare credentials missing'}</small></span>
         </div>
         {providerHealth.providerNotice && <p>{providerHealth.providerNotice}</p>}
@@ -381,7 +379,6 @@ export default function MiaStudio() {
         <div className="mia-chat-heading">
           <div><strong><Bot size={18}/> MIΛ conversation</strong><small>Choose a guided task below, or type a custom request when you need to.</small></div>
           <div className="mia-chat-tools">
-            {remaining !== null && <span className="mia-remaining">{remaining} requests left today</span>}
             <button type="button" className="secondary-button" onClick={() => void checkProviderHealth()} disabled={checkingProviders || !userId}><Activity size={14}/>{checkingProviders ? 'Checking AI…' : 'Test AI providers'}</button>
             <button type="button" className="secondary-button" onClick={clearConversation}><Trash2 size={14}/> Clear chat</button>
           </div>

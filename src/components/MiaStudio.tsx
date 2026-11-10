@@ -180,7 +180,7 @@ export default function MiaStudio() {
     setCheckingProviders(true);
     setProviderHealthError('');
     try {
-      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', { body: { action: 'healthcheck' } }), 80000, 'The provider health check timed out. Try again.');
+      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', { body: { action: 'healthcheck' } }), 120000, 'The provider health check timed out after 120 seconds. Try again.');
       if (invokeError) throw new Error(await edgeError(invokeError));
       if (!data?.success || !data?.verified) throw new Error(typeof data?.error === 'string' ? data.error : 'The AI providers did not return a verified test response.');
       setProviderHealth(data as ProviderHealthSnapshot);
@@ -205,7 +205,7 @@ export default function MiaStudio() {
     try {
       const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
         body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
-      }), 90000, 'MIΛ did not respond within 90 seconds. Your message has been restored so you can retry.');
+      }), 120000, 'MIΛ did not respond within 120 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {
         throw new Error(typeof data?.error === 'string' ? data.error : 'MIΛ did not return a usable response.')

@@ -25,6 +25,8 @@ const required = [
   "20261110202759_studyspace_course_profile_rpc_compatibility.sql",
   "20261110205145_studyspace_profile_setup_dismissal.sql",
   "20261110205311_studyspace_profile_country_save.sql",
+  "20261111130107_studyspace_fix_auto_group_subject_aggregation.sql",
+  "20261111132915_studyspace_remove_grouped_subject_having_from_auto_groups.sql",
 ];
 
 const superseded = [

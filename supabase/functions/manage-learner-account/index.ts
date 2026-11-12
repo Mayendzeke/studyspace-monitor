@@ -354,8 +354,34 @@ Deno.serve(async (request) => {
     const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte =>
       byte.toString(16).padStart(2, "0")
     ).join("");
-    const { error: passwordError } = await admin.auth.admin.updateUserById(learnerId, { password: temporaryPassword });
+    const { data: authUserData, error: authUserError } = await admin.auth.admin.getUserById(learnerId);
+    if (authUserError || !authUserData.user) return json(500, { error: "Supabase could not load the learner's authentication record." });
+    const nextAppMetadata = {
+      ...(authUserData.user.app_metadata ?? {}),
+      must_change_password: true,
+      password_reset_at: new Date().toISOString(),
+    };
+    const { error: passwordError } = await admin.auth.admin.updateUserById(learnerId, {
+      password: temporaryPassword,
+      app_metadata: nextAppMetadata,
+    });
     if (passwordError) return json(500, { error: "Supabase could not rotate the learner password." });
+
+    // Revoke existing refresh sessions. Sign in once with the new temporary
+    // password to obtain the learner JWT required by Supabase's admin signOut API.
+    const learnerAuth = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const learnerEmail = String(learner.student_id ?? "").toLowerCase() + "@students.studyspace.invalid";
+    const { data: temporarySession, error: temporarySignInError } = await learnerAuth.auth.signInWithPassword({
+      email: learnerEmail,
+      password: temporaryPassword,
+    });
+    if (temporarySignInError || !temporarySession.session?.access_token) {
+      console.error("[manage-learner-account] Could not create a temporary learner session for session revocation:", temporarySignInError?.message ?? "No session returned.");
+    } else {
+      const { error: revokeError } = await admin.auth.admin.signOut(temporarySession.session.access_token);
+      if (revokeError) console.error("[manage-learner-account] Existing learner refresh sessions could not be revoked:", revokeError.message);
+    }
+
     await admin.from("audit_events").insert({
       actor_id: authData.user.id, event_type: "learner_password_reset_by_admin",
       target_type: "profile", target_id: learnerId,

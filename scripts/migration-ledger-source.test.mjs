@@ -28,6 +28,7 @@ const required = [
   "20261111130107_studyspace_fix_auto_group_subject_aggregation.sql",
   "20261111132915_studyspace_remove_grouped_subject_having_from_auto_groups.sql",
   "20261112203306_studyspace_fix_gamification_rpc_output_ambiguity.sql",
+  "20261112203307_studyspace_add_student_access_pin_fk_indexes.sql",
 ];
 
 const superseded = [

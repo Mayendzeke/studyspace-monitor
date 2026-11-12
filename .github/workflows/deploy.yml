@@ -40,6 +40,8 @@ jobs:
         run: node --test scripts/lesson-recap-response-shape.test.mjs
       - name: Verify gamification RPC output-parameter qualification
         run: node --test scripts/gamification-rpc-ambiguity.test.mjs
+      - name: Verify student access PIN foreign-key indexes
+        run: node --test scripts/student-access-pin-indexes.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
       - name: Report dependency audit

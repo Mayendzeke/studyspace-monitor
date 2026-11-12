@@ -32,6 +32,8 @@ jobs:
         run: node --test scripts/homework-fallback-auth-config.test.mjs
       - name: Verify Monitor MIΛ response content variants
         run: node --test scripts/mia-monitor-response-shape.test.mjs
+      - name: Verify learner password reset safeguards
+        run: node --test scripts/manage-learner-account-password.test.mjs
       - name: Verify administrator Gemini free-tier and Gemma fallback policy
         run: node --test scripts/admin-ai-provider-policy.test.mjs
       - name: Verify lesson recap response content variants

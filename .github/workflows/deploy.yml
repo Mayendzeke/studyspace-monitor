@@ -38,6 +38,8 @@ jobs:
         run: node --test scripts/admin-ai-provider-policy.test.mjs
       - name: Verify lesson recap response content variants
         run: node --test scripts/lesson-recap-response-shape.test.mjs
+      - name: Verify gamification RPC output-parameter qualification
+        run: node --test scripts/gamification-rpc-ambiguity.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
       - name: Report dependency audit

@@ -2151,3 +2151,16 @@ html,body,#root{overflow-x:clip!important}
 @media (prefers-reduced-motion: reduce) {
   .help-card, .workspace-switcher, .help-card-reopen { transition: none; }
 }
+
+
+/* Make the teacher resource drop area respond clearly to drag-and-drop. */
+.resource-upload-zone {
+  border-width:1.5px;
+  transition:border-color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+.resource-upload-zone.is-drag-over {
+  border-color:var(--mint,#62c7a4);
+  background:color-mix(in srgb,var(--mint,#62c7a4) 10%,var(--panel,#fff));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--mint,#62c7a4) 12%,transparent);
+  transform:scale(.995);
+}

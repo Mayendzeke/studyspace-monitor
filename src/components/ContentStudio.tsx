@@ -90,6 +90,7 @@ export default function ContentStudio() {
   const [resourceCategoryFilter,setResourceCategoryFilter] = useState('All'); const [resourceSort,setResourceSort] = useState('newest')
   const [uploadSubject,setUploadSubject] = useState(''); const [uploadTopic,setUploadTopic] = useState('')
   const [uploadCategory,setUploadCategory] = useState<ResourceCategory>('Notes'); const [uploadDescription,setUploadDescription] = useState('')
+  const [resourceDragOver,setResourceDragOver] = useState(false)
   const [assignmentExercise,setAssignmentExercise] = useState(''); const [assignmentTarget,setAssignmentTarget] = useState('One learner')
   const [assignmentDue,setAssignmentDue] = useState(''); const [assignmentAvailability,setAssignmentAvailability] = useState('Immediately after publishing')
   const [paperBusy,setPaperBusy] = useState(false)
@@ -358,7 +359,7 @@ export default function ContentStudio() {
   }
   const addFiles=async(files:FileList|null)=>{
     if(!files?.length)return
-    const allowed=/\.(pdf|doc|docx|ppt|pptx|txt|rtf|jpg|jpeg|png|webp|csv|xlsx)$/i
+    const allowed=/\.(pdf|doc|docx|ppt|pptx|txt|rtf|jpg|jpeg|png|webp|csv|xlsx|xls)$/i
     const selected=Array.from(files)
     const invalid=selected.find(file=>!allowed.test(file.name))
     if(invalid){setNotice('Unsupported file type: '+invalid.name);return}
@@ -555,7 +556,7 @@ export default function ContentStudio() {
     <div className={cloudError?'setup-banner warning-banner':'setup-banner'}><div className="setup-banner-icon"><ShieldCheck size={21}/></div><div className="setup-banner-copy"><strong>{cloudLoading?'Connecting to Studyspace…':cloudError?'Cloud workspace needs attention':'Cloud content workspace'}</strong><p>{cloudError||'Assessments, answer keys, teaching resources and learner assignments are stored in the shared Studyspace project. Your browser cache is retained for continuity.'}</p></div><button className="subtle-button" onClick={()=>void loadCloudWorkspace()} disabled={cloudLoading}>Refresh</button></div>
     <div className="studio-tabs" role="tablist" aria-label="Content Studio sections">
       <button className={tab==='builder'?'selected':''} onClick={()=>setTab('builder')}><ClipboardList size={16}/> Builder</button>
-      <button className={tab==='library'?'selected':''} onClick={()=>setTab('library')}><FileText size={16}/> Resource library <span>{resources.length}</span></button>
+      <button className={tab==='library'?'selected':''} onClick={()=>setTab('library')}><FileText size={16}/> Study Materials &amp; Resources <span>{resources.length}</span></button>
       <button className={tab==='assign'?'selected':''} onClick={()=>setTab('assign')}><Send size={16}/> Review & assign</button>
     </div>
     {notice&&<div className="studio-notice" role="status"><CheckCircle2 size={16}/><span>{notice}</span><button onClick={()=>setNotice('')} aria-label="Dismiss"><X size={15}/></button></div>}
@@ -606,8 +607,13 @@ export default function ContentStudio() {
       <aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assessment queue</h2><p>Cloud drafts and review states</p></div><ClipboardList size={18}/></div>{drafts.length===0?<div className="draft-empty">Your assessments will appear here.</div>:drafts.map(d=><div className="saved-draft" key={d.id}><div><strong>{d.title}</strong><small>{d.subject} · {d.questions.length} questions</small><span className={`status-chip status-${d.status}`}>{d.status}</span></div><button className="subtle-button" onClick={()=>loadDraft(d)}>Open</button></div>)}<button className="subtle-button full-width" onClick={resetBuilder}><Plus size={15}/> New assessment</button></aside>
     </div>}
 
-    {tab==='library'&&<section className="panel studio-library-panel"><div className="panel-heading"><div><h2>Resource library</h2><p>Organise teaching materials by subject, topic and resource type</p></div><FileText size={19}/></div>
-      <div className="resource-upload-zone"><Upload size={25}/><strong>Add learning materials</strong><p>PDF, Word, PowerPoint, text, CSV, Excel and image files · 25 MB maximum per file. Files are uploaded to the private Studyspace library and remain accessible only to you and the learners you assign them to.</p>
+    {tab==='library'&&<section className="panel studio-library-panel"><div className="panel-heading"><div><h2>Study Materials &amp; Resources</h2><p>Upload, organise, preview and assign learning materials for your students.</p></div><FileText size={19}/></div>
+      <div
+        className={"resource-upload-zone"+(resourceDragOver?' is-drag-over':'')}
+        onDragOver={event=>{event.preventDefault();setResourceDragOver(true)}}
+        onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setResourceDragOver(false)}}
+        onDrop={event=>{event.preventDefault();setResourceDragOver(false);void addFiles(event.dataTransfer.files)}}
+      ><Upload size={25}/><strong>Add learning materials</strong><p>Drag and drop files here or browse. PDF, Word, PowerPoint, Excel, text, CSV and image files · 25 MB maximum per file. Materials are stored in the private Studyspace library and remain accessible only to you and the learners you assign them to.</p>
         <div className="resource-upload-fields"><label className="studio-field">Subject
           <select value={uploadSubjectCustom||(uploadSubject&&!subjectOptions.includes(uploadSubject))?'__other__':uploadSubject}
             onChange={e=>{const value=e.target.value;if(value==='__other__'){setUploadSubjectCustom(true);setUploadSubject('')}else{setUploadSubjectCustom(false);setUploadSubject(value)}}}>
@@ -617,7 +623,7 @@ export default function ContentStudio() {
           </select>
         </label>{(uploadSubjectCustom||(uploadSubject&&!subjectOptions.includes(uploadSubject)))&&<label className="studio-field">Enter subject<input value={uploadSubject} onChange={e=>setUploadSubject(e.target.value)} placeholder="Type the subject or module"/></label>}<label className="studio-field">Topic / unit<input value={uploadTopic} onChange={e=>setUploadTopic(e.target.value)} placeholder="e.g. Algebra"/></label><label className="studio-field">Resource type<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value as ResourceCategory)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label className="studio-field">Description<input value={uploadDescription} onChange={e=>setUploadDescription(e.target.value)} placeholder="Optional note about this file"/></label></div>
         {uploadCategory==='Past paper'&&<div className="builder-hint">Past-paper PDFs are read in your browser. Selectable text is extracted automatically; image-only pages use English OCR. The extracted questions become an editable draft. Check every question, mark value and answer before you publish or assign it. The original PDF remains in your private resource library.</div>}
-        <label className="primary-button"><Plus size={16}/> {paperBusy?'Reading paper…':'Choose files'}<input type="file" multiple={uploadCategory!=='Past paper'} accept={uploadCategory==='Past paper'?'.pdf,application/pdf':'.pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx'} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} disabled={paperBusy} hidden/></label>
+        <label className="primary-button"><Plus size={16}/> {paperBusy?'Reading paper…':'Choose files'}<input type="file" multiple={uploadCategory!=='Past paper'} accept={uploadCategory==='Past paper'?'.pdf,application/pdf':'.pdf,.doc,.docx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.webp,.csv,.xlsx,.xls'} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}} disabled={paperBusy} hidden/></label>
         {paperBusy&&<p className="inline-message" role="status">{paperProgress||'Preparing your past paper…'}</p>}
       </div>
       <div className="resource-toolbar"><div className="resource-search"><Search size={16}/><input value={resourceSearch} onChange={e=>setResourceSearch(e.target.value)} placeholder="Search file, subject or topic..."/></div><select aria-label="Filter by subject" value={resourceSubjectFilter} onChange={e=>setResourceSubjectFilter(e.target.value)}><option>All</option>{subjects.map(s=><option key={s}>{s}</option>)}</select><select aria-label="Filter by resource type" value={resourceCategoryFilter} onChange={e=>setResourceCategoryFilter(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select><select aria-label="Sort resources" value={resourceSort} onChange={e=>setResourceSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select></div>

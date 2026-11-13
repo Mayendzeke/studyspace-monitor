@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, Send, Users, Video, BookOpen, ClipboardList, Presentation, Play, Square, ArrowUpRight } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { CalendarDays, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, Send, Users, Video, BookOpen, ClipboardList, Presentation, Play, Square } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
 
@@ -158,7 +158,6 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
     setSending(false)
   }
 
-  const counts = useMemo(()=>({total:learners.length,completed:completed.size}),[learners.length,completed])
   const todaySessions=sessions.filter(row=>isToday(row.starts_at))
   const selectedTab = (next:Tab) => setTab(next)
 

@@ -26,6 +26,6 @@ test("trial reminder remains one day before the new seven-day trial expires", ()
 test("only currently active free trials are extended; paid and expired access is untouched", () => {
   const migration = read("supabase/migrations/20261113134926_extend_studyspace_free_trial_to_seven_days.sql");
   assert.match(migration, /account_status = 'active'/);
-  assert.match(migration, /subscription_tier is null/);
+  assert.match(migration, /subscription_tier\s+is\s+null/i);
   assert.match(migration, /trial_expires_at > clock_timestamp\(\)/);
 });

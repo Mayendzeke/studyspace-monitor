@@ -1,5 +1,6 @@
 import ContentStudio from './components/ContentStudio'
 import ClassroomStudio from './components/ClassroomStudio'
+import MonitorTodaySession from './components/MonitorTodaySession'
 import HomeworkBuilder from './components/HomeworkBuilder'
 import HomeworkHelpInbox from './components/HomeworkHelpInbox'
 import AssessmentReviewQueue from './components/AssessmentReviewQueue'
@@ -27,12 +28,13 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | "Today's Session" | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
+  { label: "Today's Session", icon: CalendarDays },
   { label: 'Learners', icon: Users },
   { label: 'Messages', icon: MessageCircle },
   { label: 'Timetable', icon: CalendarDays },
@@ -316,6 +318,7 @@ function App() {
 
         <div className="content-wrap">
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
+          {page === "Today's Session" && <MonitorTodaySession onCreateLesson={() => navigate('Classroom Studio')} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Access PINs')} />}
           {page === 'Timetable' && <TeacherWeeklyTimetable />}
           {page === 'Messages' && <MessagesPage onOpenHomework={() => setPage('Classroom Studio')} />}

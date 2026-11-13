@@ -158,7 +158,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
     const image=new Image()
     image.onload=()=>{if(canvasRef.current&&!drawingRef.current){const ctx=canvasRef.current.getContext('2d');ctx?.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);ctx?.drawImage(image,0,0,canvasRef.current.width,canvasRef.current.height)}}
     image.src=boardImage
-  },[boardImage,activeId])
+  },[boardImage,activeId,tab])
 
   function boardPoint(event:ReactPointerEvent<HTMLCanvasElement>){
     const canvas=canvasRef.current!

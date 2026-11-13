@@ -17,8 +17,9 @@ test('learner resource manager uses the private resource bucket and shared assig
   assert.match(panel, /learning_resources/);
   assert.match(panel, /resource_assignments/);
   assert.match(panel, /25\s*\*\s*1024\s*\*\s*1024/);
-  assert.match(panel, /\.pdf\|doc\|docx/);
-  assert.match(panel, /\.delete\(\).*resource_assignments|resource_assignments[\s\S]*\.delete\(/);
+  assert.ok(panel.includes('\\.(pdf|doc|docx'), 'the established document extension allowlist must be retained');
+  assert.match(panel, /resource_assignments[\s\S]*\.delete\(/);
+  assert.doesNotMatch(panel, /from\(["']learning_resources["']\)\s*\.delete\(/);
 });
 
 test('Monitor two-week subscription price is E180 for fourteen days', () => {
@@ -29,12 +30,13 @@ test('Monitor two-week subscription price is E180 for fourteen days', () => {
 
 test('Monitor top bar remains sticky with a theme-aware surface', () => {
   const styles = read('src/styles.css');
-  const topbar = styles.match(/\.topbar\s*\{([^}]*)\}/);
-  assert.ok(topbar, 'topbar rule must exist');
-  assert.match(topbar[1], /position:\s*sticky/);
-  assert.match(topbar[1], /top:\s*0/);
-  assert.match(topbar[1], /z-index:/);
-  assert.match(topbar[1], /background:/);
+  const topbarRules = [...styles.matchAll(/\.topbar\s*\{([^}]*)\}/g)].map(match => match[1]);
+  assert.ok(topbarRules.some(rule =>
+    /position:\s*sticky/.test(rule) &&
+    /top:\s*0/.test(rule) &&
+    /z-index:/.test(rule) &&
+    /background:/.test(rule)
+  ), 'a theme-aware sticky topbar rule must exist');
 });
 
 test('deployment workflow checks the actual teacher timetable component', () => {

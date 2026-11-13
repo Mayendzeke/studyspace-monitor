@@ -57,7 +57,7 @@
 - Paid tiers: Weekly E100/7 days, 2 Weeks E180/14 days, Monthly E350/28 days.
 - Timetable CI assertion targets `src/components/TeacherWeeklyTimetable.tsx`.
 
-- [ ] Confirm the regression tests fail against the current stale price, non-sticky top bar and legacy workflow path.
-- [ ] Apply the three focused fixes and add the regression test to GitHub Actions.
+- [ ] Confirm the regression tests fail against the current stale price, missing daily classes card and legacy workflow path; confirm the existing sticky top bar passes.
+- [ ] Add the daily classes summary and apply the price/workflow fixes; retain the already-correct sticky top bar and add the regression test to GitHub Actions.
 - [ ] Run `node --test scripts/monitor-finalization.test.mjs`, then `npm run typecheck` and `npm run build`.
 - [ ] Inspect the full PR diff and the CI result before integration.

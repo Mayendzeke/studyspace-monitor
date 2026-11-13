@@ -141,6 +141,7 @@ export default function LearnerResourcePanel({
     setError("");
     setNotice("");
     let storagePath = "";
+    let resourceSaved = false;
     let resourceId = "";
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -173,6 +174,7 @@ export default function LearnerResourcePanel({
         storagePath = "";
         throw new Error("The file uploaded, but its resource record could not be saved: " + insertError.message);
       }
+      resourceSaved = true;
 
       const { error: assignmentError } = await supabase.from("resource_assignments").upsert({
         resource_id: resourceId,
@@ -191,7 +193,7 @@ export default function LearnerResourcePanel({
       if (input) input.value = "";
       await refresh();
     } catch (reason) {
-      if (storagePath && !resourceId) await supabase.storage.from("studyspace-resources").remove([storagePath]);
+      if (storagePath && !resourceSaved) await supabase.storage.from("studyspace-resources").remove([storagePath]);
       setError(reason instanceof Error ? reason.message : "The learner resource could not be uploaded.");
     } finally {
       setUploading(false);

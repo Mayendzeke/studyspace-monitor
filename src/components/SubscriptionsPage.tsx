@@ -79,7 +79,7 @@ export default function SubscriptionsPage() {
     const expired = days !== null && days <= 0;
     const expiring = days !== null && days > 0 && days <= (isTrial ? 1 : 14);
     const accessDisabled = item.account_status !== "active";
-    const displayedTier = item.subscription_tier ? tierLabel(item.subscription_tier) : isTrial ? "48-hour Free Trial" : "No active plan";
+    const displayedTier = item.subscription_tier ? tierLabel(item.subscription_tier) : isTrial ? "7-day Free Trial" : "No active plan";
     return { ...item, days, expired, expiring, accessDisabled, effectiveExpiry, isTrial, displayedTier };
   }), [learners, now]);
 

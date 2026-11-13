@@ -46,6 +46,8 @@ jobs:
         run: node --test scripts/student-access-pin-indexes.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
+      - name: Verify seven-day free trial migration
+        run: node --test scripts/seven-day-trial.test.mjs
       - name: Verify Monitor finalization regressions
         run: node --test scripts/monitor-finalization.test.mjs
       - name: Report dependency audit

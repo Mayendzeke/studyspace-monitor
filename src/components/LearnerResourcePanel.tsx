@@ -81,7 +81,15 @@ export default function LearnerResourcePanel({
       if (libraryResult.error) throw libraryResult.error;
       if (assignmentResult.error) throw assignmentResult.error;
       const resources = (libraryResult.data || []) as Resource[];
-      const byId = new Map(resources.map(resource => [resource.id, resource]));
+      const assignedIds = (assignmentResult.data || []).map(row => row.resource_id);
+      const assignedResourceResult = assignedIds.length
+        ? await supabase.from("learning_resources")
+          .select("id,title,subject_name,topic,resource_type,mime_type,file_size,storage_path,created_at")
+          .in("id", assignedIds)
+        : { data: [] as Resource[], error: null };
+      if (assignedResourceResult.error) throw assignedResourceResult.error;
+      const allAssignedResources = (assignedResourceResult.data || []) as Resource[];
+      const byId = new Map([...resources, ...allAssignedResources].map(resource => [resource.id, resource]));
       setLibrary(resources);
       setAssigned((assignmentResult.data || []).flatMap(row => {
         const resource = byId.get(row.resource_id);

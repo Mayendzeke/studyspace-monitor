@@ -33,17 +33,17 @@ type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Pro
 
 const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
-  { label: 'MIΛ', icon: Brain },
   { label: 'Learners', icon: Users },
-  { label: 'Timetable', icon: CalendarDays },
   { label: 'Messages', icon: MessageCircle },
+  { label: 'Timetable', icon: CalendarDays },
+  { label: 'MIΛ', icon: Brain },
   { label: 'Guardian verification', icon: ShieldCheck },
   { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
-  { label: 'Access PINs', icon: KeyRound },
   { label: 'Academic progress', icon: Activity },
   { label: 'Learning engagement', icon: Sparkles },
+  { label: 'Access PINs', icon: KeyRound },
   { label: 'Testimonials', icon: Users },
   { label: 'Settings', icon: Settings },
 ]

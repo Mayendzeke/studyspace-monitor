@@ -5,6 +5,7 @@ Close the Monitor gaps found in the requirements audit without changing the stud
 
 ## Goals
 - Let an administrator open a learner record and upload a document or PDF directly into that learner's Student Library.
+- Show a daily classes card above the weekly teaching timetable, ordered by start time.
 - Let an administrator assign an existing library resource to that learner and remove only the learner's assignment when needed.
 - Keep the existing private `studyspace-resources` bucket and the `learning_resources` / `resource_assignments` data model.
 - Keep the Monitor top bar visible while the workspace scrolls.

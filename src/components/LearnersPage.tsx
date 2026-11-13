@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
+import LearnerResourcePanel from "./LearnerResourcePanel";
 
 type Learner = {
   id: string;
@@ -52,7 +53,7 @@ type ManageAction = "disable" | "enable" | "reset_password";
 
 const SUBSCRIPTION_PLANS = [
   { value: "Weekly", label: "Weekly — 7 days — E100", days: 7 },
-  { value: "2 Weeks", label: "2 Weeks — 14 days — E200", days: 14 },
+  { value: "2 Weeks", label: "2 Weeks — 14 days — E180", days: 14 },
   { value: "Monthly", label: "Monthly — 28 days — E350", days: 28 },
 ] as const;
 
@@ -516,6 +517,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <strong>Registered subjects</strong>
               {viewSubjectsLoading ? <small>Loading subjects…</small> : viewSubjects.length ? <div>{viewSubjects.map(subject => <span key={subject}>{subject}</span>)}</div> : <small>No registered subjects were found.</small>}
             </section>
+            <LearnerResourcePanel learnerId={viewTarget.id} learnerName={learnerName(viewTarget)} subjects={viewSubjects}/>
             {guardianRecord && <section className="learner-view-subjects guardian-record-view">
               <strong>Guardian verification record</strong>
               <div className="guardian-record-grid">

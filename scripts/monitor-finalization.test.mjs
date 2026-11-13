@@ -59,3 +59,27 @@ test('deployment workflow checks the actual teacher timetable component', () => 
   assert.match(workflow, /src\/components\/TeacherWeeklyTimetable\.tsx/);
   assert.doesNotMatch(workflow, /src\/components\/AdminTimetablePage\.tsx/);
 });
+
+
+test('Monitor exposes a dedicated Today’s Session workspace connected to the student classroom records', () => {
+  const app = read('src/App.tsx');
+  const page = read('src/components/MonitorTodaySession.tsx');
+  assert.match(app, /Today's Session/);
+  assert.match(app, /<MonitorTodaySession onCreateLesson=/);
+  for (const table of ['class_sessions', 'class_session_members', 'session_lesson_notes', 'session_messages', 'session_homework', 'session_whiteboards', 'session_homework_submissions']) {
+    assert.ok(page.includes(table), 'teacher workspace must use shared ' + table + ' records');
+  }
+  assert.match(page, /audience="teacher"/);
+  assert.match(page, /postgres_changes/);
+  assert.match(page, /Start live class/);
+  assert.match(page, /End class/);
+  assert.match(page, /monitor-board-canvas-wrap/);
+});
+
+test('Monitor has exactly one scroll surface for sidebar navigation and one for the workspace', () => {
+  const styles = read('src/styles.css');
+  assert.match(styles, /html,body,#root\s*\{height:100%;min-height:0;overflow:hidden\}/);
+  assert.match(styles, /\.app-shell>\.sidebar>\.main-nav\s*\{[^}]*overflow-y:auto/);
+  assert.match(styles, /\.app-shell>\.main-area\s*\{[^}]*overflow-y:auto/);
+  assert.match(styles, /\.app-shell>\.main-area>\.topbar\s*\{position:sticky;top:0/);
+});

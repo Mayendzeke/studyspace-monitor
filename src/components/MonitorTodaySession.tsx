@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { CalendarDays, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, Send, Users, Video, BookOpen, ClipboardList, Presentation, Play, Square } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import { CalendarDays, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, Send, Users, Video, BookOpen, ClipboardList, Presentation, Play, Square, PenLine, Eraser, Save } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
 
@@ -28,7 +29,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
   const [learners,setLearners] = useState<LearnerRow[]>([])
   const [messages,setMessages] = useState<MessageRow[]>([])
   const [homework,setHomework] = useState<HomeworkRow[]>([])
-  const [completed,setCompleted] = useState<Set<string>>(new Set())
+  const [completedCounts,setCompletedCounts] = useState<Record<string,number>>({})
   const [lessonNotes,setLessonNotes] = useState<{summary:string;keyPoints:string[];workedExample:string;exitQuestion:string}>({summary:'',keyPoints:[],workedExample:'',exitQuestion:''})
   const [boardImage,setBoardImage] = useState('')
   const [adminId,setAdminId] = useState('')
@@ -39,6 +40,11 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
   const [sending,setSending] = useState(false)
   const [error,setError] = useState('')
   const [notice,setNotice] = useState('')
+  const [boardTool,setBoardTool] = useState<'pen'|'eraser'>('pen')
+  const [boardInk,setBoardInk] = useState('#27324a')
+  const [boardNotice,setBoardNotice] = useState('')
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingRef = useRef(false)
 
   const refreshSessions = useCallback(async (preserve = true) => {
     if (!supabase) { setError('Studyspace is not connected to the classroom service.'); setLoading(false); return }
@@ -81,7 +87,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
 
   useEffect(() => {
     if (!activeId || !supabase) {
-      setActive(null);setLearners([]);setMessages([]);setHomework([]);setCompleted(new Set());setBoardImage('')
+      setActive(null);setLearners([]);setMessages([]);setHomework([]);setCompletedCounts({});setBoardImage('')
       setLessonNotes({summary:'',keyPoints:[],workedExample:'',exitQuestion:''})
       return
     }
@@ -110,10 +116,12 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
       const tasks=(homeworkResult.data??[]) as HomeworkRow[]
       setHomework(tasks)
       if (tasks.length) {
-        const {data:submissions,error:submissionError}=await supabase!.from('session_homework_submissions').select('homework_id,completed_at').in('homework_id',tasks.map(item=>item.id))
+        const {data:submissions,error:submissionError}=await supabase!.from('session_homework_submissions').select('homework_id,learner_id,completed_at').in('homework_id',tasks.map(item=>item.id))
         if (submissionError) throw submissionError
-        if (alive) setCompleted(new Set((submissions??[]).filter(row=>row.completed_at).map(row=>row.homework_id)))
-      } else setCompleted(new Set())
+        const counts:Record<string,number>={}
+        for(const row of submissions??[]) if(row.completed_at) counts[row.homework_id]=(counts[row.homework_id]||0)+1
+        if (alive) setCompletedCounts(counts)
+      } else setCompletedCounts({})
       setBoardImage((boardResult.data?.board_state as {imageData?:string}|null)?.imageData||'')
       channel=supabase!.channel('monitor-session-workspace-'+activeId)
         .on('postgres_changes',{event:'UPDATE',schema:'public',table:'class_sessions',filter:'id=eq.'+activeId},payload=>{
@@ -137,6 +145,65 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
     void load().catch(reason=>{if(alive)setError(reason instanceof Error?reason.message:'Session details could not be loaded.')})
     return ()=>{alive=false;if(channel&&supabase)void supabase.removeChannel(channel)}
   },[activeId])
+
+
+  useEffect(() => {
+    const canvas=canvasRef.current
+    if(!canvas)return
+    const context=canvas.getContext('2d')
+    if(!context)return
+    context.fillStyle='#ffffff'
+    context.fillRect(0,0,canvas.width,canvas.height)
+    if(!boardImage)return
+    const image=new Image()
+    image.onload=()=>{if(canvasRef.current&&!drawingRef.current){const ctx=canvasRef.current.getContext('2d');ctx?.clearRect(0,0,canvasRef.current.width,canvasRef.current.height);ctx?.drawImage(image,0,0,canvasRef.current.width,canvasRef.current.height)}}
+    image.src=boardImage
+  },[boardImage,activeId])
+
+  function boardPoint(event:ReactPointerEvent<HTMLCanvasElement>){
+    const canvas=canvasRef.current!
+    const rect=canvas.getBoundingClientRect()
+    return {x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height}
+  }
+  function startBoardDraw(event:ReactPointerEvent<HTMLCanvasElement>){
+    const canvas=canvasRef.current
+    const context=canvas?.getContext('2d')
+    if(!canvas||!context)return
+    drawingRef.current=true
+    canvas.setPointerCapture(event.pointerId)
+    const point=boardPoint(event)
+    context.beginPath();context.moveTo(point.x,point.y)
+    context.strokeStyle=boardTool==='eraser'?'#ffffff':boardInk
+    context.lineWidth=boardTool==='eraser'?24:3
+    context.lineCap='round';context.lineJoin='round'
+  }
+  function continueBoardDraw(event:ReactPointerEvent<HTMLCanvasElement>){
+    if(!drawingRef.current)return
+    const context=canvasRef.current?.getContext('2d')
+    if(!context)return
+    const point=boardPoint(event);context.lineTo(point.x,point.y);context.stroke()
+  }
+  async function saveBoard(){
+    const canvas=canvasRef.current
+    if(!canvas||!active||!supabase||!adminId)return
+    const imageData=canvas.toDataURL('image/jpeg',0.55)
+    setBoardNotice('Saving shared board…')
+    const {error:saveError}=await supabase.from('session_whiteboards').upsert({session_id:active.id,board_state:{version:1,imageData},updated_by:adminId,updated_at:new Date().toISOString()},{onConflict:'session_id'})
+    if(saveError){setBoardNotice('The shared board could not be saved. Your drawing remains here; reconnect and save again.');return}
+    setBoardImage(imageData);setBoardNotice('Shared board saved. Learners can see the update in Today’s Session.')
+  }
+  function stopBoardDraw(){
+    if(!drawingRef.current)return
+    drawingRef.current=false
+    void saveBoard()
+  }
+  async function clearBoard(){
+    const canvas=canvasRef.current
+    const context=canvas?.getContext('2d')
+    if(!canvas||!context)return
+    context.clearRect(0,0,canvas.width,canvas.height);context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height)
+    await saveBoard()
+  }
 
   const changeStatus = async (status:'live'|'ended') => {
     if(!supabase||!active)return
@@ -200,8 +267,8 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
             </div>}
             {tab==='Lesson guide'&&<section className="panel monitor-today-panel"><h3><BookOpen size={16}/> Shared lesson guide</h3>{lessonNotes.summary?<><p>{lessonNotes.summary}</p>{lessonNotes.keyPoints.length>0&&<><h4>Key points</h4><ul>{lessonNotes.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul></>}{lessonNotes.workedExample&&<><h4>Worked example</h4><p>{lessonNotes.workedExample}</p></>}{lessonNotes.exitQuestion&&<><h4>Check for understanding</h4><p>{lessonNotes.exitQuestion}</p></>}</>:<p className="monitor-today-muted">The lesson guide has not been published yet. Add or publish notes in Classroom Studio.</p>}</section>}
             {tab==='Class chat'&&<section className="panel monitor-today-panel monitor-today-chat"><h3><MessageCircle size={16}/> Shared class chat</h3><div className="monitor-today-message-list">{messages.length?messages.map(message=><article key={message.id} className={message.sender_id===adminId?'mine':''}><strong>{message.sender_id===adminId?'You':learners.find(learner=>learner.id===message.sender_id)?.preferred_name||learners.find(learner=>learner.id===message.sender_id)?.full_name||'Learner'}</strong><p>{message.message}</p><small>{new Date(message.created_at).toLocaleString([], {dateStyle:'short',timeStyle:'short'})}</small></article>):<div className="monitor-today-muted">No class messages yet. Students’ messages will appear here.</div>}</div><form className="monitor-today-compose" onSubmit={sendMessage}><input value={draftMessage} onChange={event=>setDraftMessage(event.target.value)} maxLength={2000} placeholder="Reply to your class…" aria-label="Class message"/><button className="primary-button" type="submit" disabled={!draftMessage.trim()||sending}><Send size={15}/>{sending?'Sending…':'Send'}</button></form></section>}
-            {tab==='Homework'&&<section className="panel monitor-today-panel"><h3><ClipboardList size={16}/> Teacher-assigned homework</h3>{homework.length?homework.map(item=><article className="monitor-today-homework" key={item.id}><div><strong>{item.title}</strong><p>{item.instructions||'No additional instructions.'}</p><small>{item.due_at?'Due '+formatDate(item.due_at):'No due date'}</small></div><span>{completed.has(item.id)?'Completed by at least one learner':'Assigned'}</span></article>):<p className="monitor-today-muted">No homework has been assigned for this lesson yet.</p>}</section>}
-            {tab==='Shared board'&&<section className="panel monitor-today-panel"><h3><Presentation size={16}/> Shared worksheet / whiteboard</h3>{boardImage?<img className="monitor-today-board-image" src={boardImage} alt="Latest shared classroom whiteboard"/>:<p className="monitor-today-muted">The shared worksheet will appear here when a learner or teacher saves work in the student Today’s Session workspace.</p>}</section>}
+            {tab==='Homework'&&<section className="panel monitor-today-panel"><h3><ClipboardList size={16}/> Teacher-assigned homework</h3>{homework.length?homework.map(item=><article className="monitor-today-homework" key={item.id}><div><strong>{item.title}</strong><p>{item.instructions||'No additional instructions.'}</p><small>{item.due_at?'Due '+formatDate(item.due_at):'No due date'}</small></div><span>{(completedCounts[item.id]||0)+' / '+learners.length+' learners completed'}</span></article>):<p className="monitor-today-muted">No homework has been assigned for this lesson yet.</p>}</section>}
+            {tab==='Shared board'&&<section className="panel monitor-today-panel"><h3><Presentation size={16}/> Shared worksheet / whiteboard</h3><div className="monitor-board-tools"><button type="button" className={boardTool==='pen'?'selected':''} onClick={()=>setBoardTool('pen')}><PenLine size={14}/> Pen</button><button type="button" className={boardTool==='eraser'?'selected':''} onClick={()=>setBoardTool('eraser')}><Eraser size={14}/> Eraser</button><input aria-label="Board pen colour" type="color" value={boardInk} onChange={event=>setBoardInk(event.target.value)}/><button type="button" onClick={()=>void clearBoard()}>Clear board</button><button type="button" className="primary-button" onClick={()=>void saveBoard()}><Save size={14}/> Save</button></div><div className="monitor-board-canvas-wrap"><canvas ref={canvasRef} width={1200} height={680} onPointerDown={startBoardDraw} onPointerMove={continueBoardDraw} onPointerUp={stopBoardDraw} onPointerCancel={stopBoardDraw} onPointerLeave={stopBoardDraw} aria-label="Shared classroom whiteboard"/></div><p className="monitor-today-muted">Draw here or erase parts of the board. Saved changes are shared with the students assigned to this lesson.</p>{boardNotice&&<p className="monitor-today-muted" role="status">{boardNotice}</p></section>}
           </>}
         </section>
       </div>

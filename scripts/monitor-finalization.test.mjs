@@ -22,6 +22,13 @@ test('learner resource manager uses the private resource bucket and shared assig
   assert.doesNotMatch(panel, /from\(["']learning_resources["']\)\s*\.delete\(/);
 });
 
+test('weekly timetable includes a daily teaching card', () => {
+  const timetable = read('src/components/TeacherWeeklyTimetable.tsx');
+  assert.match(timetable, /todayClasses/);
+  assert.match(timetable, /Today's classes/);
+  assert.match(timetable, /monitor-today-classes/);
+});
+
 test('Monitor two-week subscription price is E180 for fourteen days', () => {
   const page = read('src/components/LearnersPage.tsx');
   assert.match(page, /2 Weeks — 14 days — E180/);

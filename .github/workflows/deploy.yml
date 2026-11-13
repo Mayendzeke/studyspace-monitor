@@ -44,6 +44,8 @@ jobs:
         run: node --test scripts/student-access-pin-indexes.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
+      - name: Verify Monitor finalization regressions
+        run: node --test scripts/monitor-finalization.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true
@@ -267,7 +269,7 @@ jobs:
           const testimonialsInbox = readFileSync('src/components/TestimonialsInbox.tsx', 'utf8')
           const profileTestimonialMigration = readFileSync('supabase/migrations/20261108180747_student_profile_photos_and_private_testimonials.sql', 'utf8')
           const testimonialRealtimeMigration = readFileSync('supabase/migrations/20261108182736_student_feedback_realtime_inbox.sql', 'utf8')
-          const timetablePage = readFileSync('src/components/AdminTimetablePage.tsx', 'utf8')
+          const timetablePage = readFileSync('src/components/TeacherWeeklyTimetable.tsx', 'utf8')
           if (!app.includes('beforeinstallprompt') || !app.includes('monitor-install-button')) throw new Error('The Monitor install control is missing.')
           if (!mia.includes('mia-welcome-toast') || !mia.includes('welcomeFading') || mia.includes("id: 'mia-welcome'")) throw new Error('MIΛ must use a dismissible, fading welcome notice instead of a permanent greeting message.')
           if (!mia.includes('studyspace-monitor-mia-lesson-handoff-v1') || !mia.includes('studyspace-open-classroom-studio')) throw new Error('MIΛ lesson handoff is incomplete.')
@@ -286,7 +288,7 @@ jobs:
           if (!accessPinRedeem.includes('redeem_studyspace_access_pin') || !accessPinRedeem.includes('pin_redemption_attempts')) throw new Error('Learners must redeem access PINs against their own account with rate limiting.')
           if (!profileTestimonialMigration.includes('studyspace-avatars') || !profileTestimonialMigration.includes('testimonial_private_consent') || !profileTestimonialMigration.includes('update_studyspace_learner_avatar') || !profileTestimonialMigration.includes('is_studyspace_admin')) throw new Error('The private profile-photo and testimonial migration is incomplete.')
           if (!app.includes("scope: 'others'") || !app.includes('updateUser({ password: newPassword })')) throw new Error('Administrator password and session-security settings are incomplete.')
-          if (!timetablePage.includes('.eq("created_by", auth.user.id)') || !timetablePage.includes('Learners → select a learner')) throw new Error('The Monitor timetable must remain limited to the administrator’s shared sessions.')
+          if (!timetablePage.includes('.eq("teacher_id",id)') || !timetablePage.includes('One personal weekly plan')) throw new Error('The Monitor timetable must remain limited to the signed-in administrator’s own weekly teaching plan.')
           const termsVersion = '2026-11-09-v8'
           for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts', 'supabase/functions/enrol-learner/index.ts', 'supabase/functions/mia-assistant/index.ts', 'supabase/functions/manage-guardian-verification/index.ts', 'supabase/functions/guardian-consent/index.ts']) {
             const source = readFileSync(path, 'utf8')

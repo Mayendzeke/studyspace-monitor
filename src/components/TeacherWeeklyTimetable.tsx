@@ -103,6 +103,8 @@ export default function TeacherWeeklyTimetable() {
   const visible=eligible.filter(x=>[nameOf(x),x.full_name,x.student_id,x.grade,x.course].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase()));
   const times=[...new Set([...entries.map(x=>hhmm(x.starts_at)),...personalSlots.map(x=>hhmm(x.starts_at))])].sort((a,b)=>mins(a)-mins(b));
   const today=new Date().getDay();
+  const todayClasses=entries.filter(entry=>entry.day_of_week===today).sort((a,b)=>mins(a.starts_at)-mins(b.starts_at));
+  const todayLabel=DAYS.find(day=>day.day===today)?.label||"Today";
   const nameMap=new Map(learners.map(x=>[x.id,nameOf(x)]));
   const now=Date.now();
   const due=homework.filter(x=>!x.submitted&&Date.parse(x.dueAt)<=now).sort((a,b)=>Date.parse(a.dueAt)-Date.parse(b.dueAt));
@@ -151,6 +153,19 @@ export default function TeacherWeeklyTimetable() {
   return <div className="subpage monitor-timetable-page">
     <div className="welcome-row"><div><div className="eyebrow"><CalendarDays size={14}/> WEEKLY TEACHING PLAN</div><h1>My weekly <span>timetable.</span></h1><p className="page-subtitle">One personal weekly plan. Add your own teaching blocks and choose whether to share each one with learners.</p></div><div className="monitor-timetable-header-actions"><button className="secondary-button" type="button" onClick={()=>void refresh(true)} disabled={refreshing}><RefreshCw size={15}/>{refreshing?"Refreshing…":"Refresh"}</button><button className="primary-button" type="button" onClick={beginNew}><Plus size={16}/> Add to timetable</button></div></div>
     {error&&<p className="inline-message error-message" role="alert"><AlertCircle size={15}/>{error}</p>}{notice&&<p className="inline-message" role="status"><CheckCircle2 size={15}/>{notice}</p>}
+    <section className="panel monitor-today-classes">
+      <div className="monitor-today-heading">
+        <div><span className="eyebrow">TODAY · {todayLabel.toUpperCase()}</span><h2>Today's classes</h2><p>Your teaching blocks scheduled for today, in start-time order.</p></div>
+        <span className="monitor-today-count">{todayClasses.length} class{todayClasses.length===1?"":"es"}</span>
+      </div>
+      {loading ? <div className="monitor-today-empty"><CalendarDays size={18}/><span><strong>Loading today's classes…</strong><small>Refreshing your weekly teaching plan.</small></span></div> : todayClasses.length ? <div className="monitor-today-list">
+        {todayClasses.map(entry=><button type="button" className="monitor-today-class" key={entry.id} onClick={()=>beginEdit(entry)}>
+          <span className="monitor-today-time">{hhmm(entry.starts_at)}<i>to</i>{hhmm(entry.ends_at)}</span>
+          <span className="monitor-today-copy"><strong>{entry.title}</strong><small>{entry.subject_name}{entry.location?" · "+entry.location:""}</small></span>
+          <span className="monitor-today-sharing">{entry.learnerIds.length?entry.learnerIds.length+" shared":"Private"}</span>
+        </button>)}
+      </div> : <div className="monitor-today-empty"><CalendarDays size={18}/><span><strong>No classes scheduled today</strong><small>Add a teaching block to your weekly timetable when you have a class to plan.</small></span></div>}
+    </section>
     {editorOpen&&<section className="panel monitor-timetable-editor"><div className="panel-heading"><div><h2>{editingId?"Edit timetable block":"Add a timetable block"}</h2><p>Build your own weekly plan. Sharing a block with learners is optional.</p></div><button type="button" className="icon-button" onClick={()=>setEditorOpen(false)} aria-label="Close editor"><X size={17}/></button></div><form onSubmit={event=>void save(event)}><div className="monitor-timetable-form-grid">
       <label>Class title<input maxLength={120} value={draft.title} onChange={e=>setDraft(v=>({...v,title:e.target.value}))} placeholder="e.g. Form 3 Mathematics"/></label>
       <label>Subject<select required value={subjectCustom?"__custom__":draft.subject_name} onChange={e=>{if(e.target.value==="__custom__"){setSubjectCustom(true);setDraft(v=>({...v,subject_name:""}));}else{setSubjectCustom(false);setDraft(v=>({...v,subject_name:e.target.value}));}}}><option value="">Choose subject</option>{subjects.map(s=><option key={s} value={s}>{s}</option>)}<option value="__custom__">Other / enter subject…</option></select></label>

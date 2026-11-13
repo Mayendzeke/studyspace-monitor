@@ -29,6 +29,12 @@ test('weekly timetable includes a daily teaching card', () => {
   assert.match(timetable, /monitor-today-classes/);
 });
 
+test('assigned learner resources are not hidden by the recent-library limit', () => {
+  const panel = read('src/components/LearnerResourcePanel.tsx');
+  assert.match(panel, /assignedIds/);
+  assert.match(panel, /\.in\(["']id["'], assignedIds\)/);
+});
+
 test('Monitor two-week subscription price is E180 for fourteen days', () => {
   const page = read('src/components/LearnersPage.tsx');
   assert.match(page, /2 Weeks — 14 days — E180/);

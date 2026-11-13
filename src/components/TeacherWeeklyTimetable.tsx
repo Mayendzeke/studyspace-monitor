@@ -103,6 +103,8 @@ export default function TeacherWeeklyTimetable() {
   const visible=eligible.filter(x=>[nameOf(x),x.full_name,x.student_id,x.grade,x.course].join(" ").toLowerCase().includes(studentSearch.trim().toLowerCase()));
   const times=[...new Set([...entries.map(x=>hhmm(x.starts_at)),...personalSlots.map(x=>hhmm(x.starts_at))])].sort((a,b)=>mins(a)-mins(b));
   const today=new Date().getDay();
+  const todayClasses=entries.filter(entry=>entry.day_of_week===today).sort((a,b)=>mins(a.starts_at)-mins(b.starts_at));
+  const todayLabel=DAYS.find(day=>day.day===today)?.label||"Today";
   const nameMap=new Map(learners.map(x=>[x.id,nameOf(x)]));
   const now=Date.now();
   const due=homework.filter(x=>!x.submitted&&Date.parse(x.dueAt)<=now).sort((a,b)=>Date.parse(a.dueAt)-Date.parse(b.dueAt));

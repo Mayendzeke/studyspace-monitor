@@ -89,7 +89,25 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [adminName, setAdminName] = useState('Administrator')
+  const [helpCardOpen, setHelpCardOpen] = useState(true)
+  const [helpCardFading, setHelpCardFading] = useState(false)
+  const adminInitials = adminName.trim().split(/\s+/).map(part => part.charAt(0)).join('').slice(0, 2).toUpperCase() || 'AD'
   const handleMfaVerified = useCallback(() => setMfaVerified(true), [])
+
+  useEffect(() => {
+    if (!helpCardOpen) {
+      setHelpCardFading(false)
+      return
+    }
+
+    setHelpCardFading(false)
+    const fadeTimer = window.setTimeout(() => setHelpCardFading(true), 9600)
+    const dismissTimer = window.setTimeout(() => setHelpCardOpen(false), 10000)
+    return () => {
+      window.clearTimeout(fadeTimer)
+      window.clearTimeout(dismissTimer)
+    }
+  }, [helpCardOpen])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSplashElapsed(true), 5200)
@@ -219,8 +237,11 @@ function App() {
         </div>
 
         <button type="button" className="workspace-switcher" onClick={() => navigate('Settings')} aria-label="Open workspace settings">
-          <span className="workspace-avatar">SZ</span>
-          <span className="workspace-copy"><strong>{adminName}</strong><small>Administrator workspace</small></span>
+          <span className="workspace-avatar" aria-hidden="true">{adminInitials}</span>
+          <span className="workspace-copy">
+            <strong title={session.user.email || adminName}>{session.user.email || adminName}</strong>
+            <small>Administrator workspace</small>
+          </span>
           <ChevronDown size={16} className="muted-icon" />
         </button>
 
@@ -236,12 +257,35 @@ function App() {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="help-card">
-            <div className="help-icon"><CircleHelp size={18} /></div>
-            <strong>Need a hand?</strong>
-            <p>Your learner workspace is being prepared.</p>
-            <button onClick={() => navigate('Settings')}>View setup guide <ArrowUpRight size={14} /></button>
-          </div>
+          {helpCardOpen ? (
+            <section className={`help-card ${helpCardFading ? 'is-fading' : ''}`} aria-label="Monitor setup help">
+              <div className="help-card-top">
+                <div className="help-icon"><CircleHelp size={18} /></div>
+                <button
+                  type="button"
+                  className="help-card-close"
+                  aria-label="Dismiss help card"
+                  title="Dismiss help card"
+                  onClick={() => setHelpCardOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <strong>Need a hand?</strong>
+              <p>Your learner workspace is being prepared.</p>
+              <button type="button" onClick={() => navigate('Settings')}>View setup guide <ArrowUpRight size={14} /></button>
+            </section>
+          ) : (
+            <button
+              type="button"
+              className="help-card-reopen"
+              aria-label="Reopen setup help"
+              title="Reopen setup help"
+              onClick={() => setHelpCardOpen(true)}
+            >
+              <CircleHelp size={18} />
+            </button>
+          )}
           <button type="button" className="nav-item monitor-sidebar-install" onClick={() => void installMonitor()}><Download size={18}/><span>{installPrompt ? 'Install Studyspace Monitor' : 'Install / add to device'}</span></button>
           <div className="sidebar-profile">
             <div className="profile-avatar">A</div>

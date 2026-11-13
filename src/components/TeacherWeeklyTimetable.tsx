@@ -158,7 +158,7 @@ export default function TeacherWeeklyTimetable() {
         <div><span className="eyebrow">TODAY · {todayLabel.toUpperCase()}</span><h2>Today's classes</h2><p>Your teaching blocks scheduled for today, in start-time order.</p></div>
         <span className="monitor-today-count">{todayClasses.length} class{todayClasses.length===1?"":"es"}</span>
       </div>
-      {todayClasses.length ? <div className="monitor-today-list">
+      {loading ? <div className="monitor-today-empty"><CalendarDays size={18}/><span><strong>Loading today's classes…</strong><small>Refreshing your weekly teaching plan.</small></span></div> : todayClasses.length ? <div className="monitor-today-list">
         {todayClasses.map(entry=><button type="button" className="monitor-today-class" key={entry.id} onClick={()=>beginEdit(entry)}>
           <span className="monitor-today-time">{hhmm(entry.starts_at)}<i>to</i>{hhmm(entry.ends_at)}</span>
           <span className="monitor-today-copy"><strong>{entry.title}</strong><small>{entry.subject_name}{entry.location?" · "+entry.location:""}</small></span>

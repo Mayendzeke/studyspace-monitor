@@ -27,6 +27,7 @@ test('weekly timetable includes a daily teaching card', () => {
   assert.match(timetable, /todayClasses/);
   assert.match(timetable, /Today's classes/);
   assert.match(timetable, /monitor-today-classes/);
+  assert.match(timetable, /Loading today's classes/);
 });
 
 test('assigned learner resources are not hidden by the recent-library limit', () => {

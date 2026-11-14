@@ -83,3 +83,33 @@ test('Monitor has exactly one scroll surface for sidebar navigation and one for 
   assert.match(styles, /\.app-shell>\.main-area\s*\{[^}]*overflow-y:auto/);
   assert.match(styles, /\.app-shell>\.main-area>\.topbar\s*\{position:sticky;top:0/);
 });
+
+
+test('Monitor uses the canonical Study Space logo and installable standalone manifest', () => {
+  const app = read('src/App.tsx');
+  const config = read('vite.config.ts');
+  const html = read('index.html');
+  const styles = read('src/styles.css');
+  const logo = read('public/studyspace-monitor.svg');
+  assert.match(app, /brand-logo-image/);
+  assert.match(app, /studyspace-monitor\.svg/);
+  assert.match(styles, /\.brand-mark \.brand-logo-image/);
+  assert.match(logo, /#927df5/);
+  assert.match(config, /name: 'Study Space Monitor'/);
+  assert.match(config, /display: 'standalone'/);
+  assert.match(config, /start_url: '\/studyspace-monitor\/'/);
+  assert.match(config, /scope: '\/studyspace-monitor\/'/);
+  assert.match(config, /purpose: 'any'/);
+  assert.match(config, /purpose: 'maskable'/);
+  assert.match(config, /monitor-icon-192\.png/);
+  assert.match(config, /monitor-icon-512\.png/);
+  assert.match(html, /monitor-icon-192\.png/);
+});
+
+test('Monitor install helper distinguishes a standalone app from a browser shortcut', () => {
+  const app = read('src/App.tsx');
+  assert.match(app, /matchMedia\('\(display-mode: standalone\)'\)/);
+  assert.match(app, /isStandalone \? 'Installed' : 'Install app'/);
+  assert.match(app, /does not offer a full standalone PWA install/);
+  assert.match(app, /cannot turn a browser shortcut into a native Android package/);
+});

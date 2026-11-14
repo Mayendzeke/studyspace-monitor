@@ -242,3 +242,62 @@ create policy session_homework_submissions_admin_mark
   on public.session_homework_submissions for update to authenticated
   using(public.is_studyspace_admin()) with check(public.is_studyspace_admin());
 grant update on public.session_homework_submissions to authenticated;
+
+
+-- Keep the learner academic record in lock-step with authoritative attempts.
+-- A single progress event per submitted attempt is updated when teacher marks change.
+with ranked as (
+  select ctid,
+    row_number() over (
+      partition by learner_id, metadata->>'attempt_id'
+      order by created_at desc, ctid desc
+    ) as position
+  from public.progress_events
+  where event_type='assigned_assessment' and metadata ? 'attempt_id'
+)
+delete from public.progress_events e using ranked r
+where e.ctid=r.ctid and r.position>1;
+
+create unique index if not exists progress_events_one_assigned_attempt
+  on public.progress_events(learner_id,(metadata->>'attempt_id'))
+  where event_type='assigned_assessment' and metadata ? 'attempt_id';
+
+create or replace function public.sync_studyspace_assessment_progress()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if new.total_points <= 0 then return new; end if;
+  insert into public.progress_events(learner_id,event_type,score,max_score,metadata)
+  values(
+    new.learner_id,
+    'assigned_assessment',
+    new.score,
+    new.total_points,
+    jsonb_build_object(
+      'assignment_id',new.assignment_id,
+      'attempt_id',new.id,
+      'marking_status',new.marking_status,
+      'teacher_review_required',new.teacher_review_required,
+      'ai_marked_at',new.ai_marked_at,
+      'teacher_marked_at',new.marked_at
+    )
+  )
+  on conflict(learner_id,(metadata->>'attempt_id'))
+    where event_type='assigned_assessment' and metadata ? 'attempt_id'
+  do update set
+    score=excluded.score,
+    max_score=excluded.max_score,
+    metadata=coalesce(public.progress_events.metadata,'{}'::jsonb)||excluded.metadata,
+    created_at=now();
+  return new;
+end;
+$function$;
+revoke all on function public.sync_studyspace_assessment_progress() from public,anon,authenticated;
+drop trigger if exists studyspace_sync_assessment_progress on public.exercise_attempts;
+create trigger studyspace_sync_assessment_progress
+  after insert or update of score,total_points,marking_status,marking_details,teacher_review_required,ai_marked_at,marked_at
+  on public.exercise_attempts
+  for each row execute function public.sync_studyspace_assessment_progress();

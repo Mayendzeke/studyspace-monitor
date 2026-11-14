@@ -91,6 +91,7 @@ test('Monitor uses the canonical Study Space logo and installable standalone man
   const html = read('index.html');
   const styles = read('src/styles.css');
   const logo = read('public/studyspace-monitor.svg');
+  const splash = read('src/components/SplashScreen.tsx');
   assert.match(app, /brand-logo-image/);
   assert.match(app, /studyspace-monitor\.svg/);
   assert.match(styles, /\.brand-mark \.brand-logo-image/);

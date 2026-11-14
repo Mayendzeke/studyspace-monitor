@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import SplashScreen from './SplashScreen'
 
-type Props = { onVerified: () => void }
-export default function AdminMfaGate({ onVerified }: Props) {
+type Props = { onVerified: () => void; theme?: 'light' | 'dark'; displayName?: string }
+export default function AdminMfaGate({ onVerified, theme = 'light', displayName = 'Ayanda Zwane' }: Props) {
   const [loading,setLoading]=useState(true)
   const [factorId,setFactorId]=useState('')
   const [challengeId,setChallengeId]=useState('')
@@ -73,7 +74,7 @@ export default function AdminMfaGate({ onVerified }: Props) {
     finally{setBusy(false)}
   }
 
-  if(loading)return <div className="auth-screen"><div className="auth-card"><div className="auth-spinner"/><p>Preparing administrator two-factor security…</p></div></div>
+  if(loading)return <SplashScreen theme={theme} displayName={displayName} />
   return <div className="auth-screen"><form className="auth-card" onSubmit={verify}>
     <div className="auth-lock-icon"><ShieldCheck size={26}/></div>
     <h1>{enrolling?'Secure your administrator account':'Verify your identity'}</h1>

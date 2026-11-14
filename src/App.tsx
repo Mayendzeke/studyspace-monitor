@@ -85,6 +85,7 @@ function App() {
   const [splashElapsed, setSplashElapsed] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [installHelpOpen, setInstallHelpOpen] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches)
   const [adminAllowed, setAdminAllowed] = useState(false)
   const [mfaVerified, setMfaVerified] = useState(false)
   const [adminLoading, setAdminLoading] = useState(false)
@@ -114,6 +115,14 @@ function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setSplashElapsed(true), 5200)
     return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    const displayMode = window.matchMedia('(display-mode: standalone)')
+    const updateDisplayMode = () => setIsStandalone(displayMode.matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
+    updateDisplayMode()
+    displayMode.addEventListener('change', updateDisplayMode)
+    return () => displayMode.removeEventListener('change', updateDisplayMode)
   }, [])
 
   useEffect(() => {
@@ -157,7 +166,7 @@ function App() {
 
   const installMonitor = async () => {
     setMobileOpen(false)
-    if (!installPrompt) { setInstallHelpOpen(true); return }
+    if (isStandalone || !installPrompt) { setInstallHelpOpen(true); return }
     await installPrompt.prompt()
     const choice = await installPrompt.userChoice
     if (choice.outcome === 'accepted') setInstallPrompt(null)
@@ -233,7 +242,7 @@ function App() {
       {mobileOpen && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMobileOpen(false)} />}
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark"><GraduationCap size={23} strokeWidth={2.2} /></div>
+          <div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "studyspace-monitor.svg"} alt="Study Space"/></div>
           <div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div>
           <button className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={18} /></button>
         </div>
@@ -305,7 +314,7 @@ function App() {
             <div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div>
           </div>
           <div className="topbar-actions">
-            <button type="button" className="monitor-install-button" onClick={() => void installMonitor()} title="Install Studyspace Monitor on this device"><Download size={15}/><span>{installPrompt ? 'Install app' : 'Add to device'}</span></button>
+            <button type="button" className="monitor-install-button" onClick={() => void installMonitor()} title="Install Studyspace Monitor on this device"><Download size={15}/><span>{isStandalone ? 'Installed' : 'Install app'}</span></button>
             <div className="system-status"><span className="status-dot" /> MFA verified</div>
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
@@ -335,7 +344,7 @@ function App() {
 
         </div>
       </main>
-      {installHelpOpen && <div className="monitor-install-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setInstallHelpOpen(false) }}><section className="monitor-install-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-install-title"><header><div><span className="eyebrow">STUDYSPACE MONITOR</span><h2 id="monitor-install-title">Install on your device</h2><p>Use Monitor like an app, with its own icon and app window. Your administrator sign-in and MFA remain required.</p></div><button type="button" className="icon-button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={18}/></button></header><div className="monitor-install-instructions"><article><strong>Android · Chrome</strong><p>On Android, open the page in an up-to-date Chrome browser and choose <b>Install app</b> from the browser menu when available. Avoid <b>Create shortcut</b> when you want an installed app. On iPhone/iPad Safari, use <b>Share → Add to Home Screen</b>; that is the iOS web-app installation flow.</p></article><article><strong>Windows · Chrome or Edge</strong><p>Use the install icon in the address bar, or open the browser menu and choose <b>Install Studyspace Monitor</b>.</p></article><article><strong>iPhone / iPad · Safari</strong><p>Tap <b>Share</b>, choose <b>Add to Home Screen</b>, then confirm.</p></article><article><strong>Mac · Chrome or Safari</strong><p>In Chrome use <b>Install page as app</b>. In supported Safari versions, use <b>File → Add to Dock</b>.</p></article></div><footer><span>Requires an internet connection for the latest learner and administrator records. Offline caching does not bypass sign-in or access checks.</span><button type="button" className="primary-button" onClick={() => setInstallHelpOpen(false)}>Got it</button></footer></section></div>}
+      {installHelpOpen && <div className="monitor-install-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setInstallHelpOpen(false) }}><section className="monitor-install-dialog" role="dialog" aria-modal="true" aria-labelledby="monitor-install-title"><header><div><span className="eyebrow">STUDYSPACE MONITOR</span><h2 id="monitor-install-title">{isStandalone ? 'Monitor is installed' : 'Install on your device'}</h2><p>{isStandalone ? 'This page is already running in its standalone app window. Your administrator sign-in and MFA remain required.' : 'Use Monitor like an app, with its own icon and app window. Your administrator sign-in and MFA remain required.'}</p></div><button type="button" className="icon-button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={18}/></button></header><div className="monitor-install-instructions"><article><strong>Android · Chrome</strong><p>On Android, open this exact Monitor address in Chrome, open the browser menu and choose <b>Install app</b>. Do not choose <b>Create shortcut</b>. When the menu only offers a shortcut, that browser/device is not offering a full standalone PWA install; try current Chrome or Samsung Internet on a supported device. The web app cannot turn a browser shortcut into a native Android package.</p></article><article><strong>Windows · Chrome or Edge</strong><p>Use the install icon in the address bar, or open the browser menu and choose <b>Install Studyspace Monitor</b>.</p></article><article><strong>iPhone / iPad · Safari</strong><p>Tap <b>Share</b>, choose <b>Add to Home Screen</b>, then confirm.</p></article><article><strong>Mac · Chrome or Safari</strong><p>In Chrome use <b>Install page as app</b>. In supported Safari versions, use <b>File → Add to Dock</b>.</p></article></div><footer><span>Requires an internet connection for the latest learner and administrator records. Offline caching does not bypass sign-in or access checks.</span><button type="button" className="primary-button" onClick={() => setInstallHelpOpen(false)}>Got it</button></footer></section></div>}
     </div>
   )
 }

@@ -22,11 +22,11 @@ export default defineConfig({
         scope: '/studyspace-monitor/',
         prefer_related_applications: false,
         icons: [
+          { src: '/studyspace-monitor/studyspace-monitor.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           { src: '/studyspace-monitor/monitor-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/studyspace-monitor/monitor-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           { src: '/studyspace-monitor/monitor-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: '/studyspace-monitor/monitor-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-          { src: '/studyspace-monitor/studyspace-monitor.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
         ]
       },
       workbox: {

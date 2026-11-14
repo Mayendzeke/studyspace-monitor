@@ -2342,3 +2342,10 @@ html,body,#root{height:100%;min-height:0;overflow:hidden}
 @keyframes connection-pulse{70%{box-shadow:0 0 0 9px rgba(255,189,118,0)}100%{box-shadow:0 0 0 0 rgba(255,189,118,0)}}
 @media(max-width:480px){.connection-status-banner{padding:11px 12px;border-radius:14px;gap:9px}.connection-status-copy strong{font-size:10px}.connection-status-copy small{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.connection-status-banner,.connection-status-pulse{animation:none}}
+
+
+/* Monitor-only dimensional splash mark; the Student splash keeps its drawn graduation cap. */
+.studyspace-monitor-splash-logo{filter:drop-shadow(0 20px 30px rgba(65,48,148,.26))}
+.studyspace-monitor-logo-art{opacity:0;transform-box:fill-box;transform-origin:center;animation:studyspace-monitor-logo-reveal 1.15s cubic-bezier(.18,.78,.22,1) .18s forwards}
+@keyframes studyspace-monitor-logo-reveal{0%{opacity:0;transform:translateY(13px) scale(.82) rotate(-7deg);filter:blur(5px)}70%{opacity:1;transform:translateY(-2px) scale(1.025) rotate(1deg);filter:blur(0)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0);filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.studyspace-monitor-logo-art{opacity:1;animation:none;transform:none;filter:none}}

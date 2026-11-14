@@ -210,3 +210,20 @@ test('student and teacher live classroom surfaces remain connected to all existi
   assert.ok(teacher.includes('monitor-board-canvas-wrap'));
   assert.ok(teacher.includes('Class chat'));
 });
+
+
+test('learners cannot alter class-homework marks and only MFA-verified Monitor admins can finalise them', () => {
+  const migration = read('supabase/migrations/20261114150000_studyspace_secure_class_homework_final_marks.sql');
+  const student = read('src/components/TodaySession.tsx');
+  const teacher = read('src/components/MonitorTodaySession.tsx');
+  assert.match(migration, /drop policy if exists "homework_submission_self_manage"/);
+  assert.match(migration, /create policy homework_submission_self_read[\\s\\S]*for select to authenticated/);
+  assert.match(migration, /create policy session_homework_submissions_admin_mark[\\s\\S]*for update to authenticated/);
+  assert.match(migration, /coalesce\\(\\(\\(select auth\\.jwt\\(\\)\\) ->> 'aal'\\), ''\\) = 'aal2'/);
+  assert.match(migration, /revoke all on table public\\.session_homework_submissions[\\s\\S]*from public, anon, authenticated/);
+  assert.match(migration, /grant update \\(teacher_score, teacher_feedback, marked_by, marked_at, ai_marking_status\\)/);
+  assert.match(migration, /set search_path = ''/);
+  assert.match(student, /functions\\.invoke\\(["']mark-class-homework["']/);
+  assert.match(teacher, /teacher_score:value/);
+  assert.match(teacher, /ai_marking_status:'teacher_marked'/);
+});

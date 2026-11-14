@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, LoaderCircle, RefreshCw, Save } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -14,6 +14,10 @@ type Attempt = {
   teacher_feedback: string;
   marked_by: string | null;
   marked_at: string | null;
+  marking_status: string;
+  marking_details: Record<string, { method?: string; ai_suggested_mark?: number | null; confidence?: number | null; feedback?: string; awarded?: number; maximum?: number }>;
+  teacher_review_required: boolean;
+  ai_marked_at: string | null;
 };
 type Question = { id: string; exercise_set_id: string; question_type: string; prompt: string; points: number; markingGuide?: string };
 type ReviewItem = {
@@ -50,8 +54,8 @@ export default function AssessmentReviewQueue() {
       const learnerIds = [...new Set(rows.map(row => row.learner_id))];
       const [attemptResult, setResult, questionResult, learnerResult] = await Promise.all([
         supabase.from("exercise_attempts")
-          .select("id,assignment_id,learner_id,answers,score,total_points,submitted_at,manual_marks,teacher_feedback,marked_by,marked_at")
-          .in("assignment_id", assignmentIds).order("submitted_at", { ascending: false }),
+          .select("id,assignment_id,learner_id,answers,score,total_points,submitted_at,manual_marks,teacher_feedback,marked_by,marked_at,marking_status,marking_details,teacher_review_required,ai_marked_at")
+          .in("assignment_id", assignmentIds).eq("teacher_review_required", true).order("submitted_at", { ascending: false }),
         supabase.from("exercise_sets").select("id,title,subject_name").in("id", setIds),
         supabase.from("exercise_questions").select("id,exercise_set_id,question_type,prompt,points")
           .in("exercise_set_id", setIds).order("position"),
@@ -79,6 +83,7 @@ export default function AssessmentReviewQueue() {
         const attempt = {
           ...raw,
           manual_marks: (raw.manual_marks || {}) as Record<string, number>,
+          marking_details: (raw.marking_details || {}) as Attempt["marking_details"],
           answers: (raw.answers || {}) as Record<string, unknown>,
         } as Attempt;
         const assignment = assignmentMap.get(attempt.assignment_id);
@@ -100,10 +105,11 @@ export default function AssessmentReviewQueue() {
         const updated = { ...current };
         for (const item of next) {
           if (!updated[item.attempt.id]) {
-            updated[item.attempt.id] = Object.fromEntries(item.questions.map(q => [
-              q.id,
-              item.attempt.manual_marks[q.id] === undefined ? "" : String(item.attempt.manual_marks[q.id])
-            ]));
+            updated[item.attempt.id] = Object.fromEntries(item.questions.map(q => {
+              const aiMark = item.attempt.marking_details[q.id]?.ai_suggested_mark;
+              const previousMark = item.attempt.manual_marks[q.id];
+              return [q.id, previousMark !== undefined ? String(previousMark) : aiMark !== undefined && aiMark !== null ? String(aiMark) : ""];
+            }));
           }
         }
         return updated;
@@ -120,7 +126,7 @@ export default function AssessmentReviewQueue() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const pendingCount = useMemo(() => items.filter(item => !item.attempt.marked_at).length, [items]);
+  const pendingCount = items.length;
 
   const gradeAttempt = async (item: ReviewItem) => {
     if (!supabase || busyId) return;
@@ -152,21 +158,10 @@ export default function AssessmentReviewQueue() {
         marked_by: auth.user.id,
         marked_at: markedAt,
         score: nextScore,
+        marking_status: "teacher_marked",
+        teacher_review_required: false,
       }).eq("id", attemptId);
       if (updateError) throw updateError;
-
-      const { data: events, error: eventsError } = await supabase.from("progress_events")
-        .select("id,metadata").eq("learner_id", item.attempt.learner_id).eq("event_type", "assigned_assessment");
-      if (eventsError) throw eventsError;
-      const event = (events || []).find(row => row.metadata?.attempt_id === attemptId);
-      if (event) {
-        const { error: progressError } = await supabase.from("progress_events").update({
-          score: nextScore,
-          max_score: item.attempt.total_points,
-          metadata: { ...event.metadata, teacher_marked_at: markedAt },
-        }).eq("id", event.id);
-        if (progressError) throw new Error("The written answers were marked, but progress reporting could not be refreshed: " + progressError.message);
-      }
       setNotice("Written responses marked and the learner's result updated.");
       await refresh();
     } catch (reason) {
@@ -190,12 +185,19 @@ export default function AssessmentReviewQueue() {
             <div><strong>{item.learner}</strong><span>{item.studentId ? item.studentId + " · " : ""}{item.title} · {item.subject}</span></div>
             <span className={attempt.marked_at ? "assessment-review-status is-marked" : "assessment-review-status"}>{attempt.marked_at ? "Marked" : "Awaiting review"}</span>
           </div>
-          <div className="assessment-review-card-meta"><span>Submitted {new Date(attempt.submitted_at).toLocaleString()}</span><span>Automatic mark: {Number(attempt.score) - Object.values(attempt.manual_marks || {}).reduce((sum,value)=>sum+Number(value||0),0)} / {attempt.total_points}</span></div>
+          <div className="assessment-review-card-meta"><span>Submitted {new Date(attempt.submitted_at).toLocaleString()}</span><span>Provisional result: {attempt.score} / {attempt.total_points}</span><span>{attempt.ai_marked_at ? "MIΛ marked " + new Date(attempt.ai_marked_at).toLocaleString() : "Teacher review required"}</span></div>
           {item.questions.map((question,index) => <div className="assessment-review-answer" key={question.id}>
             <div className="assessment-review-question"><strong>Written response {index + 1}</strong><span>{question.points} marks</span></div>
             <p>{question.prompt}</p>
             <blockquote>{String(attempt.answers[question.id] ?? "").trim() || "No answer submitted."}</blockquote>
-            {question.markingGuide && <div className="assessment-review-guidance"><strong>Private marking guidance</strong><p>{question.markingGuide}</p></div>}
+            {question.markingGuide && <div className="assessment-review-guidance"><strong>Teacher marking guidance</strong><p>{question.markingGuide}</p></div>}
+            <div className="assessment-review-ai-suggestion">
+              <strong>MIΛ's suggested mark</strong>
+              {attempt.marking_details?.[question.id]?.ai_suggested_mark !== undefined && attempt.marking_details[question.id].ai_suggested_mark !== null
+                ? <span>{attempt.marking_details[question.id].ai_suggested_mark} / {question.points} · confidence {Math.round(Number(attempt.marking_details[question.id].confidence || 0) * 100)}%</span>
+                : <span>MIΛ could not confidently judge this answer. Please mark it using the guide.</span>}
+              {attempt.marking_details?.[question.id]?.feedback && <p>{attempt.marking_details[question.id].feedback}</p>}
+            </div>
             <label>Mark awarded
               <input type="number" min="0" max={question.points} step="0.5" value={attemptMarks[question.id] ?? ""}
                 onChange={event => setMarks(current => ({ ...current, [attempt.id]: { ...(current[attempt.id] || {}), [question.id]: event.target.value } }))}/>
@@ -213,6 +215,6 @@ export default function AssessmentReviewQueue() {
           </div>
         </article>;
       })}</div> :
-      <div className="assessment-review-empty"><ClipboardCheck size={25}/><strong>No written submissions to review</strong><span>Short-answer responses from assigned assessments will appear here after learners submit them.</span></div>}
+      <div className="assessment-review-empty"><ClipboardCheck size={25}/><strong>No written submissions need review</strong><span>MIΛ marks clear written answers automatically. Only uncertain answers appear here for teacher review.</span></div>}
   </section>;
 }

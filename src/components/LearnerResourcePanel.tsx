@@ -15,6 +15,7 @@ type Resource = {
 };
 
 type AssignedResource = Resource & { assigned_at: string };
+type StorageStatus = { used_bytes: number; quota_bytes: number; reserved_bytes: number; available_bytes: number; used_percent: number };
 
 const ALLOWED_FILE = /\.(pdf|doc|docx|ppt|pptx|txt|rtf|jpg|jpeg|png|webp|csv|xlsx)$/i;
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -28,6 +29,10 @@ function formatSize(bytes: number): string {
 
 function safeFileName(name: string): string {
   return name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 100) || "resource";
+}
+function formatStorage(bytes:number):string {
+  if(!Number.isFinite(bytes)||bytes<0)return "—";
+  return bytes>=1024*1024*1024?(bytes/(1024*1024*1024)).toFixed(2)+" GB":(bytes/(1024*1024)).toFixed(0)+" MB";
 }
 
 export default function LearnerResourcePanel({
@@ -54,6 +59,10 @@ export default function LearnerResourcePanel({
   const [removingId, setRemovingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
+  const [storageError, setStorageError] = useState("");
+  const [quotaChoice, setQuotaChoice] = useState("1");
+  const [quotaSaving, setQuotaSaving] = useState(false);
 
   const subjectOptions = useMemo(() => [...new Set([...subjects, "General"])].filter(Boolean), [subjects]);
   const assignedIds = useMemo(() => new Set(assigned.map(item => item.id)), [assigned]);
@@ -69,7 +78,7 @@ export default function LearnerResourcePanel({
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError || !authData.user) throw new Error("Sign in again before managing learner resources.");
-      const [libraryResult, assignmentResult] = await Promise.all([
+      const [libraryResult, assignmentResult, storageResult] = await Promise.all([
         supabase.from("learning_resources")
           .select("id,title,subject_name,topic,resource_type,mime_type,file_size,storage_path,created_at")
           .order("created_at", { ascending: false }).limit(150),
@@ -77,9 +86,19 @@ export default function LearnerResourcePanel({
           .select("resource_id,assigned_at")
           .eq("learner_id", learnerId)
           .order("assigned_at", { ascending: false }),
+        supabase.rpc("get_studyspace_storage_status", { p_learner_id: learnerId }),
       ]);
       if (libraryResult.error) throw libraryResult.error;
       if (assignmentResult.error) throw assignmentResult.error;
+      if (storageResult.error) {
+        setStorageStatus(null);
+        setStorageError("Storage details require active administrator access with MFA: " + storageResult.error.message);
+      } else {
+        const status = storageResult.data as StorageStatus;
+        setStorageStatus(status);
+        setStorageError("");
+        setQuotaChoice(String(Math.max(1,Math.round(status.quota_bytes/1073741824))));
+      }
       const resources = (libraryResult.data || []) as Resource[];
       const assignedIds = (assignmentResult.data || []).map(row => row.resource_id);
       const assignedResourceResult = assignedIds.length
@@ -104,6 +123,23 @@ export default function LearnerResourcePanel({
   }, [learnerId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  async function changeStorageQuota() {
+    if (!supabase || quotaSaving) return;
+    const gb = Number(quotaChoice);
+    if (!Number.isFinite(gb) || gb < 1 || gb > 20) { setError("Choose a storage allowance from 1 to 20 GB."); return; }
+    setQuotaSaving(true); setError(""); setNotice("");
+    const { data, error: quotaError } = await supabase.rpc("set_studyspace_learner_storage_quota", {
+      p_learner_id: learnerId,
+      p_quota_bytes: Math.round(gb * 1024 * 1024 * 1024),
+    });
+    if (quotaError) setError("Storage allowance could not be changed: " + quotaError.message);
+    else {
+      setStorageStatus(data as StorageStatus);
+      setNotice(learnerName + "'s personal storage allowance is now " + gb + " GB.");
+    }
+    setQuotaSaving(false);
+  }
 
   async function assignExisting() {
     if (!supabase || !selectedResourceId || assigning) return;
@@ -235,6 +271,16 @@ export default function LearnerResourcePanel({
 
       {notice && <p className="inline-message" role="status">{notice}</p>}
       {error && <p className="inline-message error-message" role="alert">{error}</p>}
+
+      <section className="learner-storage-quota" aria-label="Learner personal cloud storage">
+        <div className="learner-storage-quota-heading"><div><span className="eyebrow">PERSONAL STUDENT STORAGE</span><strong>Cloud storage allowance</strong><small>Counts the learner's private files. Your shared Resource Library remains separate.</small></div><span className="learner-storage-used">{storageStatus ? formatStorage(storageStatus.used_bytes) : "—"}<small>USED</small></span></div>
+        {storageStatus ? <>
+          <div className="learner-storage-track" role="progressbar" aria-label="Learner cloud storage usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,storageStatus.used_percent)}><span style={{width:Math.min(100,Math.max(0,storageStatus.used_percent))+"%"}}/></div>
+          <div className="learner-storage-stats"><strong>{formatStorage(storageStatus.used_bytes+storageStatus.reserved_bytes)} of {formatStorage(storageStatus.quota_bytes)}</strong><span>{formatStorage(storageStatus.available_bytes)} available</span></div>
+        </> : <p className="learner-resource-empty">{storageError || "Loading personal storage information…"}</p>}
+        <div className="learner-storage-controls"><label>Set storage allowance<select value={quotaChoice} onChange={event=>setQuotaChoice(event.target.value)}>{[1,2,5,10,15,20].map(gb=><option key={gb} value={String(gb)}>{gb} GB</option>)}</select></label><button type="button" className="secondary-button" onClick={()=>void changeStorageQuota()} disabled={quotaSaving||!storageStatus||Number(quotaChoice)*1073741824<=storageStatus.quota_bytes}>{quotaSaving?"Saving…":"Increase storage"}</button></div>
+        <small className="learner-storage-note">Only an administrator with verified MFA can change this allowance. The new allowance cannot be lower than existing usage.</small>
+      </section>
 
       <div className="learner-resource-assigned">
         <div className="learner-resource-subheading"><strong>Assigned to {learnerName}</strong><span>{assigned.length} resource{assigned.length === 1 ? "" : "s"}</span></div>

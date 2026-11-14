@@ -36,16 +36,16 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: "Today's Session", icon: CalendarDays },
   { label: 'Learners', icon: Users },
-  { label: 'Messages', icon: MessageCircle },
-  { label: 'Timetable', icon: CalendarDays },
-  { label: 'MIΛ', icon: Brain },
-  { label: 'Guardian verification', icon: ShieldCheck },
-  { label: 'Subscriptions', icon: CreditCard },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
+  { label: 'Timetable', icon: CalendarDays },
   { label: 'Academic progress', icon: Activity },
   { label: 'Learning engagement', icon: Sparkles },
+  { label: 'Messages', icon: MessageCircle },
+  { label: 'MIΛ', icon: Brain },
   { label: 'Access PINs', icon: KeyRound },
+  { label: 'Guardian verification', icon: ShieldCheck },
+  { label: 'Subscriptions', icon: CreditCard },
   { label: 'Testimonials', icon: Users },
   { label: 'Settings', icon: Settings },
 ]
@@ -441,6 +441,7 @@ function AcademicProgressPage() {
   };
   type StudyRow = { learner_id: string; duration_minutes: number; started_at: string };
   type AttemptRow = { learner_id: string; score: number; total_points: number; submitted_at: string; marked_at: string | null };
+  type HomeworkAttemptRow = { learner_id:string; homework_id:string; ai_score:number|null; teacher_score:number|null; total_points:number; submitted_at:string|null; completed_at:string|null; ai_marking_status:string; ai_marked_at:string|null; marked_at:string|null };
   type PracticeRow = { learner_id: string; score: number | null; max_score: number | null; created_at: string };
   type AssignmentRow = { learner_id: string; id: string };
   type SubjectRow = { learner_id: string; name: string };
@@ -460,7 +461,7 @@ function AcademicProgressPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  type AssessmentDetail = { id:string; title:string; subject_name:string; score:number; total_points:number; submitted_at:string; marked_at:string|null; teacher_feedback:string };
+  type AssessmentDetail = { id:string; title:string; subject_name:string; score:number; total_points:number; submitted_at:string; marked_at:string|null; teacher_feedback:string; result_type?:string };
   type MemoryDetail = { strengths:unknown; difficulties:unknown; goals:unknown; recent_topics:unknown; updated_at:string } | null;
   type RecordEvent = { id:string; event_type:string; score:number|null; max_score:number|null; duration_minutes:number|null; created_at:string; metadata:unknown };
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
@@ -478,15 +479,16 @@ function AcademicProgressPage() {
     }
     setLoading(true);
     setError('');
-    const [profileResult, studyResult, assignmentResult, attemptResult, practiceResult, subjectResult] = await Promise.all([
+    const [profileResult, studyResult, assignmentResult, attemptResult, homeworkAttemptResult, practiceResult, subjectResult] = await Promise.all([
       supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,account_status').eq('role','learner').order('preferred_name'),
       supabase.from('study_sessions').select('learner_id,duration_minutes,started_at').order('started_at',{ascending:false}),
       supabase.from('exercise_assignments').select('id,learner_id'),
-      supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at').order('submitted_at',{ascending:false}),
+      supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at,teacher_review_required').eq('teacher_review_required',false).order('submitted_at',{ascending:false}),
+      supabase.from('session_homework_submissions').select('learner_id,homework_id,ai_score,teacher_score,total_points,submitted_at,completed_at,ai_marking_status,ai_marked_at,marked_at').in('ai_marking_status',['ai_marked','teacher_marked']).order('submitted_at',{ascending:false}),
       supabase.from('progress_events').select('learner_id,score,max_score,created_at').eq('event_type','weekly_test_attempt').order('created_at',{ascending:false}),
       supabase.from('student_subjects').select('learner_id,name'),
     ]);
-    const failed = [profileResult.error,studyResult.error,assignmentResult.error,attemptResult.error,practiceResult.error,subjectResult.error].find(Boolean);
+    const failed = [profileResult.error,studyResult.error,assignmentResult.error,attemptResult.error,homeworkAttemptResult.error,practiceResult.error,subjectResult.error].find(Boolean);
     if (failed) {
       setError('Academic progress could not be loaded. Check administrator permissions and the latest database migrations, then refresh.');
       setLearners([]);
@@ -530,6 +532,16 @@ function AcademicProgressPage() {
       const activity=row.marked_at||row.submitted_at;
       if(activity && activity>item.lastActivity) item.lastActivity=activity;
     }
+    for (const row of (homeworkAttemptResult.data || []) as HomeworkAttemptRow[]) {
+      const item=progress.get(row.learner_id);
+      const score=row.teacher_score ?? row.ai_score;
+      if(!item || score===null || Number(row.total_points)<=0) continue;
+      item.submissions+=1;
+      item.score+=Math.max(0,Number(score)||0);
+      item.possible+=Math.max(0,Number(row.total_points)||0);
+      const activity=row.marked_at||row.ai_marked_at||row.submitted_at||row.completed_at||'';
+      if(activity && activity>item.lastActivity)item.lastActivity=activity;
+    }
     for (const row of (practiceResult.data || []) as PracticeRow[]) {
       const item=progress.get(row.learner_id);
       if(!item) continue;
@@ -543,7 +555,13 @@ function AcademicProgressPage() {
     setLoading(false);
   };
 
-  useEffect(()=>{void refresh();},[]);
+  useEffect(()=>{
+    void refresh();
+    const onFocus=()=>{if(document.visibilityState==='visible')void refresh();};
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},60000);
+    window.addEventListener('focus',onFocus);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',onFocus);};
+  },[]);
 
   const loadLearnerRecord = async (learnerId:string) => {
     if (!supabase) return;
@@ -551,13 +569,14 @@ function AcademicProgressPage() {
     setRecordLoading(true);
     setRecordError('');
     try {
-      const [assignmentRows, attemptRows, eventRows, memoryRow] = await Promise.all([
+      const [assignmentRows, attemptRows, homeworkSubmissionRows, eventRows, memoryRow] = await Promise.all([
         supabase.from('exercise_assignments').select('id,exercise_set_id').eq('learner_id',learnerId),
-        supabase.from('exercise_attempts').select('id,assignment_id,score,total_points,submitted_at,marked_at,teacher_feedback').eq('learner_id',learnerId).order('submitted_at',{ascending:false}).limit(100),
+        supabase.from('exercise_attempts').select('id,assignment_id,score,total_points,submitted_at,marked_at,teacher_feedback,teacher_review_required').eq('learner_id',learnerId).eq('teacher_review_required',false).order('submitted_at',{ascending:false}).limit(100),
+        supabase.from('session_homework_submissions').select('id,homework_id,ai_score,teacher_score,total_points,submitted_at,completed_at,ai_feedback,teacher_feedback,ai_marking_status,ai_marked_at,marked_at').eq('learner_id',learnerId).in('ai_marking_status',['ai_marked','teacher_marked']).order('submitted_at',{ascending:false}).limit(100),
         supabase.from('progress_events').select('id,event_type,score,max_score,duration_minutes,created_at,metadata').eq('learner_id',learnerId).order('created_at',{ascending:false}).limit(50),
         supabase.from('mia_learning_memory').select('strengths,difficulties,goals,recent_topics,updated_at').eq('learner_id',learnerId).maybeSingle(),
       ]);
-      const failed=[assignmentRows.error,attemptRows.error,eventRows.error,memoryRow.error].find(Boolean);
+      const failed=[assignmentRows.error,attemptRows.error,homeworkSubmissionRows.error,eventRows.error,memoryRow.error].find(Boolean);
       if(failed) throw failed;
       const assignmentMap=new Map(((assignmentRows.data??[]) as {id:string;exercise_set_id:string}[]).map(x=>[x.id,x.exercise_set_id]));
       const exerciseSetIds=[...new Set([...assignmentMap.values()])];
@@ -571,7 +590,35 @@ function AcademicProgressPage() {
           const set=sets.get(assignmentMap.get(x.assignment_id)||'');
           return {id:x.id,title:set?.title||'Assessment',subject_name:set?.subject_name||'General',score:Number(x.score)||0,total_points:Number(x.total_points)||0,submitted_at:x.submitted_at,marked_at:x.marked_at,teacher_feedback:x.teacher_feedback||''};
         });
-      setAssessmentRecords(rows);
+      const homeworkRows=(homeworkSubmissionRows.data??[]) as {id:string;homework_id:string;ai_score:number|null;teacher_score:number|null;total_points:number;submitted_at:string|null;completed_at:string|null;ai_feedback:string;teacher_feedback:string;ai_marking_status:string;ai_marked_at:string|null;marked_at:string|null}[];
+      const homeworkIds=[...new Set(homeworkRows.map(x=>x.homework_id))];
+      const homeworkDefinitions=homeworkIds.length
+        ? await supabase.from('session_homework').select('id,title,session_id').in('id',homeworkIds)
+        : {data:[],error:null};
+      if(homeworkDefinitions.error)throw homeworkDefinitions.error;
+      const sessionIds=[...new Set((homeworkDefinitions.data??[]).map(x=>x.session_id).filter(Boolean))];
+      const sessions=sessionIds.length
+        ? await supabase.from('class_sessions').select('id,subject_name').in('id',sessionIds)
+        : {data:[],error:null};
+      if(sessions.error)throw sessions.error;
+      const sessionSubjects=new Map(((sessions.data??[]) as {id:string;subject_name:string}[]).map(x=>[x.id,x.subject_name]));
+      const homeworkById=new Map(((homeworkDefinitions.data??[]) as {id:string;title:string;session_id:string}[]).map(x=>[x.id,x]));
+      const classHomeworkRecords:AssessmentDetail[]=homeworkRows.flatMap(x=>{
+        const mark=x.teacher_score??x.ai_score;
+        const definition=homeworkById.get(x.homework_id);
+        if(mark===null||Number(x.total_points)<=0||!definition)return [];
+        return [{
+          id:'class-homework:'+x.id,
+          title:definition.title||'Class homework',
+          subject_name:sessionSubjects.get(definition.session_id)||'General',
+          score:Number(mark)||0,total_points:Number(x.total_points)||0,
+          submitted_at:x.submitted_at||x.completed_at||'',
+          marked_at:x.marked_at||x.ai_marked_at,
+          teacher_feedback:x.teacher_feedback||x.ai_feedback||'',
+          result_type:'Live-class homework',
+        }];
+      });
+      setAssessmentRecords([...rows.map(x=>({...x,result_type:'Assigned assessment'})),...classHomeworkRecords].sort((a,b)=>b.submitted_at.localeCompare(a.submitted_at)));
       setRecordEvents((eventRows.data??[]) as RecordEvent[]);
       setLearningMemory((memoryRow.data??null) as MemoryDetail);
     } catch(reason) {
@@ -581,6 +628,12 @@ function AcademicProgressPage() {
       setLearningMemory(null);
     } finally { setRecordLoading(false); }
   };
+
+  useEffect(()=>{
+    if(!selectedRecordId)return;
+    const timer=window.setInterval(()=>void loadLearnerRecord(selectedRecordId),45000);
+    return()=>window.clearInterval(timer);
+  },[selectedRecordId]);
 
   const visible=learners.filter(item=>{
     const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.grade,item.learner.curriculum].join(' ').toLocaleLowerCase();
@@ -601,7 +654,7 @@ function AcademicProgressPage() {
     <section className="stats-grid" aria-label="Academic progress summary">
       <StatCard label="LEARNERS" value={String(learners.length)} detail={active+' active accounts'} icon={<Users size={19}/>}/>
       <StatCard label="STUDY TIME" value={(minutes/60).toFixed(1)+'h'} detail="Recorded study sessions" icon={<Clock3 size={19}/>}/>
-      <StatCard label="SUBMISSIONS" value={String(attempts)} detail="Completed assessments and practice tests" icon={<FileText size={19}/>}/>
+      <StatCard label="SUBMISSIONS" value={String(attempts)} detail="Assessments, class homework and practice tests" icon={<FileText size={19}/>}/>
       <StatCard label="AVERAGE SCORE" value={average===null?'—':average+'%'} detail={scored?'Across automatically scored work':'No scored work yet'} icon={<Activity size={19}/>}/>
     </section>
     <label className="learners-search"><span>Find a learner</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search by Student ID, name, grade or curriculum"/></label>
@@ -618,7 +671,7 @@ function AcademicProgressPage() {
         </article>;
       }):<div className="classroom-empty"><Activity size={25}/><strong>{search?'No matching learners':'No learner activity yet'}</strong><span>{search?'Try another search term.':'Learner study sessions and completed assessments will appear here as they use Studyspace.'}</span></div>}
     </section>
-    <p className="subtle-note">Scores include submitted teacher assignments and self-practice tests. Written responses awaiting teacher marking may not yet have a final score.</p>
+    <p className="subtle-note">Scores include formal assessments, live-class homework and self-practice tests. Written responses awaiting teacher review are kept provisional until a teacher publishes the final mark.</p>
     {selectedRecordId && <section className="panel monitor-progress-records">
       {(() => {
         const selected=learners.find(x=>x.learner.id===selectedRecordId)?.learner;
@@ -633,7 +686,7 @@ function AcademicProgressPage() {
           {recordError&&<p className="inline-message error-message" role="alert">{recordError}</p>}
           {recordLoading?<div className="classroom-empty">Loading this learner’s records…</div>:<>
             <div className="monitor-record-stat-row">
-              <article><span>TESTS MARKED</span><strong>{assessmentRecords.length}</strong></article>
+              <article><span>ASSESSMENTS MARKED</span><strong>{assessmentRecords.length}</strong></article>
               <article><span>AVERAGE RESULT</span><strong>{assessmentRecords.length?Math.round(assessmentRecords.reduce((n,x)=>n+(x.total_points?x.score/x.total_points*100:0),0)/assessmentRecords.length)+'%':'—'}</strong></article>
               <article><span>PROGRESS EVENTS</span><strong>{recordEvents.length}</strong></article>
             </div>
@@ -647,7 +700,7 @@ function AcademicProgressPage() {
             </div>
             <div className="monitor-record-assessments">
               <strong>Past tests and marked work</strong>
-              {assessmentRecords.length?assessmentRecords.map(x=><article key={x.id}><div><strong>{x.title}</strong><span>{x.subject_name} · {x.submitted_at?new Date(x.submitted_at).toLocaleDateString():'Date not recorded'}</span>{x.teacher_feedback&&<small>Teacher feedback: {x.teacher_feedback}</small>}</div><b>{x.total_points?Math.round(x.score/x.total_points*100)+'%':'Awaiting score'}</b></article>):<p>No past test records yet.</p>}
+              {assessmentRecords.length?assessmentRecords.map(x=><article key={x.id}><div><strong>{x.title}</strong><span>{x.result_type||'Assessment'} · {x.subject_name} · {x.submitted_at?new Date(x.submitted_at).toLocaleDateString():'Date not recorded'}</span>{x.teacher_feedback&&<small>Feedback: {x.teacher_feedback}</small>}</div><b>{x.total_points?Math.round(x.score/x.total_points*100)+'%':'Awaiting score'}</b></article>):<p>No past test records yet.</p>}
             </div>
             <div className="monitor-record-mia">
               <strong><Sparkles size={15}/> MIΛ learning observations</strong>

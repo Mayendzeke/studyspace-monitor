@@ -114,3 +114,99 @@ test('Monitor install helper distinguishes a standalone app from a browser short
   assert.match(app, /not offering a full standalone PWA install/);
   assert.match(app, /cannot turn a browser shortcut into a native Android package/);
 });
+
+
+test('Monitor navigation is ordered by the teacher operating workflow', () => {
+  const app = read('src/App.tsx');
+  const labels = [
+    "label: 'Overview'",
+    "label: \"Today's Session\"",
+    "label: 'Learners'",
+    "label: 'Content Studio'",
+    "label: 'Classroom Studio'",
+    "label: 'Timetable'",
+    "label: 'Academic progress'",
+    "label: 'Learning engagement'",
+    "label: 'Messages'",
+    "label: 'MIΛ'",
+    "label: 'Access PINs'",
+    "label: 'Guardian verification'",
+    "label: 'Subscriptions'",
+    "label: 'Testimonials'",
+    "label: 'Settings'",
+  ];
+  let previous = -1;
+  for (const label of labels) {
+    const current = app.indexOf(label);
+    assert.ok(current > previous, label + ' should appear in the requested navigation order');
+    previous = current;
+  }
+});
+
+test('MIΛ marks written assessment answers and defers uncertain marks to the teacher', () => {
+  const endpoint = read('supabase/functions/submit-exercise-attempt/index.ts');
+  const provider = read('supabase/functions/submit-exercise-attempt/provider.ts');
+  const queue = read('src/components/AssessmentReviewQueue.tsx');
+  const migration = read('supabase/migrations/20261114120000_studyspace_ai_marking_and_student_storage.sql');
+  assert.ok(endpoint.includes('markWithCloudflare'));
+  assert.ok(endpoint.includes('question_type === "short_answer"'));
+  assert.ok(endpoint.includes('confidence >= 0.75'));
+  assert.ok(endpoint.includes('teacher_review'));
+  assert.ok(endpoint.includes('marking_details'));
+  assert.ok(endpoint.includes('teacher_review_required'));
+  assert.ok(provider.includes('GEMMA_MODEL'));
+  assert.ok(provider.includes('SECONDARY_MODEL'));
+  assert.ok(!provider.includes('GEMINI_API_KEY'));
+  assert.ok(queue.includes('.eq("teacher_review_required", true)'));
+  assert.ok(queue.includes('ai_suggested_mark'));
+  assert.ok(queue.includes('marking_status: "teacher_marked"'));
+  assert.ok(migration.includes('sync_studyspace_assessment_progress'));
+  assert.ok(migration.includes('progress_events_one_assigned_attempt'));
+});
+
+test('live-class homework supports student submissions, MIΛ marks and final teacher overrides', () => {
+  const studentFunction = read('supabase/functions/mark-class-homework/index.ts');
+  const teacherSession = read('src/components/MonitorTodaySession.tsx');
+  const migration = read('supabase/migrations/20261114120000_studyspace_ai_marking_and_student_storage.sql');
+  assert.ok(studentFunction.includes('markWithCloudflare'));
+  assert.ok(studentFunction.includes('session_homework_submissions'));
+  assert.ok(studentFunction.includes('teacher_review'));
+  assert.ok(studentFunction.includes('ai_marking_status'));
+  assert.ok(!studentFunction.includes('GEMINI_API_KEY'));
+  assert.ok(teacherSession.includes('publishSessionHomework'));
+  assert.ok(teacherSession.includes('marking_rubric'));
+  assert.ok(teacherSession.includes('saveTeacherHomeworkMark'));
+  assert.ok(teacherSession.includes('teacher_score'));
+  assert.ok(teacherSession.includes('postgres_changes'));
+  assert.ok(migration.includes('sync_studyspace_class_homework_progress'));
+  assert.ok(migration.includes('class_homework_results'));
+});
+
+test('per-learner storage quota is visible and can be increased securely in Monitor', () => {
+  const panel = read('src/components/LearnerResourcePanel.tsx');
+  const migration = read('supabase/migrations/20261114120000_studyspace_ai_marking_and_student_storage.sql');
+  const sync = read('supabase/functions/mark-class-homework/index.ts');
+  assert.ok(panel.includes('get_studyspace_storage_status'));
+  assert.ok(panel.includes('set_studyspace_learner_storage_quota'));
+  assert.ok(panel.includes('learner-storage-quota'));
+  assert.ok(panel.includes('quotaChoice'));
+  assert.ok(migration.includes('learner_storage_quotas'));
+  assert.ok(migration.includes('learner_storage_reservations'));
+  assert.ok(migration.includes('reserve_studyspace_personal_storage'));
+  assert.ok(migration.includes('can_upload_studyspace_personal_object'));
+  assert.ok(migration.includes('20 * 1024 * 1024 * 1024') || migration.includes('21474836480'));
+  assert.ok(migration.includes('Administrator access with verified MFA is required'));
+});
+
+test('student and teacher live classroom surfaces remain connected to all existing session tools', () => {
+  const teacher = read('src/components/MonitorTodaySession.tsx');
+  const app = read('src/App.tsx');
+  for (const feature of ['class_sessions','class_session_members','session_lesson_notes','session_messages','session_homework','session_whiteboards','session_homework_submissions']) {
+    assert.ok(teacher.includes(feature), 'Today\'s Session must retain ' + feature);
+  }
+  assert.ok(app.includes('<MonitorTodaySession onCreateLesson='));
+  assert.ok(teacher.includes('Start live class'));
+  assert.ok(teacher.includes('End class'));
+  assert.ok(teacher.includes('monitor-board-canvas-wrap'));
+  assert.ok(teacher.includes('Class chat'));
+});

@@ -11,7 +11,8 @@ type SessionRow = {
 }
 type LearnerRow = { id: string; student_id: string | null; full_name: string; preferred_name: string }
 type MessageRow = { id: string; sender_id: string; message: string; created_at: string }
-type HomeworkRow = { id: string; title: string; instructions: string; due_at: string | null }
+type HomeworkRow = { id: string; title: string; instructions: string; due_at: string | null; total_points: number; marking_rubric: string };
+type HomeworkSubmissionRow = { id: string; homework_id: string; learner_id: string; response: string; submitted_at: string | null; completed_at: string | null; ai_score: number | null; total_points: number; ai_feedback: string; ai_marking_status: string; ai_marking_details: Record<string, unknown>; teacher_score: number | null; teacher_feedback: string; marked_at: string | null };
 type Tab = 'Overview'|'Lesson guide'|'Class chat'|'Homework'|'Shared board'
 
 const tabs: {label:Tab; icon:typeof BookOpen}[] = [
@@ -30,6 +31,16 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
   const [messages,setMessages] = useState<MessageRow[]>([])
   const [homework,setHomework] = useState<HomeworkRow[]>([])
   const [completedCounts,setCompletedCounts] = useState<Record<string,number>>({})
+  const [submissions,setSubmissions] = useState<HomeworkSubmissionRow[]>([])
+  const [submissionMarks,setSubmissionMarks] = useState<Record<string,string>>({})
+  const [submissionFeedback,setSubmissionFeedback] = useState<Record<string,string>>({})
+  const [homeworkTitle,setHomeworkTitle] = useState('')
+  const [homeworkInstructions,setHomeworkInstructions] = useState('')
+  const [homeworkRubric,setHomeworkRubric] = useState('')
+  const [homeworkDue,setHomeworkDue] = useState('')
+  const [homeworkPoints,setHomeworkPoints] = useState('10')
+  const [savingHomework,setSavingHomework] = useState(false)
+  const [markingSubmission,setMarkingSubmission] = useState('')
   const [lessonNotes,setLessonNotes] = useState<{summary:string;keyPoints:string[];workedExample:string;exitQuestion:string}>({summary:'',keyPoints:[],workedExample:'',exitQuestion:''})
   const [boardImage,setBoardImage] = useState('')
   const [adminId,setAdminId] = useState('')
@@ -87,7 +98,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
 
   useEffect(() => {
     if (!activeId || !supabase) {
-      setActive(null);setLearners([]);setMessages([]);setHomework([]);setCompletedCounts({});setBoardImage('')
+      setActive(null);setLearners([]);setMessages([]);setHomework([]);setCompletedCounts({});setSubmissions([]);setBoardImage('')
       setLessonNotes({summary:'',keyPoints:[],workedExample:'',exitQuestion:''})
       return
     }
@@ -99,7 +110,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
         supabase!.from('class_session_members').select('learner_id').eq('session_id',activeId),
         supabase!.from('session_messages').select('id,sender_id,message,created_at').eq('session_id',activeId).order('created_at'),
         supabase!.from('session_lesson_notes').select('summary,key_points,worked_example,exit_question').eq('session_id',activeId).maybeSingle(),
-        supabase!.from('session_homework').select('id,title,instructions,due_at').eq('session_id',activeId).order('created_at'),
+        supabase!.from('session_homework').select('id,title,instructions,due_at,total_points,marking_rubric').eq('session_id',activeId).order('created_at'),
         supabase!.from('session_whiteboards').select('board_state').eq('session_id',activeId).maybeSingle()
       ])
       if (!alive) return
@@ -116,12 +127,20 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
       const tasks=(homeworkResult.data??[]) as HomeworkRow[]
       setHomework(tasks)
       if (tasks.length) {
-        const {data:submissions,error:submissionError}=await supabase!.from('session_homework_submissions').select('homework_id,learner_id,completed_at').in('homework_id',tasks.map(item=>item.id))
+        const {data:submissionRows,error:submissionError}=await supabase!.from('session_homework_submissions')
+          .select('id,homework_id,learner_id,response,submitted_at,completed_at,ai_score,total_points,ai_feedback,ai_marking_status,ai_marking_details,teacher_score,teacher_feedback,marked_at')
+          .in('homework_id',tasks.map(item=>item.id))
         if (submissionError) throw submissionError
+        const rows=(submissionRows??[]) as HomeworkSubmissionRow[]
         const counts:Record<string,number>={}
-        for(const row of submissions??[]) if(row.completed_at) counts[row.homework_id]=(counts[row.homework_id]||0)+1
-        if (alive) setCompletedCounts(counts)
-      } else setCompletedCounts({})
+        for(const row of rows) if(row.completed_at) counts[row.homework_id]=(counts[row.homework_id]||0)+1
+        if (alive) {
+          setCompletedCounts(counts)
+          setSubmissions(rows)
+          setSubmissionMarks(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_score==null?(row.ai_score==null?'':String(row.ai_score)):String(row.teacher_score);return next})
+          setSubmissionFeedback(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_feedback||'';return next})
+        }
+      } else { setCompletedCounts({});setSubmissions([]) }
       setBoardImage((boardResult.data?.board_state as {imageData?:string}|null)?.imageData||'')
       channel=supabase!.channel('monitor-session-workspace-'+activeId)
         .on('postgres_changes',{event:'UPDATE',schema:'public',table:'class_sessions',filter:'id=eq.'+activeId},payload=>{
@@ -139,7 +158,23 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
           if(!alive)return
           setBoardImage((payload.new as {board_state?:{imageData?:string}}).board_state?.imageData||'')
         })
-        .on('postgres_changes',{event:'*',schema:'public',table:'session_homework',filter:'session_id=eq.'+activeId},()=>{if(alive)void load()})
+        .on('postgres_changes',{event:'*',schema:'public',table:'session_homework',filter:'session_id=eq.'+activeId},async()=>{
+          if(!alive)return
+          const {data:updated,error:updatedError}=await supabase!.from('session_homework').select('id,title,instructions,due_at,total_points,marking_rubric').eq('session_id',activeId).order('created_at')
+          if(!updatedError&&alive)setHomework((updated??[]) as HomeworkRow[])
+        })
+        .on('postgres_changes',{event:'*',schema:'public',table:'session_homework_submissions'},async()=>{
+          if(!alive||!tasks.length)return
+          const {data:updated,error:updatedError}=await supabase!.from('session_homework_submissions')
+            .select('id,homework_id,learner_id,response,submitted_at,completed_at,ai_score,total_points,ai_feedback,ai_marking_status,ai_marking_details,teacher_score,teacher_feedback,marked_at')
+            .in('homework_id',tasks.map(item=>item.id))
+          if(!updatedError&&alive){
+            const rows=(updated??[]) as HomeworkSubmissionRow[];setSubmissions(rows)
+            const counts:Record<string,number>={};for(const row of rows)if(row.completed_at)counts[row.homework_id]=(counts[row.homework_id]||0)+1;setCompletedCounts(counts)
+            setSubmissionMarks(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_score==null?(row.ai_score==null?'':String(row.ai_score)):String(row.teacher_score);return next})
+            setSubmissionFeedback(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_feedback||'';return next})
+          }
+        })
         .subscribe()
     }
     void load().catch(reason=>{if(alive)setError(reason instanceof Error?reason.message:'Session details could not be loaded.')})
@@ -215,6 +250,45 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
     setNotice(status==='live'?'Your class is live. Assigned learners can now join from Today’s Session.':'This class has ended. Learners can still access its lesson guide and homework.')
   }
 
+  const publishSessionHomework = async (event:React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if(!supabase||!active||!adminId||savingHomework||!homeworkTitle.trim())return
+    const points=Number(homeworkPoints)
+    if(!Number.isFinite(points)||points<1||points>100){setError('Set homework marks between 1 and 100.');return}
+    setSavingHomework(true);setError('');setNotice('')
+    const {error:saveError}=await supabase.from('session_homework').insert({
+      session_id:active.id,title:homeworkTitle.trim(),instructions:homeworkInstructions.trim(),
+      due_at:homeworkDue?new Date(homeworkDue).toISOString():null,created_by:adminId,
+      total_points:points,marking_rubric:homeworkRubric.trim(),
+    })
+    if(saveError)setError('Homework could not be published: '+saveError.message)
+    else{
+      setHomeworkTitle('');setHomeworkInstructions('');setHomeworkRubric('');setHomeworkDue('');setHomeworkPoints('10')
+      setNotice('Homework published to all learners in this live-class session. MIΛ will mark their written submissions.')
+      const {data:updated}=await supabase.from('session_homework').select('id,title,instructions,due_at,total_points,marking_rubric').eq('session_id',active.id).order('created_at')
+      if(updated)setHomework(updated as HomeworkRow[])
+    }
+    setSavingHomework(false)
+  }
+
+  const saveTeacherHomeworkMark = async (row:HomeworkSubmissionRow) => {
+    if(!supabase||!adminId||markingSubmission)return
+    const value=submissionMarks[row.id]===''||submissionMarks[row.id]===undefined?NaN:Number(submissionMarks[row.id])
+    if(!Number.isFinite(value)||value<0||value>Number(row.total_points)){setError('Enter a final mark between 0 and '+row.total_points+'.');return}
+    setMarkingSubmission(row.id);setError('');setNotice('')
+    const markedAt=new Date().toISOString()
+    const {error:saveError}=await supabase.from('session_homework_submissions').update({
+      teacher_score:value,teacher_feedback:(submissionFeedback[row.id]||'').trim().slice(0,2500),
+      marked_by:adminId,marked_at:markedAt,ai_marking_status:'teacher_marked',
+    }).eq('id',row.id).eq('homework_id',row.homework_id)
+    if(saveError)setError('The final homework mark could not be saved: '+saveError.message)
+    else{
+      setSubmissions(current=>current.map(item=>item.id===row.id?{...item,teacher_score:value,teacher_feedback:(submissionFeedback[row.id]||'').trim(),marked_at:markedAt,ai_marking_status:'teacher_marked'}:item))
+      setNotice('Teacher mark saved. The learner will see this final result in Today’s Session.')
+    }
+    setMarkingSubmission('')
+  }
+
   const sendMessage = async (event:React.FormEvent) => {
     event.preventDefault()
     if(!supabase||!active||!adminId||!draftMessage.trim())return
@@ -267,7 +341,33 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
             </div>}
             {tab==='Lesson guide'&&<section className="panel monitor-today-panel"><h3><BookOpen size={16}/> Shared lesson guide</h3>{lessonNotes.summary?<><p>{lessonNotes.summary}</p>{lessonNotes.keyPoints.length>0&&<><h4>Key points</h4><ul>{lessonNotes.keyPoints.map((point,index)=><li key={index}>{point}</li>)}</ul></>}{lessonNotes.workedExample&&<><h4>Worked example</h4><p>{lessonNotes.workedExample}</p></>}{lessonNotes.exitQuestion&&<><h4>Check for understanding</h4><p>{lessonNotes.exitQuestion}</p></>}</>:<p className="monitor-today-muted">The lesson guide has not been published yet. Add or publish notes in Classroom Studio.</p>}</section>}
             {tab==='Class chat'&&<section className="panel monitor-today-panel monitor-today-chat"><h3><MessageCircle size={16}/> Shared class chat</h3><div className="monitor-today-message-list">{messages.length?messages.map(message=><article key={message.id} className={message.sender_id===adminId?'mine':''}><strong>{message.sender_id===adminId?'You':learners.find(learner=>learner.id===message.sender_id)?.preferred_name||learners.find(learner=>learner.id===message.sender_id)?.full_name||'Learner'}</strong><p>{message.message}</p><small>{new Date(message.created_at).toLocaleString([], {dateStyle:'short',timeStyle:'short'})}</small></article>):<div className="monitor-today-muted">No class messages yet. Students’ messages will appear here.</div>}</div><form className="monitor-today-compose" onSubmit={sendMessage}><input value={draftMessage} onChange={event=>setDraftMessage(event.target.value)} maxLength={2000} placeholder="Reply to your class…" aria-label="Class message"/><button className="primary-button" type="submit" disabled={!draftMessage.trim()||sending}><Send size={15}/>{sending?'Sending…':'Send'}</button></form></section>}
-            {tab==='Homework'&&<section className="panel monitor-today-panel"><h3><ClipboardList size={16}/> Teacher-assigned homework</h3>{homework.length?homework.map(item=><article className="monitor-today-homework" key={item.id}><div><strong>{item.title}</strong><p>{item.instructions||'No additional instructions.'}</p><small>{item.due_at?'Due '+formatDate(item.due_at):'No due date'}</small></div><span>{(completedCounts[item.id]||0)+' / '+learners.length+' learners completed'}</span></article>):<p className="monitor-today-muted">No homework has been assigned for this lesson yet.</p>}</section>}
+            {tab==='Homework'&&<section className="panel monitor-today-panel monitor-today-homework-workspace">
+              <h3><ClipboardList size={16}/> Teacher-assigned homework and marking</h3>
+              <form className="monitor-today-homework-form" onSubmit={publishSessionHomework}>
+                <label>Homework title<input value={homeworkTitle} onChange={event=>setHomeworkTitle(event.target.value)} maxLength={180} placeholder="e.g. Complete questions 1–5" required/></label>
+                <label>Instructions<textarea rows={3} value={homeworkInstructions} onChange={event=>setHomeworkInstructions(event.target.value)} maxLength={3000} placeholder="Explain exactly what learners must submit."/></label>
+                <label>Marking guide / rubric<textarea rows={3} value={homeworkRubric} onChange={event=>setHomeworkRubric(event.target.value)} maxLength={4000} placeholder="Describe required points, method, evidence and how partial marks should be awarded."/></label>
+                <div className="monitor-today-homework-form-row"><label>Total marks<input type="number" min="1" max="100" value={homeworkPoints} onChange={event=>setHomeworkPoints(event.target.value)}/></label><label>Due date and time<input type="datetime-local" value={homeworkDue} onChange={event=>setHomeworkDue(event.target.value)}/></label></div>
+                <button className="primary-button" type="submit" disabled={savingHomework||!homeworkTitle.trim()}>{savingHomework?'Publishing…':'Publish homework to this class'}</button>
+              </form>
+              {homework.length?homework.map(item=>{
+                const taskSubmissions=submissions.filter(row=>row.homework_id===item.id)
+                return <article className="monitor-today-homework" key={item.id}>
+                  <div className="monitor-today-homework-summary"><div><strong>{item.title}</strong><p>{item.instructions||'No additional instructions.'}</p><small>{item.due_at?'Due '+formatDate(item.due_at):'No due date'} · {item.total_points} marks</small>{item.marking_rubric&&<small>Rubric: {item.marking_rubric}</small>}</div><span>{(completedCounts[item.id]||0)+' / '+learners.length+' submitted'}</span></div>
+                  {taskSubmissions.length?taskSubmissions.map(row=>{
+                    const learner=learners.find(person=>person.id===row.learner_id)
+                    return <div className="monitor-today-homework-submission" key={row.id}>
+                      <div className="monitor-today-homework-submission-head"><strong>{learner?.preferred_name||learner?.full_name||'Learner'}</strong><span>{row.ai_marking_status==='teacher_marked'?'Teacher marked':row.ai_marking_status==='ai_marked'?'MIΛ marked':row.ai_marking_status==='teacher_review'?'Needs review':row.ai_marking_status==='marking_failed'?'Marking unavailable':'Submitted'}</span></div>
+                      <p>{row.response||'No written response.'}</p>
+                      {row.ai_score!==null&&<p><b>MIΛ mark: {row.ai_score} / {row.total_points}</b> · {row.ai_feedback}</p>}
+                      {row.ai_marking_details?.ai_suggested_mark!==undefined&&<small>MIΛ suggested: {String(row.ai_marking_details.ai_suggested_mark)} · confidence {Math.round(Number(row.ai_marking_details.confidence||0)*100)}%</small>}
+                      <div className="monitor-today-homework-mark-row"><label>Final mark<input type="number" min="0" max={row.total_points} step="0.5" value={submissionMarks[row.id]??''} onChange={event=>setSubmissionMarks(current=>({...current,[row.id]:event.target.value}))}/></label><label>Teacher feedback<textarea rows={2} value={submissionFeedback[row.id]??''} onChange={event=>setSubmissionFeedback(current=>({...current,[row.id]:event.target.value}))} placeholder="Feedback for the learner"/></label><button type="button" className="subtle-button" disabled={markingSubmission===row.id} onClick={()=>void saveTeacherHomeworkMark(row)}>{markingSubmission===row.id?'Saving…':'Save final mark'}</button></div>
+                      {row.marked_at&&<small>Final result saved {formatDate(row.marked_at)}</small>}
+                    </div>
+                  }):<p className="monitor-today-muted">No submissions yet. Learners can submit written work from their Today’s Session tab.</p>}
+                </article>
+              }):<p className="monitor-today-muted">No homework has been assigned for this lesson yet.</p>}
+            </section>}
             {tab==='Shared board'&&<section className="panel monitor-today-panel"><h3><Presentation size={16}/> Shared worksheet / whiteboard</h3><div className="monitor-board-tools"><button type="button" className={boardTool==='pen'?'selected':''} onClick={()=>setBoardTool('pen')}><PenLine size={14}/> Pen</button><button type="button" className={boardTool==='eraser'?'selected':''} onClick={()=>setBoardTool('eraser')}><Eraser size={14}/> Eraser</button><input aria-label="Board pen colour" type="color" value={boardInk} onChange={event=>setBoardInk(event.target.value)}/><button type="button" onClick={()=>void clearBoard()}>Clear board</button><button type="button" className="primary-button" onClick={()=>void saveBoard()}><Save size={14}/> Save</button></div><div className="monitor-board-canvas-wrap"><canvas ref={canvasRef} width={1200} height={680} onPointerDown={startBoardDraw} onPointerMove={continueBoardDraw} onPointerUp={stopBoardDraw} onPointerCancel={stopBoardDraw} onPointerLeave={stopBoardDraw} aria-label="Shared classroom whiteboard"/></div><p className="monitor-today-muted">Draw here or erase parts of the board. Saved changes are shared with the students assigned to this lesson.</p>{boardNotice&&<p className="monitor-today-muted" role="status">{boardNotice}</p>}</section>}
           </>}
         </section>

@@ -20,6 +20,6 @@ test('testimonial PNG export quotes learner copy and uses the shared brand and p
   assert.match(page, /Manrope/);
   assert.match(page, /DM Sans/);
   assert.doesNotMatch(page, /Georgia, serif/);
-  assert.doesNotMatch(page, /Arial, sans-serif/);
+  assert.ok(page.includes('600 42px Manrope'), 'the learner quote uses the branded Manrope typeface');
   assert.ok(page.includes('canExportMarketingImage(item)'), 'marketing consent guard must remain in place');
 });

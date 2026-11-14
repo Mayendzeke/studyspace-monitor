@@ -9,30 +9,45 @@ export default function SplashScreen({ theme = "light", displayName = "Ayanda Zw
       <div className="studyspace-splash-glow studyspace-splash-glow-two" />
       <div className="studyspace-splash-content">
         <div className="studyspace-splash-logo-stage">
-          <svg className="studyspace-splash-logo" viewBox="0 0 512 512" role="img" aria-label="Study Space graduation cap logo">
+          <svg className="studyspace-splash-logo studyspace-monitor-splash-logo" viewBox="0 0 512 512" role="img" aria-label="Study Space Monitor three-dimensional dashboard logo">
             <defs>
-              <linearGradient id="studyspace-brand-gradient" x1="0" y1="0" x2="1" y2="1">
+              <linearGradient id="monitor-splash-bg" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stopColor="#927df5" />
-                <stop offset="100%" stopColor="#5d45c8" />
+                <stop offset="55%" stopColor="#6b58ce" />
+                <stop offset="100%" stopColor="#42348f" />
               </linearGradient>
+              <linearGradient id="monitor-splash-screen" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#f7f3ff" />
+                <stop offset="100%" stopColor="#d9f8ef" />
+              </linearGradient>
+              <linearGradient id="monitor-splash-stand" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#d8d0ff" />
+                <stop offset="100%" stopColor="#9b8be9" />
+              </linearGradient>
+              <filter id="monitor-splash-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                <feGaussianBlur stdDeviation="12" />
+              </filter>
             </defs>
-            <rect className="studyspace-logo-colour" x="8" y="8" width="496" height="496" rx="112" fill="url(#studyspace-brand-gradient)" />
-            <g className="studyspace-logo-sketch" fill="none" stroke="currentColor" strokeWidth="23" strokeLinecap="round" strokeLinejoin="round">
-              <rect className="studyspace-logo-frame" x="8" y="8" width="496" height="496" rx="112" />
-              <path className="studyspace-logo-cap-sketch" d="M112 215 256 143 400 215 256 288 112 215Z" />
-              <path className="studyspace-logo-cap-sketch" d="M164 246v76c0 17 41 42 92 42s92-25 92-42v-76" />
-              <path className="studyspace-logo-cap-sketch" d="M400 215v112" />
-            </g>
-            <g className="studyspace-logo-finish" fill="none" stroke="#fff" strokeWidth="23" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M112 215 256 143 400 215 256 288 112 215Z" />
-              <path d="M164 246v76c0 17 41 42 92 42s92-25 92-42v-76" />
-              <path d="M400 215v112" />
-            </g>
-            <g className="studyspace-splash-pencil" aria-hidden="true">
-              <path d="M0 0 12-12 34 10 22 22Z" fill="#f5d58a" stroke="#6e5a37" strokeWidth="2" />
-              <path d="m0 0-5 17 17-5" fill="#f1d8ad" stroke="#6e5a37" strokeWidth="2" />
-              <path d="m-5 17 7-2-5-5Z" fill="#4b4651" />
-              <path d="m12-12 5-5 22 22-5 5Z" fill="#c4c9d3" stroke="#6e5a37" strokeWidth="2" />
+            <g className="studyspace-monitor-logo-art">
+              <rect width="512" height="512" rx="112" fill="url(#monitor-splash-bg)" />
+              <circle cx="398" cy="108" r="76" fill="#fff" opacity=".07" />
+              <ellipse cx="270" cy="409" rx="150" ry="24" fill="#211858" opacity=".35" filter="url(#monitor-splash-shadow)" />
+              <path d="M92 116 356 72 425 115 160 164Z" fill="#d5ccff" />
+              <path d="M160 164 425 115 425 311 160 361Z" fill="#4b3b9e" />
+              <path d="M92 116 160 164 160 361 92 311Z" fill="#7967d8" />
+              <path d="M113 133 350 94 398 124 161 168Z" fill="#43348e" />
+              <path d="M161 168 398 124 398 289 161 337Z" fill="url(#monitor-splash-screen)" />
+              <path d="M183 197 369 163" stroke="#a59ae8" strokeWidth="13" strokeLinecap="round" />
+              <path d="M184 228 340 199" stroke="#c6c2e9" strokeWidth="10" strokeLinecap="round" />
+              <path d="M183 258 321 233" stroke="#c6c2e9" strokeWidth="10" strokeLinecap="round" />
+              <path d="M184 289 259 275" stroke="#70cdb8" strokeWidth="15" strokeLinecap="round" />
+              <path d="M161 361 425 311 425 339 160 390Z" fill="#3c2d88" />
+              <path d="M92 311 160 361 160 390 92 340Z" fill="#6554c3" />
+              <path d="M229 349 294 337 310 386 215 403Z" fill="url(#monitor-splash-stand)" />
+              <path d="M197 398 322 375 361 397 232 423Z" fill="#e6e0ff" />
+              <path d="M197 398 232 423 361 397 322 375Z" fill="#b6a9f1" />
+              <circle cx="373" cy="347" r="49" fill="#7be0c3" stroke="#fff" strokeWidth="10" />
+              <path d="m350 348 15 15 31-36" fill="none" stroke="#254c64" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" />
             </g>
           </svg>
           <span className="studyspace-splash-halo" />

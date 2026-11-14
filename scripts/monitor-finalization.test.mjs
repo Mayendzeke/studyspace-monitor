@@ -110,6 +110,6 @@ test('Monitor install helper distinguishes a standalone app from a browser short
   const app = read('src/App.tsx');
   assert.match(app, /matchMedia\('\(display-mode: standalone\)'\)/);
   assert.match(app, /isStandalone \? 'Installed' : 'Install app'/);
-  assert.match(app, /does not offer a full standalone PWA install/);
+  assert.match(app, /not offering a full standalone PWA install/);
   assert.match(app, /cannot turn a browser shortcut into a native Android package/);
 });

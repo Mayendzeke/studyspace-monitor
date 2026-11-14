@@ -61,7 +61,7 @@ export default function LearnerResourcePanel({
   const [notice, setNotice] = useState("");
   const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
   const [storageError, setStorageError] = useState("");
-  const [quotaChoice, setQuotaChoice] = useState("1");
+  const [quotaChoice, setQuotaChoice] = useState("3");
   const [quotaSaving, setQuotaSaving] = useState(false);
 
   const subjectOptions = useMemo(() => [...new Set([...subjects, "General"])].filter(Boolean), [subjects]);
@@ -97,7 +97,9 @@ export default function LearnerResourcePanel({
         const status = storageResult.data as StorageStatus;
         setStorageStatus(status);
         setStorageError("");
-        setQuotaChoice(String(Math.max(1,Math.round(status.quota_bytes/1073741824))));
+        const currentGb = status.quota_bytes / 1073741824;
+        const choices = [3, 5, 10, 15, 20];
+        setQuotaChoice(String(choices.find(gb => gb >= currentGb) ?? 20));
       }
       const resources = (libraryResult.data || []) as Resource[];
       const assignedIds = (assignmentResult.data || []).map(row => row.resource_id);
@@ -127,7 +129,7 @@ export default function LearnerResourcePanel({
   async function changeStorageQuota() {
     if (!supabase || quotaSaving) return;
     const gb = Number(quotaChoice);
-    if (!Number.isFinite(gb) || gb < 1 || gb > 20) { setError("Choose a storage allowance from 1 to 20 GB."); return; }
+    if (!Number.isFinite(gb) || gb < 3 || gb > 20) { setError("Choose a storage allowance from 3 to 20 GB."); return; }
     setQuotaSaving(true); setError(""); setNotice("");
     const { data, error: quotaError } = await supabase.rpc("set_studyspace_learner_storage_quota", {
       p_learner_id: learnerId,
@@ -278,8 +280,8 @@ export default function LearnerResourcePanel({
           <div className="learner-storage-track" role="progressbar" aria-label="Learner cloud storage usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,storageStatus.used_percent)}><span style={{width:Math.min(100,Math.max(0,storageStatus.used_percent))+"%"}}/></div>
           <div className="learner-storage-stats"><strong>{formatStorage(storageStatus.used_bytes+storageStatus.reserved_bytes)} of {formatStorage(storageStatus.quota_bytes)}</strong><span>{formatStorage(storageStatus.available_bytes)} available</span></div>
         </> : <p className="learner-resource-empty">{storageError || "Loading personal storage information…"}</p>}
-        <div className="learner-storage-controls"><label>Set storage allowance<select value={quotaChoice} onChange={event=>setQuotaChoice(event.target.value)}>{[1,2,5,10,15,20].map(gb=><option key={gb} value={String(gb)}>{gb} GB</option>)}</select></label><button type="button" className="secondary-button" onClick={()=>void changeStorageQuota()} disabled={quotaSaving||!storageStatus||Number(quotaChoice)*1073741824<=storageStatus.quota_bytes}>{quotaSaving?"Saving…":"Increase storage"}</button></div>
-        <small className="learner-storage-note">Only an administrator with verified MFA can change this allowance. The new allowance cannot be lower than existing usage.</small>
+        <div className="learner-storage-controls"><label>Set storage allowance<select value={quotaChoice} onChange={event=>setQuotaChoice(event.target.value)}>{[3,5,10,15,20].map(gb=><option key={gb} value={String(gb)}>{gb} GB{gb===3?" · Standard allowance":gb===5?" · E350 monthly plan":""}</option>)}</select></label><button type="button" className="secondary-button" onClick={()=>void changeStorageQuota()} disabled={quotaSaving||!storageStatus||Number(quotaChoice)*1073741824<=storageStatus.quota_bytes}>{quotaSaving?"Saving…":"Increase storage"}</button></div>
+        <small className="learner-storage-note">Every learner starts with 3 GB. Select 5 GB for an E350 monthly-plan learner or choose a larger allowance. Changes require verified administrator MFA and cannot reduce storage below files already in use.</small>
       </section>
 
       <div className="learner-resource-assigned">

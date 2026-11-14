@@ -116,8 +116,9 @@ begin
   if p_quota_bytes < 1073741824 or p_quota_bytes > 21474836480 then
     raise exception 'Storage quota must be between 1 GiB and 20 GiB' using errcode = '22023';
   end if;
-  if not exists(select 1 from public.profiles p where p.id=p_learner_id and p.role='learner') then
-    raise exception 'Learner account was not found' using errcode = 'P0002';
+  perform 1 from public.profiles p where p.id=p_learner_id and p.role='learner' and p.account_status='active' for update;
+  if not found then
+    raise exception 'Active learner account was not found' using errcode = 'P0002';
   end if;
   select coalesce(sum(file_size),0)::bigint into v_used
     from public.learner_personal_resources where learner_id=p_learner_id;
@@ -270,7 +271,7 @@ set search_path = ''
 as $function$
 begin
   if new.total_points <= 0 or new.teacher_review_required then return new; end if;
-  insert into public.progress_events(learner_id,event_type,score,max_score,metadata)
+  insert into public.progress_events as existing(learner_id,event_type,score,max_score,metadata)
   values(
     new.learner_id,
     'assigned_assessment',
@@ -290,7 +291,7 @@ begin
   do update set
     score=excluded.score,
     max_score=excluded.max_score,
-    metadata=coalesce(public.progress_events.metadata,'{}'::jsonb)||excluded.metadata,
+    metadata=coalesce(existing.metadata,'{}'::jsonb)||excluded.metadata,
     created_at=now();
   return new;
 end;

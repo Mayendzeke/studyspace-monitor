@@ -10,7 +10,8 @@ test('Monitor navigation uses the shared StudySpace brand mark while retaining i
   assert.match(app, /brand-logo-image[^>]*favicon\.svg/);
   assert.equal(existsSync('public/favicon.svg'), true, 'shared StudySpace brand mark must be shipped with Monitor');
   assert.match(index, /monitor-icon-192\.png/);
-  assert.match(index, /studyspace-monitor\.svg/);
+  assert.match(index, /favicon\.svg/, 'the browser tab uses the shared brand mark');
+  assert.match(read('vite.config.ts'), /monitor-icon-192\.png/, 'the installed Monitor app keeps its dedicated launcher art');
 });
 
 test('testimonial PNG export quotes learner copy and uses the shared brand and product typography', () => {

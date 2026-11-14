@@ -158,21 +158,10 @@ export default function AssessmentReviewQueue() {
         marked_by: auth.user.id,
         marked_at: markedAt,
         score: nextScore,
+        marking_status: "teacher_marked",
+        teacher_review_required: false,
       }).eq("id", attemptId);
       if (updateError) throw updateError;
-
-      const { data: events, error: eventsError } = await supabase.from("progress_events")
-        .select("id,metadata").eq("learner_id", item.attempt.learner_id).eq("event_type", "assigned_assessment");
-      if (eventsError) throw eventsError;
-      const event = (events || []).find(row => row.metadata?.attempt_id === attemptId);
-      if (event) {
-        const { error: progressError } = await supabase.from("progress_events").update({
-          score: nextScore,
-          max_score: item.attempt.total_points,
-          metadata: { ...event.metadata, teacher_marked_at: markedAt },
-        }).eq("id", event.id);
-        if (progressError) throw new Error("The written answers were marked, but progress reporting could not be refreshed: " + progressError.message);
-      }
       setNotice("Written responses marked and the learner's result updated.");
       await refresh();
     } catch (reason) {
@@ -196,12 +185,19 @@ export default function AssessmentReviewQueue() {
             <div><strong>{item.learner}</strong><span>{item.studentId ? item.studentId + " · " : ""}{item.title} · {item.subject}</span></div>
             <span className={attempt.marked_at ? "assessment-review-status is-marked" : "assessment-review-status"}>{attempt.marked_at ? "Marked" : "Awaiting review"}</span>
           </div>
-          <div className="assessment-review-card-meta"><span>Submitted {new Date(attempt.submitted_at).toLocaleString()}</span><span>Automatic mark: {Number(attempt.score) - Object.values(attempt.manual_marks || {}).reduce((sum,value)=>sum+Number(value||0),0)} / {attempt.total_points}</span></div>
+          <div className="assessment-review-card-meta"><span>Submitted {new Date(attempt.submitted_at).toLocaleString()}</span><span>Provisional result: {attempt.score} / {attempt.total_points}</span><span>{attempt.ai_marked_at ? "MIΛ marked " + new Date(attempt.ai_marked_at).toLocaleString() : "Teacher review required"}</span></div>
           {item.questions.map((question,index) => <div className="assessment-review-answer" key={question.id}>
             <div className="assessment-review-question"><strong>Written response {index + 1}</strong><span>{question.points} marks</span></div>
             <p>{question.prompt}</p>
             <blockquote>{String(attempt.answers[question.id] ?? "").trim() || "No answer submitted."}</blockquote>
-            {question.markingGuide && <div className="assessment-review-guidance"><strong>Private marking guidance</strong><p>{question.markingGuide}</p></div>}
+            {question.markingGuide && <div className="assessment-review-guidance"><strong>Teacher marking guidance</strong><p>{question.markingGuide}</p></div>}
+            <div className="assessment-review-ai-suggestion">
+              <strong>MIΛ's suggested mark</strong>
+              {attempt.marking_details?.[question.id]?.ai_suggested_mark !== undefined && attempt.marking_details[question.id].ai_suggested_mark !== null
+                ? <span>{attempt.marking_details[question.id].ai_suggested_mark} / {question.points} · confidence {Math.round(Number(attempt.marking_details[question.id].confidence || 0) * 100)}%</span>
+                : <span>MIΛ could not confidently judge this answer. Please mark it using the guide.</span>}
+              {attempt.marking_details?.[question.id]?.feedback && <p>{attempt.marking_details[question.id].feedback}</p>}
+            </div>
             <label>Mark awarded
               <input type="number" min="0" max={question.points} step="0.5" value={attemptMarks[question.id] ?? ""}
                 onChange={event => setMarks(current => ({ ...current, [attempt.id]: { ...(current[attempt.id] || {}), [question.id]: event.target.value } }))}/>
@@ -219,6 +215,6 @@ export default function AssessmentReviewQueue() {
           </div>
         </article>;
       })}</div> :
-      <div className="assessment-review-empty"><ClipboardCheck size={25}/><strong>No written submissions to review</strong><span>Short-answer responses from assigned assessments will appear here after learners submit them.</span></div>}
+      <div className="assessment-review-empty"><ClipboardCheck size={25}/><strong>No written submissions need review</strong><span>MIΛ marks clear written answers automatically. Only uncertain answers appear here for teacher review.</span></div>}
   </section>;
 }

@@ -2327,3 +2327,18 @@ html,body,#root{height:100%;min-height:0;overflow:hidden}
 @keyframes studyspace-text-in{to{opacity:1;transform:translateY(0)}}
 @keyframes studyspace-splash-progress{0%{width:0}42%{width:47%}78%{width:83%}100%{width:100%}}
 @media(prefers-reduced-motion:reduce){.studyspace-logo-colour{opacity:1;animation:none}.studyspace-logo-sketch,.studyspace-splash-pencil{display:none}.studyspace-logo-finish,.studyspace-splash-wordmark,.studyspace-splash-divider,.studyspace-splash-welcome,.studyspace-splash-tagline,.studyspace-splash-status,.studyspace-splash-footnote{opacity:1;transform:none;animation:none}.studyspace-splash-progress span{width:100%;animation:none}}
+
+
+/* Global connection feedback for offline moments and recovery. */
+.connection-status-banner{position:fixed;z-index:1000;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);width:min(520px,calc(100vw - 28px));display:flex;align-items:center;gap:12px;padding:13px 16px;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:rgba(20,28,46,.96);color:#f7f9ff;box-shadow:0 18px 55px rgba(0,0,0,.28);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);animation:connection-arrive .32s cubic-bezier(.2,.8,.2,1) both;pointer-events:none}
+.connection-status-banner.is-online{border-color:rgba(104,225,184,.4);background:rgba(19,57,49,.96)}
+.connection-status-icon{width:34px;height:34px;display:grid;place-items:center;flex:0 0 34px;border-radius:11px;background:rgba(255,255,255,.1);color:#ffd18d}
+.is-online .connection-status-icon{color:#8ef0c6;background:rgba(142,240,198,.12)}
+.connection-status-copy{display:grid;gap:4px;min-width:0}
+.connection-status-copy strong{font-size:11px;line-height:1.35}
+.connection-status-copy small{font-size:9px;line-height:1.45;color:rgba(255,255,255,.74)}
+.connection-status-pulse{margin-left:auto;width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#ffbd76;box-shadow:0 0 0 0 rgba(255,189,118,.55);animation:connection-pulse 1.5s ease-out infinite}
+@keyframes connection-arrive{from{opacity:0;transform:translate(-50%,-9px) scale(.98)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes connection-pulse{70%{box-shadow:0 0 0 9px rgba(255,189,118,0)}100%{box-shadow:0 0 0 0 rgba(255,189,118,0)}}
+@media(max-width:480px){.connection-status-banner{padding:11px 12px;border-radius:14px;gap:9px}.connection-status-copy strong{font-size:10px}.connection-status-copy small{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.connection-status-banner,.connection-status-pulse{animation:none}}

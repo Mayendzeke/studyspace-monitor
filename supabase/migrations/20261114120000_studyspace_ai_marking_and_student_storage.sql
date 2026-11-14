@@ -269,7 +269,7 @@ security definer
 set search_path = ''
 as $function$
 begin
-  if new.total_points <= 0 then return new; end if;
+  if new.total_points <= 0 or new.teacher_review_required then return new; end if;
   insert into public.progress_events(learner_id,event_type,score,max_score,metadata)
   values(
     new.learner_id,
@@ -405,6 +405,7 @@ begin
     join public.exercise_sets es on es.id=ea.exercise_set_id
     join public.exercise_attempts a on a.assignment_id=ea.id and a.learner_id=ea.learner_id
     where a.learner_id=auth.uid() and a.submitted_at is not null and a.total_points>0
+      and not coalesce(a.teacher_review_required,false)
     order by ea.id,a.submitted_at desc
   ),
   all_latest_attempts as (
@@ -413,6 +414,7 @@ begin
     from public.exercise_assignments ea
     join public.exercise_attempts a on a.assignment_id=ea.id and a.learner_id=ea.learner_id
     where a.submitted_at is not null and a.total_points>0
+      and not coalesce(a.teacher_review_required,false)
     order by ea.id,a.submitted_at desc
   ),
   cohorts as (

@@ -170,15 +170,19 @@ export default function TestimonialsInbox() {
       const learner = profiles[item.learner_id];
       const preferredName = learner?.preferred_name?.trim() || '';
       const schoolName = learner?.institution?.trim() || '';
+      // Load the same StudySpace mark used by the student app and public website.
+      try { await document.fonts.ready; } catch { /* Use the local font fallback if web fonts are offline. */ }
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       const measure = canvas.getContext('2d');
       if (!measure) throw new Error('This browser could not create the testimonial image.');
-      measure.font = '44px Georgia, serif';
-      const lines = wrapCanvasText(measure, item.message, 900);
-      const lineHeight = 62;
+      const quoteFont = '600 42px Manrope, "DM Sans", Arial, sans-serif';
+      measure.font = quoteFont;
+      const quoteText = '“' + item.message.trim() + '”';
+      const lines = wrapCanvasText(measure, quoteText, 900);
+      const lineHeight = 60;
       const attributionHeight = (preferredName ? 82 : 0) + (schoolName ? 54 : 0);
-      canvas.height = Math.max(1050, 420 + lines.length * lineHeight + attributionHeight + 230);
+      canvas.height = Math.max(1080, 420 + lines.length * lineHeight + attributionHeight + 250);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser could not render the testimonial image.');
 
@@ -199,31 +203,43 @@ export default function TestimonialsInbox() {
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Compact StudySpace brand mark in the top-right corner.
-      ctx.save();
-      ctx.translate(810, 58);
-      ctx.fillStyle = '#8be4cf';
-      ctx.beginPath();
-      ctx.moveTo(0, 28); ctx.lineTo(42, 8); ctx.lineTo(84, 28); ctx.lineTo(42, 48);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#8be4cf';
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(18, 38); ctx.lineTo(18, 62); ctx.quadraticCurveTo(42, 76, 66, 62); ctx.lineTo(66, 38); ctx.stroke();
+      // Shared logo lockup: the exact favicon/brand symbol used by the Student app and website.
+      const brandMark = new Image();
+      brandMark.src = import.meta.env.BASE_URL + 'favicon.svg';
+      try {
+        await brandMark.decode();
+        ctx.drawImage(brandMark, 778, 43, 72, 72);
+      } catch {
+        // Keep the export available even when the logo asset cannot be loaded offline.
+        ctx.save();
+        ctx.translate(778, 43);
+        ctx.fillStyle = '#8be4cf';
+        ctx.beginPath();
+        ctx.moveTo(0, 26); ctx.lineTo(36, 8); ctx.lineTo(72, 26); ctx.lineTo(36, 44);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#8be4cf';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(15, 36); ctx.lineTo(15, 57); ctx.quadraticCurveTo(36, 70, 57, 57); ctx.lineTo(57, 36); ctx.stroke();
+        ctx.restore();
+      }
       ctx.fillStyle = '#f8fbff';
-      ctx.font = '700 27px Arial, sans-serif';
+      ctx.font = '800 28px Manrope, "DM Sans", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('studyspace', 98, 43);
-      ctx.restore();
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('studyspace', 864, 87);
+      const wordmarkWidth = ctx.measureText('studyspace').width;
+      ctx.fillStyle = '#8be4cf';
+      ctx.fillText('.', 864 + wordmarkWidth, 87);
 
-      // The learner-selected palette is the whole canvas; no white card or unrelated overlays.
+      // The learner-selected gradient remains the full canvas; typography follows the app's design system.
       const lightTextPalettes = new Set(['ocean','violet','emerald','rose','midnight']);
       const textColor = lightTextPalettes.has(item.testimonial_background || 'ocean') ? '#f8fbff' : '#1c2a3c';
       ctx.fillStyle = textColor;
-      ctx.font = '44px Georgia, serif';
+      ctx.font = quoteFont;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
       const quoteTop = 235;
-      const quoteBottom = canvas.height - attributionHeight - 230;
+      const quoteBottom = canvas.height - attributionHeight - 240;
       const quoteHeight = lines.length * lineHeight;
       let y = quoteTop + Math.max(0, (quoteBottom - quoteTop - quoteHeight) / 2) + 46;
       for (const line of lines) {
@@ -231,18 +247,18 @@ export default function TestimonialsInbox() {
         y += lineHeight;
       }
 
-      // Keep the student's chosen display name and institution together, centred near the bottom.
+      // The learner's chosen display name and institution remain centred and clearly secondary.
       let attributionY = canvas.height - attributionHeight - 105;
       ctx.textAlign = 'center';
       if (preferredName) {
         ctx.fillStyle = textColor;
-        ctx.font = '700 32px Arial, sans-serif';
+        ctx.font = '800 31px Manrope, "DM Sans", Arial, sans-serif';
         ctx.fillText(preferredName, canvas.width / 2, attributionY, 900);
         attributionY += 52;
       }
       if (schoolName) {
         ctx.fillStyle = lightTextPalettes.has(item.testimonial_background || 'ocean') ? 'rgba(248,251,255,.86)' : 'rgba(28,42,60,.84)';
-        ctx.font = '23px Arial, sans-serif';
+        ctx.font = '500 22px "DM Sans", Arial, sans-serif';
         ctx.fillText(schoolName, canvas.width / 2, attributionY, 900);
       }
 
@@ -263,7 +279,6 @@ export default function TestimonialsInbox() {
       setExportingId('');
     }
   }
-
   const newCount = useMemo(() => items.filter(item => item.status === 'new').length, [items]);
 
   return <div className="subpage testimonials-page">

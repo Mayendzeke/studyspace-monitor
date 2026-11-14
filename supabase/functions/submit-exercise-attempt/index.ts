@@ -31,6 +31,11 @@ function json(status: number, body: Record<string, unknown>) {
 function normalize(value: unknown): string {
   return String(value ?? "").trim().toLocaleLowerCase().replace(/\s+/g, " ");
 }
+function mayContainPersonalIdentifier(value: string): boolean {
+  return /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value)
+    || /\b(?:\+?268[\s-]?)?7[0-9](?:[\s-]?\d){6}\b/.test(value)
+    || /\b(?:student\s*id|passport|identity\s*(?:number|no\.?|card)|national\s*id)\s*[:#-]?\s*[A-Z0-9-]{4,}\b/i.test(value);
+}
 function clampMark(value: unknown, max: number): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0 || numeric > max) return null;
@@ -100,8 +105,16 @@ Deno.serve(async request => {
   const written = questions.filter(question => question.question_type === "short_answer" && normalize(answers[question.id]).length > 0);
   const aiMarks = new Map<string, { awarded: number; confidence: number; feedback: string }>();
   let aiMarkingFailure = "";
-  if (written.length > 0 && written.length <= 20) {
-    const markingQuestions = written.map(question => {
+  const safeWritten = written.filter(question => !mayContainPersonalIdentifier(String(answers[question.id] ?? "")));
+  const sensitiveWrittenCount = written.length - safeWritten.length;
+  if (sensitiveWrittenCount > 0) {
+    aiMarkingFailure = "Some written responses may contain personal contact or identity information. They were not sent for automated marking and need teacher review.";
+  }
+  if (written.length > 20) {
+    aiMarkingFailure = "This assessment has more than 20 written answers; teacher review is required.";
+  }
+  if (safeWritten.length > 0 && written.length <= 20) {
+    const markingQuestions = safeWritten.map(question => {
       const key = keyMap.get(question.id) ?? {};
       return {
         question_id: question.id,
@@ -150,8 +163,6 @@ Deno.serve(async request => {
     } catch (error) {
       aiMarkingFailure = error instanceof Error ? error.message.slice(0, 240) : "MIΛ could not complete written marking.";
     }
-  } else if (written.length > 20) {
-    aiMarkingFailure = "This assessment has more than 20 written answers; teacher review is required.";
   }
 
   let score = 0;

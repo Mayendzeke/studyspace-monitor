@@ -171,6 +171,8 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
           if(!updatedError&&alive){
             const rows=(updated??[]) as HomeworkSubmissionRow[];setSubmissions(rows)
             const counts:Record<string,number>={};for(const row of rows)if(row.completed_at)counts[row.homework_id]=(counts[row.homework_id]||0)+1;setCompletedCounts(counts)
+            setSubmissionMarks(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_score==null?(row.ai_score==null?'':String(row.ai_score)):String(row.teacher_score);return next})
+            setSubmissionFeedback(current=>{const next={...current};for(const row of rows)if(next[row.id]===undefined)next[row.id]=row.teacher_feedback||'';return next})
           }
         })
         .subscribe()

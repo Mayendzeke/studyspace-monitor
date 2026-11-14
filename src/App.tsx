@@ -555,7 +555,13 @@ function AcademicProgressPage() {
     setLoading(false);
   };
 
-  useEffect(()=>{void refresh();},[]);
+  useEffect(()=>{
+    void refresh();
+    const onFocus=()=>{if(document.visibilityState==='visible')void refresh();};
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},60000);
+    window.addEventListener('focus',onFocus);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',onFocus);};
+  },[]);
 
   const loadLearnerRecord = async (learnerId:string) => {
     if (!supabase) return;
@@ -622,6 +628,12 @@ function AcademicProgressPage() {
       setLearningMemory(null);
     } finally { setRecordLoading(false); }
   };
+
+  useEffect(()=>{
+    if(!selectedRecordId)return;
+    const timer=window.setInterval(()=>void loadLearnerRecord(selectedRecordId),45000);
+    return()=>window.clearInterval(timer);
+  },[selectedRecordId]);
 
   const visible=learners.filter(item=>{
     const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.grade,item.learner.curriculum].join(' ').toLocaleLowerCase();

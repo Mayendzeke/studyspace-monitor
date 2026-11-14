@@ -14,6 +14,10 @@ type Attempt = {
   teacher_feedback: string;
   marked_by: string | null;
   marked_at: string | null;
+  marking_status: string;
+  marking_details: Record<string, { method?: string; ai_suggested_mark?: number | null; confidence?: number | null; feedback?: string; awarded?: number; maximum?: number }>;
+  teacher_review_required: boolean;
+  ai_marked_at: string | null;
 };
 type Question = { id: string; exercise_set_id: string; question_type: string; prompt: string; points: number; markingGuide?: string };
 type ReviewItem = {
@@ -50,8 +54,8 @@ export default function AssessmentReviewQueue() {
       const learnerIds = [...new Set(rows.map(row => row.learner_id))];
       const [attemptResult, setResult, questionResult, learnerResult] = await Promise.all([
         supabase.from("exercise_attempts")
-          .select("id,assignment_id,learner_id,answers,score,total_points,submitted_at,manual_marks,teacher_feedback,marked_by,marked_at")
-          .in("assignment_id", assignmentIds).order("submitted_at", { ascending: false }),
+          .select("id,assignment_id,learner_id,answers,score,total_points,submitted_at,manual_marks,teacher_feedback,marked_by,marked_at,marking_status,marking_details,teacher_review_required,ai_marked_at")
+          .in("assignment_id", assignmentIds).eq("teacher_review_required", true).order("submitted_at", { ascending: false }),
         supabase.from("exercise_sets").select("id,title,subject_name").in("id", setIds),
         supabase.from("exercise_questions").select("id,exercise_set_id,question_type,prompt,points")
           .in("exercise_set_id", setIds).order("position"),
@@ -79,6 +83,7 @@ export default function AssessmentReviewQueue() {
         const attempt = {
           ...raw,
           manual_marks: (raw.manual_marks || {}) as Record<string, number>,
+          marking_details: (raw.marking_details || {}) as Attempt["marking_details"],
           answers: (raw.answers || {}) as Record<string, unknown>,
         } as Attempt;
         const assignment = assignmentMap.get(attempt.assignment_id);
@@ -100,10 +105,11 @@ export default function AssessmentReviewQueue() {
         const updated = { ...current };
         for (const item of next) {
           if (!updated[item.attempt.id]) {
-            updated[item.attempt.id] = Object.fromEntries(item.questions.map(q => [
-              q.id,
-              item.attempt.manual_marks[q.id] === undefined ? "" : String(item.attempt.manual_marks[q.id])
-            ]));
+            updated[item.attempt.id] = Object.fromEntries(item.questions.map(q => {
+              const aiMark = item.attempt.marking_details[q.id]?.ai_suggested_mark;
+              const previousMark = item.attempt.manual_marks[q.id];
+              return [q.id, previousMark !== undefined ? String(previousMark) : aiMark !== undefined && aiMark !== null ? String(aiMark) : ""];
+            }));
           }
         }
         return updated;
@@ -120,7 +126,7 @@ export default function AssessmentReviewQueue() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const pendingCount = useMemo(() => items.filter(item => !item.attempt.marked_at).length, [items]);
+  const pendingCount = items.length;
 
   const gradeAttempt = async (item: ReviewItem) => {
     if (!supabase || busyId) return;

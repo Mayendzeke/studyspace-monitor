@@ -20,6 +20,11 @@ const headers = {
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers });
 }
+function mayContainPersonalIdentifier(value: string): boolean {
+  return /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value)
+    || /\b(?:\+?268[\s-]?)?7[0-9](?:[\s-]?\d){6}\b/.test(value)
+    || /\b(?:student\s*id|passport|identity\s*(?:number|no\.?|card)|national\s*id)\s*[:#-]?\s*[A-Z0-9-]{4,}\b/i.test(value);
+}
 async function markWithCloudflare(prompt: string): Promise<{mark:number;confidence:number;feedback:string;model:string}> {
   const account = Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim() ?? "";
   const token = Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim() ?? "";
@@ -126,6 +131,18 @@ Deno.serve(async request => {
     ai_marking_details:{},teacher_feedback:"",teacher_score:null,marked_by:null,marked_at:null,
   },{onConflict:"homework_id,learner_id"}).select("id").single();
   if(saveError||!saved)return json(503,{error:"Your homework was saved unsuccessfully. Please try again."});
+
+  if(mayContainPersonalIdentifier(response)){
+    const feedback="Your work is safely submitted. It may contain personal contact or identity information, so it was not sent for automated marking. Your teacher will review it.";
+    const {error:privacyUpdateError}=await admin.from("session_homework_submissions").update({
+      ai_marking_status:"teacher_review",
+      ai_feedback:feedback,
+      ai_marked_at:null,
+      ai_marking_details:{teacher_review_required:true,reason:"possible_personal_identifier"},
+    }).eq("id",saved.id);
+    if(privacyUpdateError)return json(200,{success:true,submissionId:saved.id,score:null,totalPoints:points,markingStatus:"teacher_review",message:"Your submission is saved. Your teacher will review it privately."});
+    return json(200,{success:true,submissionId:saved.id,score:null,totalPoints:points,markingStatus:"teacher_review",message:feedback});
+  }
 
   try{
     const markingPrompt=JSON.stringify({

@@ -91,7 +91,7 @@ function App() {
   const [adminLoading, setAdminLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [passwordRecovery, setPasswordRecovery] = useState(false)
-  const [adminName, setAdminName] = useState('Administrator')
+  const [adminName, setAdminName] = useState('Ayanda Zwane')
   const [helpCardOpen, setHelpCardOpen] = useState(true)
   const [helpCardFading, setHelpCardFading] = useState(false)
   const adminInitials = adminName.trim().split(/\s+/).map(part => part.charAt(0)).join('').slice(0, 2).toUpperCase() || 'AD'
@@ -113,7 +113,7 @@ function App() {
   }, [helpCardOpen])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSplashElapsed(true), 5200)
+    const timer = window.setTimeout(() => setSplashElapsed(true), 6600)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -226,6 +226,16 @@ function App() {
     return () => { alive = false }
   }, [session])
 
+  useEffect(() => {
+    if (!supabase || !session) return;
+    let alive = true;
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
+      if (!alive || error) return;
+      if (data.currentLevel === 'aal2') setMfaVerified(true);
+    }).catch(() => { /* The MFA gate remains the secure fallback. */ });
+    return () => { alive = false };
+  }, [session]);
+
   const navigate = (next: Page) => {
     setPage(next)
     setMobileOpen(false)
@@ -233,9 +243,9 @@ function App() {
 
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
-  if (authLoading || adminLoading || !splashElapsed) return <SplashScreen theme={theme} />
+  if (authLoading || adminLoading || !splashElapsed) return <SplashScreen theme={theme} displayName={adminName} />
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
-  if (!mfaVerified) return <AdminMfaGate onVerified={handleMfaVerified} />
+  if (!mfaVerified) return <AdminMfaGate theme={theme} displayName={adminName} onVerified={handleMfaVerified} />
 
   return (
     <div className="app-shell" data-theme={theme}>

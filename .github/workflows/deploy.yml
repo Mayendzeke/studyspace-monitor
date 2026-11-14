@@ -48,6 +48,8 @@ jobs:
         run: node --test scripts/migration-ledger-source.test.mjs
       - name: Verify Monitor finalization regressions
         run: node --test scripts/monitor-finalization.test.mjs
+      - name: Verify shared StudySpace logo and testimonial export
+        run: node --test scripts/testimonial-brand-consistency.test.mjs
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

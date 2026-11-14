@@ -91,11 +91,14 @@ test('Monitor uses the canonical Study Space logo and installable standalone man
   const html = read('index.html');
   const styles = read('src/styles.css');
   const logo = read('public/studyspace-monitor.svg');
+  const sharedLogo = read('public/favicon.svg');
   const splash = read('src/components/SplashScreen.tsx');
   assert.match(app, /brand-logo-image/);
-  assert.match(app, /studyspace-monitor\.svg/);
+  assert.match(app, /favicon\.svg/, 'the Monitor navigation must use the shared StudySpace brand mark');
   assert.match(styles, /\.brand-mark \.brand-logo-image/);
   assert.match(logo, /#927df5/);
+  assert.match(sharedLogo, /#927df5/);
+  assert.match(sharedLogo, /M112 215 256 143 400 215/);
   assert.match(config, /name: 'Study Space Monitor'/);
   assert.match(config, /display: 'standalone'/);
   assert.match(config, /start_url: '\/studyspace-monitor\/'/);

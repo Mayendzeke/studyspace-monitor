@@ -213,9 +213,10 @@ test('student and teacher live classroom surfaces remain connected to all existi
 
 
 
+
 test('learners cannot alter class-homework marks and only MFA-verified Monitor admins can finalise them', () => {
   const migration = read('supabase/migrations/20261114150000_studyspace_secure_class_homework_final_marks.sql');
-  const student = read('src/components/TodaySession.tsx');
+  const submissionEndpoint = read('supabase/functions/mark-class-homework/index.ts');
   const teacher = read('src/components/MonitorTodaySession.tsx');
   assert.ok(migration.includes('drop policy if exists "homework_submission_self_manage"'));
   assert.ok(migration.includes('create policy homework_submission_self_read'));
@@ -224,7 +225,8 @@ test('learners cannot alter class-homework marks and only MFA-verified Monitor a
   assert.ok(migration.includes('revoke all on table public.session_homework_submissions'));
   assert.ok(migration.includes('grant update (teacher_score, teacher_feedback, marked_by, marked_at, ai_marking_status)'));
   assert.ok(migration.includes("set search_path = ''"));
-  assert.ok(student.includes('functions.invoke("mark-class-homework"'));
+  assert.ok(submissionEndpoint.includes('const admin=createClient(url,secret'));
+  assert.ok(submissionEndpoint.includes('.from("session_homework_submissions").upsert'));
   assert.ok(teacher.includes('teacher_score:value'));
   assert.ok(teacher.includes("ai_marking_status:'teacher_marked'"));
 });

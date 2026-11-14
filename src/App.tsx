@@ -483,7 +483,7 @@ function AcademicProgressPage() {
       supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,account_status').eq('role','learner').order('preferred_name'),
       supabase.from('study_sessions').select('learner_id,duration_minutes,started_at').order('started_at',{ascending:false}),
       supabase.from('exercise_assignments').select('id,learner_id'),
-      supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at').order('submitted_at',{ascending:false}),
+      supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at,teacher_review_required').eq('teacher_review_required',false).order('submitted_at',{ascending:false}),
       supabase.from('session_homework_submissions').select('learner_id,homework_id,ai_score,teacher_score,total_points,submitted_at,completed_at,ai_marking_status,ai_marked_at,marked_at').in('ai_marking_status',['ai_marked','teacher_marked']).order('submitted_at',{ascending:false}),
       supabase.from('progress_events').select('learner_id,score,max_score,created_at').eq('event_type','weekly_test_attempt').order('created_at',{ascending:false}),
       supabase.from('student_subjects').select('learner_id,name'),
@@ -571,7 +571,7 @@ function AcademicProgressPage() {
     try {
       const [assignmentRows, attemptRows, homeworkSubmissionRows, eventRows, memoryRow] = await Promise.all([
         supabase.from('exercise_assignments').select('id,exercise_set_id').eq('learner_id',learnerId),
-        supabase.from('exercise_attempts').select('id,assignment_id,score,total_points,submitted_at,marked_at,teacher_feedback').eq('learner_id',learnerId).order('submitted_at',{ascending:false}).limit(100),
+        supabase.from('exercise_attempts').select('id,assignment_id,score,total_points,submitted_at,marked_at,teacher_feedback,teacher_review_required').eq('learner_id',learnerId).eq('teacher_review_required',false).order('submitted_at',{ascending:false}).limit(100),
         supabase.from('session_homework_submissions').select('id,homework_id,ai_score,teacher_score,total_points,submitted_at,completed_at,ai_feedback,teacher_feedback,ai_marking_status,ai_marked_at,marked_at').eq('learner_id',learnerId).in('ai_marking_status',['ai_marked','teacher_marked']).order('submitted_at',{ascending:false}).limit(100),
         supabase.from('progress_events').select('id,event_type,score,max_score,duration_minutes,created_at,metadata').eq('learner_id',learnerId).order('created_at',{ascending:false}).limit(50),
         supabase.from('mia_learning_memory').select('strengths,difficulties,goals,recent_topics,updated_at').eq('learner_id',learnerId).maybeSingle(),

@@ -114,7 +114,7 @@ function App() {
   }, [helpCardOpen])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSplashElapsed(true), 6600)
+    const timer = window.setTimeout(() => setSplashElapsed(true), 4800)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -242,9 +242,10 @@ function App() {
     setMobileOpen(false)
   }
 
-  if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
-  if (authLoading || adminLoading || !splashElapsed) return <SplashScreen theme={theme} displayName={adminName} />
+  if (!splashElapsed) return <SplashScreen theme={theme} displayName={adminName} />
+  if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
+  if (authLoading || adminLoading) return <SplashScreen theme={theme} displayName={adminName} />
   if (!session || !adminAllowed) return <AuthGate mode="signin" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (!mfaVerified) return <AdminMfaGate theme={theme} displayName={adminName} onVerified={handleMfaVerified} />
 

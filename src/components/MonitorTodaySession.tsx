@@ -300,12 +300,20 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
   }
 
   const todaySessions=sessions.filter(row=>isToday(row.starts_at))
+  const launchTarget=sessions.find(row=>row.status==='live') || todaySessions.find(row=>row.status==='scheduled') || sessions.find(row=>row.status==='scheduled')
+  const launchLabel=launchTarget?.status==='live'?'Open live classroom':launchTarget?'Start next live class':'Create a live class'
+  const openLiveClassWorkspace=()=>{
+    if(!launchTarget){onCreateLesson();return}
+    setActiveId(launchTarget.id)
+    setTab('Overview')
+    window.setTimeout(()=>document.getElementById('monitor-live-class-panel')?.scrollIntoView({behavior:'smooth',block:'center'}),80)
+  }
   const selectedTab = (next:Tab) => setTab(next)
 
   return <div className="monitor-today-page">
     <div className="monitor-today-heading">
       <div><span className="eyebrow"><Video size={14}/> TEACHING WORKSPACE</span><h1>Today's <span>Session</span></h1><p className="page-subtitle">Run your live lessons and stay in sync with each learner’s classroom workspace.</p></div>
-      <div className="monitor-today-heading-actions"><button className="subtle-button" type="button" onClick={()=>void refreshSessions(true)} disabled={refreshing}><RefreshCw size={15}/> Refresh</button><button className="primary-button" type="button" onClick={onCreateLesson}><BookOpen size={15}/> Build a lesson</button></div>
+      <div className="monitor-today-heading-actions"><button className="primary-button live-class-launch" type="button" onClick={openLiveClassWorkspace}><Video size={16}/>{launchLabel}</button><button className="subtle-button" type="button" onClick={onCreateLesson}><BookOpen size={15}/> Build a lesson</button><button className="subtle-button" type="button" onClick={()=>void refreshSessions(true)} disabled={refreshing}><RefreshCw size={15}/> Refresh</button></div>
     </div>
     <div className="monitor-today-metrics">
       <article><span>Today's lessons</span><strong>{todaySessions.length}</strong><small>Scheduled for today</small></article>
@@ -325,7 +333,7 @@ export default function MonitorTodaySession({ onCreateLesson }: { onCreateLesson
         </aside>
         <section className="monitor-today-detail">
           {active&&<>
-            <div className="monitor-today-session-header panel">
+            <div id="monitor-live-class-panel" className="monitor-today-session-header panel">
               <div><span className={'monitor-session-status '+active.status}>{statusLabel(active.status)}</span><h2>{active.title}</h2><p>{active.subject_name} · {active.education_level} · {active.grade}</p><small><CalendarDays size={13}/>{formatDate(active.starts_at)} · {active.duration_minutes} minutes</small></div>
               <div className="monitor-today-session-actions">
                 {active.status==='scheduled'&&<button className="primary-button" onClick={()=>void changeStatus('live')}><Play size={15}/> Start live class</button>}

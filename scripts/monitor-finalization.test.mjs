@@ -208,5 +208,5 @@ test('student and teacher live classroom surfaces remain connected to all existi
   assert.ok(teacher.includes('Start live class'));
   assert.ok(teacher.includes('End class'));
   assert.ok(teacher.includes('monitor-board-canvas-wrap'));
-  assert.ok(teacher.includes('session-chat'));
+  assert.ok(teacher.includes('Class chat'));
 });

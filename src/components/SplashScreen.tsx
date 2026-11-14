@@ -1,5 +1,3 @@
-import { GraduationCap } from 'lucide-react'
-
 type Theme = 'light' | 'dark'
 
 export default function SplashScreen({ theme = 'light' }: { theme?: Theme }) {
@@ -16,7 +14,7 @@ export default function SplashScreen({ theme = 'light' }: { theme?: Theme }) {
       <div className="monitor-splash-glow monitor-splash-glow-two" />
       <div className="monitor-splash-content">
         <div className="monitor-splash-brand">
-          <div className="monitor-splash-mark"><GraduationCap size={29} strokeWidth={2.1} /></div>
+          <div className="monitor-splash-mark"><img src={import.meta.env.BASE_URL + "studyspace-monitor.svg"} alt="Study Space"/></div>
           <div className="monitor-splash-wordmark">
             <strong>studyspace<span>.</span></strong>
             <small>MONITOR</small>

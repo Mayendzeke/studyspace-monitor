@@ -9,21 +9,23 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['studyspace-monitor.svg', 'monitor-icon-192.png', 'monitor-icon-512.png'],
       manifest: {
-        name: 'Studyspace Monitor',
-        short_name: 'SS Monitor',
+        name: 'Study Space Monitor',
+        short_name: 'Monitor',
         description: 'StudySpace teacher and administrator workspace.',
         theme_color: '#242938',
         background_color: '#242938',
         display: 'standalone',
-        display_override: ['standalone', 'minimal-ui'],
+        display_override: ['standalone'],
         orientation: 'any',
         id: 'https://mayendzeke.github.io/studyspace-monitor/',
         start_url: '/studyspace-monitor/',
         scope: '/studyspace-monitor/',
         prefer_related_applications: false,
         icons: [
-          { src: '/studyspace-monitor/monitor-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: '/studyspace-monitor/monitor-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/studyspace-monitor/monitor-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/studyspace-monitor/monitor-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/studyspace-monitor/monitor-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/studyspace-monitor/monitor-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           { src: '/studyspace-monitor/studyspace-monitor.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
         ]
       },

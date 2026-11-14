@@ -250,7 +250,7 @@ jobs:
           const manifestName = files.find(name => name.endsWith('.webmanifest'))
           if (!manifestName) throw new Error('The PWA web app manifest was not generated.')
           const manifest = JSON.parse(readFileSync(join('dist', manifestName), 'utf8'))
-          if (manifest.name !== 'Studyspace Monitor' || manifest.start_url !== '/studyspace-monitor/' || manifest.scope !== '/studyspace-monitor/') {
+          if (manifest.name !== 'Study Space Monitor' || manifest.start_url !== '/studyspace-monitor/' || manifest.scope !== '/studyspace-monitor/' || manifest.display !== 'standalone') {
             throw new Error('The Monitor PWA manifest has an unexpected app name, start URL or scope.')
           }
           if (!Array.isArray(manifest.icons) || !manifest.icons.length) throw new Error('The PWA manifest has no app icons.')

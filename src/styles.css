@@ -2259,3 +2259,36 @@ html,body,#root{height:100%;min-height:0;overflow:hidden}
 .brand-mark .brand-logo-image{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}
 
 .monitor-splash-mark img{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}
+
+/* Learner storage quota and live-class homework marking workspace */
+.learner-storage-quota{display:grid;gap:12px;padding:16px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--surface) 88%,transparent)}
+.learner-storage-quota-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.learner-storage-quota-heading>div{display:grid;gap:5px}
+.learner-storage-quota-heading>div>strong{color:var(--text);font:750 14px Manrope,sans-serif}
+.learner-storage-quota-heading>div>small,.learner-storage-note{color:var(--muted);font-size:9px;line-height:1.55}
+.learner-storage-used{display:grid;gap:2px;color:var(--text);font:800 18px Manrope,sans-serif;text-align:right}
+.learner-storage-used small{color:var(--subtle);font:800 8px 'DM Sans',sans-serif;letter-spacing:1px}
+.learner-storage-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.learner-storage-controls label{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700}
+.learner-storage-controls select{min-width:125px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:11px}
+.learner-storage-note{margin:0}
+.monitor-today-homework-workspace{display:grid;gap:15px}
+.monitor-today-homework-form{display:grid;gap:10px;padding:15px;border:1px solid var(--border);border-radius:12px;background:color-mix(in srgb,var(--surface) 82%,transparent)}
+.monitor-today-homework-form label,.monitor-today-homework-mark-row label{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700}
+.monitor-today-homework-form input,.monitor-today-homework-form textarea,.monitor-today-homework-mark-row input,.monitor-today-homework-mark-row textarea{width:100%;min-width:0;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:11px;line-height:1.55}
+.monitor-today-homework-form input:focus,.monitor-today-homework-form textarea:focus,.monitor-today-homework-mark-row input:focus,.monitor-today-homework-mark-row textarea:focus{outline:2px solid var(--blue);outline-offset:2px}
+.monitor-today-homework-form-row{display:grid;grid-template-columns:minmax(100px,.5fr) minmax(180px,1fr);gap:10px}
+.monitor-today-homework-summary{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.monitor-today-homework-summary>div{display:grid;gap:5px}
+.monitor-today-homework-summary>span{color:var(--muted);font-size:9px;white-space:nowrap}
+.monitor-today-homework-submission{display:grid;gap:8px;margin-top:12px;padding:13px;border:1px solid var(--border);border-radius:11px;background:color-mix(in srgb,var(--surface) 88%,transparent)}
+.monitor-today-homework-submission-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.monitor-today-homework-submission-head strong{color:var(--text);font-size:11px}
+.monitor-today-homework-submission-head span{color:var(--muted);font-size:9px}
+.monitor-today-homework-submission>p{margin:0;padding:10px;border-radius:8px;background:var(--bg);color:var(--text);font-size:10px;white-space:pre-wrap;line-height:1.6}
+.monitor-today-homework-submission>small{color:var(--muted);font-size:9px;line-height:1.5}
+.monitor-today-homework-mark-row{display:grid;grid-template-columns:minmax(100px,.35fr) minmax(170px,1fr) auto;align-items:end;gap:9px}
+.assessment-review-ai-suggestion{display:grid;gap:5px;margin-top:9px;padding:11px;border:1px solid color-mix(in srgb,var(--purple) 25%,var(--border));border-radius:9px;background:color-mix(in srgb,var(--purple) 6%,var(--surface))}
+.assessment-review-ai-suggestion strong{font-size:10px;color:var(--text)}
+.assessment-review-ai-suggestion span,.assessment-review-ai-suggestion p{margin:0;color:var(--muted);font-size:10px;line-height:1.55}
+@media(max-width:680px){.monitor-today-homework-form-row,.monitor-today-homework-mark-row{grid-template-columns:1fr}.learner-storage-quota-heading{flex-direction:column}.learner-storage-used{text-align:left}}

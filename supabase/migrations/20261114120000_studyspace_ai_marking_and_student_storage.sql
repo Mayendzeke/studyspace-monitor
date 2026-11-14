@@ -466,3 +466,21 @@ begin
   end if;
 end;
 $publication$;
+
+
+-- Migrate historic unanswered written marks into the same teacher review queue.
+update public.exercise_attempts a
+set marking_status='teacher_review',
+    teacher_review_required=true,
+    marking_details=coalesce(a.marking_details,'{}'::jsonb)
+      || jsonb_build_object('migration_note','Existing written responses require a final teacher review.')
+where a.submitted_at is not null
+  and a.marked_at is null
+  and exists (
+    select 1
+    from public.exercise_assignments ea
+    join public.exercise_questions q on q.exercise_set_id=ea.exercise_set_id
+    where ea.id=a.assignment_id
+      and ea.learner_id=a.learner_id
+      and q.question_type='short_answer'
+  );

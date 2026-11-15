@@ -6,7 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
-import { EDUCATION_PATHWAYS, INSTITUTION_TYPES, OTHER_GRADE_VALUE, QUALIFICATION_LEVELS, educationLevelLabel, gradeOptionsFor, isStandardGrade, isTertiaryStage } from "../lib/educationPathways";
+import { EDUCATION_PATHWAYS, TERTIARY_INSTITUTION_TYPES, OTHER_GRADE_VALUE, TERTIARY_QUALIFICATIONS, educationLevelLabel, gradeOptionsFor, isStandardGrade, isTertiaryStage } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -590,8 +590,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 }} disabled={!profileForm.education_level}><option value="">Choose grade or year</option>{gradeOptions.map(item => <option key={item}>{item}</option>)}<option value={OTHER_GRADE_VALUE}>Other / international equivalent</option></select></label>
                 {otherGradeSelected && <label>Enter grade / year<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder="Enter the institution's equivalent"/></label>}
                 {isTertiaryStage(profileForm.education_level) && <>
-                  <label>Institution type<select value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{INSTITUTION_TYPES.map(item => <option key={item}>{item}</option>)}</select></label>
-                  <label>Qualification level<select value={profileForm.qualification_level} onChange={event => setProfileForm(current => ({ ...current, qualification_level: event.target.value }))}><option value="">Choose qualification</option>{QUALIFICATION_LEVELS.map(item => <option key={item}>{item}</option>)}</select></label>
+                  <label>Institution type<select value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{TERTIARY_INSTITUTION_TYPES.map(item => <option key={item}>{item}</option>)}</select></label>
+                  <label>Qualification level<select value={profileForm.qualification_level} onChange={event => setProfileForm(current => ({ ...current, qualification_level: event.target.value }))}><option value="">Choose qualification</option>{TERTIARY_QUALIFICATIONS.map(item => <option key={item}>{item}</option>)}</select></label>
                   <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. Diploma in IT, BBA, MSc Education"/></label>
                 </>}
                 <label>Curriculum / awarding framework<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. Eswatini National Curriculum, IGCSE, CAPS…"/>{isTertiaryStage(profileForm.education_level) && <small>Optional for higher education.</small>}</label>

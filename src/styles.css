@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   color: #30384b;
   background: #e9edf5;
   font-synthesis: none;
@@ -21,6 +21,11 @@
   --mint: #26866e;
   --danger: #b4233a;
   --accent: var(--purple);
+  --brand-primary: var(--purple);
+  --brand-primary-strong: var(--purple-dark);
+  --brand-secondary: var(--mint);
+  --font-body: 'DM Sans', sans-serif;
+  --font-display: 'Manrope', sans-serif;
   --line: var(--border);
   --surface-2: #edf0f7;
   --raised: 7px 7px 16px #cbd0da, -7px -7px 16px #ffffff;

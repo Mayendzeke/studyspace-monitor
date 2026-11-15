@@ -115,19 +115,31 @@ create policy "document_work_admin_submitted_read"
   using (public.is_studyspace_admin() and submitted = true);
 grant select, insert, update, delete on public.student_document_work to authenticated;
 
--- Reuse the platform's canonical updated_at trigger.
-do $$
+-- Keep timestamps consistent without depending on another migration's
+-- private helper function.
+create or replace function public.set_studyspace_labs_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $
+begin
+  new.updated_at := now();
+  return new;
+end;
+$;
+
+do $
 declare table_name text;
 begin
   foreach table_name in array array['student_lab_work','lab_assignments','lab_controls','student_document_work']
   loop
     execute format('drop trigger if exists %I on public.%I', 'touch_' || table_name || '_updated_at', table_name);
     execute format(
-      'create trigger %I before update on public.%I for each row execute function public.touch_studyspace_updated_at()',
+      'create trigger %I before update on public.%I for each row execute function public.set_studyspace_labs_updated_at()',
       'touch_' || table_name || '_updated_at', table_name
     );
   end loop;
-end $$;
+end $;
 
 -- Enable Supabase Realtime for live student/monitor collaboration when the
 -- standard publication is present. Existing memberships are left untouched.

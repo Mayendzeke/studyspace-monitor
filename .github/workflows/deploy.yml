@@ -46,7 +46,7 @@ jobs:
         run: node --test scripts/student-access-pin-indexes.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
-      - name: Verify the single Secondary High learner level
+      - name: Verify the complete Monitor education pathway model
         run: node --test scripts/education-level-standard.test.mjs
       - name: Verify shared StudySpace brand tokens
         run: node --test scripts/brand-token-protocol.test.mjs

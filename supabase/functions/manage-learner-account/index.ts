@@ -208,6 +208,8 @@ Deno.serve(async (request) => {
       country: 80,
       institution: 160,
       education_level: 80,
+      institution_type: 80,
+      qualification_level: 80,
       grade: 80,
       curriculum: 120,
       academic_year: 30,
@@ -233,6 +235,32 @@ Deno.serve(async (request) => {
       }
     }
     if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
+
+    const educationStage = String(updates.education_level ?? learner.education_level ?? "");
+    const grade = String(updates.grade ?? learner.grade ?? "").trim();
+    if (!["Primary", "Secondary High", "High School", "Matric", "Tertiary"].includes(educationStage)) {
+      return json(400, { error: "Choose a valid education stage." });
+    }
+    if (!grade) return json(400, { error: "A grade, form or year of study is required." });
+    if (educationStage === "Tertiary") {
+      const institutionType = String(updates.institution_type ?? learner.institution_type ?? "");
+      const qualification = String(updates.qualification_level ?? learner.qualification_level ?? "");
+      const course = String(updates.course ?? learner.course ?? "").trim();
+      if (!["University", "College", "Technical / TVET", "Other"].includes(institutionType)) {
+        return json(400, { error: "Choose the tertiary institution type." });
+      }
+      if (!["Certificate", "Higher Certificate", "Diploma", "Advanced Diploma", "Associate Degree", "Bachelor's Degree", "Honours Degree", "Postgraduate Certificate", "Postgraduate Diploma", "Master's Degree", "Doctorate / PhD", "Other"].includes(qualification)) {
+        return json(400, { error: "Choose the tertiary qualification or award level." });
+      }
+      if (!course) return json(400, { error: "Enter the course or programme." });
+      updates.institution_type = institutionType;
+      updates.qualification_level = qualification;
+      updates.course = course;
+    } else {
+      updates.institution_type = "School";
+      updates.qualification_level = "";
+      updates.course = "";
+    }
     const nextTier = updates.subscription_tier === undefined ? null : updates.subscription_tier;
     const nextExpiry = updates.subscription_expires_at === undefined ? null : updates.subscription_expires_at;
     if (nextTier && !["Weekly", "2 Weeks", "Monthly"].includes(nextTier)) {
@@ -273,7 +301,7 @@ Deno.serve(async (request) => {
       .update(updates)
       .eq("id", learnerId)
       .eq("role", "learner")
-      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,account_status,updated_at")
+      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,institution_type,qualification_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,account_status,updated_at")
       .single();
     if (error || !updated) return json(500, { error: "Learner profile could not be saved." });
 

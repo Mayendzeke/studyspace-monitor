@@ -71,7 +71,7 @@ const emptyForm: ProfileForm = {
   country: "",
   institution: "",
   course: "",
-  education_level: "",
+  education_level: "Secondary High",
   grade: "",
   curriculum: "",
   academic_year: "",
@@ -264,7 +264,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       country: learner.country || "",
       institution: learner.institution || "",
       course: learner.course || "",
-      education_level: learner.education_level || "",
+      education_level: "Secondary High",
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",
       academic_year: learner.academic_year || "",
@@ -304,7 +304,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
+        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, education_level: "Secondary High", subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -560,8 +560,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <label>Preferred name<input maxLength={80} value={profileForm.preferred_name} onChange={event => setProfileForm(current => ({ ...current, preferred_name: event.target.value }))}/></label>
                 <label>School / institution<input maxLength={160} value={profileForm.institution} onChange={event => setProfileForm(current => ({ ...current, institution: event.target.value }))} placeholder="School or institution name"/></label>
                 <label>Country<input maxLength={80} value={profileForm.country} onChange={event => setProfileForm(current => ({ ...current, country: event.target.value }))}/></label>
-                <label>Education level<input maxLength={80} value={profileForm.education_level} onChange={event => setProfileForm(current => ({ ...current, education_level: event.target.value }))} placeholder="Primary, Secondary, Tertiary…"/></label>
-                <label>{/university|college/i.test(profileForm.education_level) ? "Year of study" : /primary/i.test(profileForm.education_level) ? "Grade / class" : /secondary|sixth form/i.test(profileForm.education_level) ? "Form / grade" : "Grade / form / year"}<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={/university|college/i.test(profileForm.education_level) ? "e.g. Year 1, Year 2, Final year" : "e.g. Grade 6, Form 3"}/></label>
+                <label>Education level<select value="Secondary High" disabled aria-label="Education level"><option>Secondary High</option></select></label>
+                <label>Form / grade<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder="e.g. Form 1, Form 5 or Lower Sixth"/></label>
                 {/university|college|tertiary/i.test(profileForm.education_level) && <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, BSc Nursing, Diploma in IT"/></label>}
                 <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>

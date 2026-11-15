@@ -6,6 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
+import { EDUCATION_STAGES, SCHOOL_INSTITUTION_TYPE, STAGE_DESCRIPTIONS, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, gradeOptionsFor, isTertiaryStage } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -20,6 +21,8 @@ type Learner = {
   institution: string;
   course: string;
   education_level: string;
+  institution_type: string;
+  qualification_level: string;
   grade: string;
   curriculum: string;
   academic_year: string;
@@ -33,7 +36,7 @@ type Learner = {
 type ProfileForm = Pick<
   Learner,
   "full_name" | "preferred_name" | "country" | "institution" | "course" |
-  "education_level" | "grade" | "curriculum" | "academic_year"
+  "education_level" | "institution_type" | "qualification_level" | "grade" | "curriculum" | "academic_year"
 > & { subscription_tier: string; subscription_expires_at: string };
 
 type GuardianRecord = {
@@ -72,6 +75,8 @@ const emptyForm: ProfileForm = {
   institution: "",
   course: "",
   education_level: "Secondary High",
+  institution_type: "School",
+  qualification_level: "",
   grade: "",
   curriculum: "",
   academic_year: "",
@@ -177,7 +182,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,date_of_birth,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
+      .select("id,student_id,full_name,preferred_name,account_status,date_of_birth,created_at,updated_at,country,institution,course,education_level,institution_type,qualification_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -211,7 +216,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       const matchesStatus = statusFilter === "all" || item.account_status === statusFilter;
       const searchable = [
         item.student_id, item.full_name, item.preferred_name, item.country,
-        item.institution, item.course, item.education_level, item.course, item.grade, item.curriculum, item.academic_year,
+        item.institution, item.course, item.education_level, item.institution_type, item.qualification_level, item.course, item.grade, item.curriculum, item.academic_year,
       ].join(" ").toLocaleLowerCase();
       return matchesStatus && (!needle || searchable.includes(needle));
     });
@@ -264,7 +269,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       country: learner.country || "",
       institution: learner.institution || "",
       course: learner.course || "",
-      education_level: "Secondary High",
+      education_level: learner.education_level || "Secondary High",
+      institution_type: learner.institution_type || (learner.education_level === "Tertiary" ? "" : SCHOOL_INSTITUTION_TYPE),
+      qualification_level: learner.qualification_level || "",
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",
       academic_year: learner.academic_year || "",
@@ -299,12 +306,14 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !editTarget || savingProfile) return;
+    if (!EDUCATION_STAGES.includes(profileForm.education_level as typeof EDUCATION_STAGES[number]) || !profileForm.grade.trim()) { setError("Choose the learner education stage and grade, form or year."); return; }
+    if (isTertiaryStage(profileForm.education_level) && (!profileForm.institution_type || !profileForm.qualification_level || !profileForm.course.trim())) { setError("Complete the institution type, qualification and programme."); return; }
     setSavingProfile(true);
     setError("");
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, education_level: "Secondary High", subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
+        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -376,7 +385,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   function exportCsv() {
     const headings = [
       "Student ID", "Full name", "Preferred name", "School / institution", "Country",
-      "Education level", "Course / programme", "Grade / year", "Curriculum", "Academic year", "Account status", "Joined",
+      "Education stage", "Institution type", "Qualification", "Course / programme", "Grade / year", "Curriculum", "Academic year", "Account status", "Joined",
     ];
     const rows = learners.map(item => [
       item.student_id, item.full_name, item.preferred_name, item.institution, item.country,
@@ -465,7 +474,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
             <div className="learner-identity">
               <strong>{learnerName(learner)}</strong>
               <span>{learner.student_id || "No Student ID"} · {learner.grade || "Grade not set"}{learner.course ? " · " + learner.course : ""} · {learner.curriculum || "Curriculum not set"}</span>
-              <small><Building2 size={12}/> {learner.institution || "School not set"} · {learner.education_level || "Level not set"} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
+              <small><Building2 size={12}/> {learner.institution || "Institution not set"} · {learner.education_level || "Stage not set"}{learner.education_level === "Tertiary" ? " · " + (learner.institution_type || "Institution type not set") + " · " + (learner.qualification_level || "Qualification not set") : ""} · {learner.academic_year || "Year not set"} · {learner.country || "Country not set"}</small>
               <small>{learner.date_of_birth ? "Date of birth " + new Date(learner.date_of_birth + "T00:00:00").toLocaleDateString() : "Date of birth not recorded"} · Joined {learner.created_at ? new Date(learner.created_at).toLocaleDateString() : "Date unavailable"}</small>
               <small>{learner.subscription_tier
                 ? "Paid plan: " + learner.subscription_tier + (learner.subscription_expires_at ? " · expires " + new Date(learner.subscription_expires_at).toLocaleString() : " · no expiry")

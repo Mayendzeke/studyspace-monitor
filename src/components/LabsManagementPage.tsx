@@ -87,14 +87,15 @@ export default function LabsManagementPage(){
 
   useEffect(()=>{
     void refresh();
-    if(!supabase)return;
-    const channel=supabase.channel("studyspace-monitor-labs")
+    const client = supabase;
+    if(!client)return;
+    const channel=client.channel("studyspace-monitor-labs")
       .on("postgres_changes",{event:"*",schema:"public",table:"student_lab_work"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"lab_assignments"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"student_document_work"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"lab_controls"},()=>void refresh())
       .subscribe();
-    return ()=>{void supabase.removeChannel(channel);};
+    return ()=>{void client.removeChannel(channel);};
   },[refresh]);
 
   const filteredWork=useMemo(()=>{

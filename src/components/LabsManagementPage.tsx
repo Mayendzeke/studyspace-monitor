@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Activity, Atom, BookOpen, CheckCircle2, ClipboardCheck, FileCheck2, FlaskConical,
-  MessageSquareText, Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Users, X,
+  Plus, RefreshCw, Search, ShieldAlert, SlidersHorizontal, Users, X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 

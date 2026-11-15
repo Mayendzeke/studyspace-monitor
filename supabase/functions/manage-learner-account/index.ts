@@ -159,7 +159,7 @@ Deno.serve(async (request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin
     .from("profiles")
-    .select("id,role,account_status,student_id,full_name,preferred_name,date_of_birth,subscription_tier,subscription_expires_at")
+    .select("id,role,account_status,student_id,full_name,preferred_name,date_of_birth,institution_type,qualification_level,education_level,grade,course,subscription_tier,subscription_expires_at")
     .eq("id", learnerId)
     .single();
   if (learnerError || !learner || learner.role !== "learner") {

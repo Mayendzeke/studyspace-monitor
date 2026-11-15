@@ -269,17 +269,20 @@ export default function ContentStudio() {
   const activeQuestion=questions[editing] || newQuestion()
   const labelFor=(type:QuestionType)=>questionTypes.find(t=>t.value===type)?.label || type
   const subjects=Array.from(new Set(resources.map(r=>r.subject).filter(Boolean))).sort()
-  const learnerLevels=standardEducationLevels;
+  const learnerLevels=[...EDUCATION_STAGES];
   const levelLearners=learners.filter(item=>!level||item.education_level===level);
-  const isTertiaryLevel=level==='College'||level==='University';
-  const learnerCourses=Array.from(new Set(levelLearners.map(item=>item.course?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
-  // Course filters are learner-derived; when no tertiary course is on file, year selection remains available.
-  const gradeLearners=levelLearners.filter(item=>!courseFilter||item.course?.trim()===courseFilter);
+  const isTertiaryLevel=isTertiaryStage(level);
+  const learnerInstitutionTypes=Array.from(new Set(levelLearners.map(item=>item.institution_type?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
+  const institutionLearners=levelLearners.filter(item=>!institutionTypeFilter||item.institution_type===institutionTypeFilter);
+  const learnerQualifications=Array.from(new Set(institutionLearners.map(item=>item.qualification_level?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
+  const qualificationLearners=institutionLearners.filter(item=>!qualificationFilter||item.qualification_level===qualificationFilter);
+  const learnerCourses=Array.from(new Set(qualificationLearners.map(item=>item.course?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
+  const gradeLearners=qualificationLearners.filter(item=>!courseFilter||item.course?.trim()===courseFilter);
   const learnerGrades=Array.from(new Set(gradeLearners.map(item=>item.grade?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
   const scopedLearners=gradeLearners.filter(item=>!grade||item.grade===grade);
   const assignmentAudience=level?scopedLearners:learners;
   const learnerCurricula=Array.from(new Set(scopedLearners.map(item=>item.curriculum?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
-  const gradeFieldLabel=level==='Secondary High'?'Form / grade':'Grade / year';
+  const gradeFieldLabel=level==='Primary'?'Grade':level==='Tertiary'?'Year / semester':level==='Matric'?'Form 6 / pre-university':'Form';
   const scopedLearnerIds=new Set(scopedLearners.map(item=>item.id));
   const builderSubjectOptions=Array.from(new Set(registeredSubjectRows.filter(row=>scopedLearnerIds.has(row.learner_id)).map(row=>row.name))).sort((a,b)=>a.localeCompare(b));
   const filteredResources=resources.filter(r=>{
@@ -288,12 +291,12 @@ export default function ContentStudio() {
   }).sort((a,b)=>resourceSort==='name'?a.name.localeCompare(b.name):resourceSort==='oldest'?a.savedAt.localeCompare(b.savedAt):b.savedAt.localeCompare(a.savedAt))
 
   const resetBuilder=()=>{
-    setActiveId(null);setTitle('');setSubject('');setLevel('');setGrade('');setCourseFilter('');setCurriculum('')
+    setActiveId(null);setTitle('');setSubject('');setLevel('');setGrade('');setCourseFilter('');setInstitutionTypeFilter('');setQualificationFilter('');setCurriculum('')
     setInstructions('Read each question carefully and answer all questions.');setDuration(30);setDueDate('')
     setQuestions([newQuestion()]);setEditing(0);setPreview(false)
   }
   const loadDraft=(d:ExerciseDraft)=>{
-    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setSubjectCustom(!!d.subject&&!subjectOptions.includes(d.subject));setLevel(d.level);setGrade(d.grade);setCourseFilter('');setCurriculum(d.curriculum)
+    setActiveId(d.id);setTitle(d.title);setSubject(d.subject);setSubjectCustom(!!d.subject&&!subjectOptions.includes(d.subject));setLevel(d.level);setGrade(d.grade);setCourseFilter('');setInstitutionTypeFilter('');setQualificationFilter('');setCurriculum(d.curriculum)
     setInstructions(d.instructions);setDuration(d.duration);setDueDate(d.dueDate);setQuestions(d.questions);setEditing(0)
     setPreview(false);setTab('builder');setNotice('Assessment loaded.')
   }

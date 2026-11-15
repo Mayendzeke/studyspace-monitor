@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import AssessmentReviewQueue from './AssessmentReviewQueue'
+import { EDUCATION_STAGES, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, gradeOptionsFor, isTertiaryStage } from '../lib/educationPathways'
 import { extractPastPaperQuestions, type ImportedPaperQuestion } from '../lib/pastPaper'
 import { Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
 
@@ -36,7 +37,6 @@ const questionTypes: { value: QuestionType; label: string }[] = [
   { value: 'word_puzzle', label: 'Word puzzle' }, { value: 'short_answer', label: 'Written response' },
 ]
 const categories: ResourceCategory[] = ['Notes', 'Revision', 'Worksheet', 'Past paper', 'Reference', 'Other']
-const standardEducationLevels = ['Secondary High']
 const newQuestion = (): Question => ({
   id: crypto.randomUUID(), type: 'multiple_choice', prompt: '', options: ['', '', '', ''],
   answer: '', acceptedAnswers: [], pairs: [{left:'',right:''},{left:'',right:''}],
@@ -55,7 +55,7 @@ const bytes = (n:number) => n < 1024*1024 ? `${(n/1024).toFixed(0)} KB` : `${(n/
 const readDrafts = (): ExerciseDraft[] => readJson<ExerciseDraft[]>(DRAFTS_KEY, []).map(d => ({
   ...d,
   status: d.status || 'draft',
-  level: 'Secondary High',
+  level: d.level || 'Secondary High',
   questions: (d.questions || []).map(q => ({
     ...q,
     acceptedAnswers: q.acceptedAnswers || [],
@@ -69,9 +69,11 @@ export default function ContentStudio() {
   const [drafts,setDrafts] = useState<ExerciseDraft[]>(readDrafts)
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
-  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string;education_level:string;course:string}[]>([])
+  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string;education_level:string;course:string;institution_type:string;qualification_level:string}[]>([])
   const [registeredSubjectRows,setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
   const [courseFilter,setCourseFilter] = useState('')
+  const [institutionTypeFilter,setInstitutionTypeFilter] = useState('')
+  const [qualificationFilter,setQualificationFilter] = useState('')
   const [subjectOptions,setSubjectOptions] = useState<string[]>([])
   const [subjectCustom,setSubjectCustom] = useState(false)
   const [uploadSubjectCustom,setUploadSubjectCustom] = useState(false)
@@ -104,7 +106,7 @@ export default function ContentStudio() {
     const keys = new Map(answerKeys.map((item:any)=>[item.question_id,item.answer_key||{}]));
     return {
       id: String(set.id), title: String(set.title||''), subject: String(set.subject_name||''),
-      level: 'Secondary High', grade: String(set.grade||''),
+      level: String(set.education_level||'Secondary High'), grade: String(set.grade||''),
       curriculum: String(set.curriculum||''), instructions: String(set.instructions||''),
       duration: Number(set.duration_minutes||30), dueDate: set.due_date||'',
       status: (set.review_status||'draft') as Status, updatedAt: String(set.updated_at||set.created_at),
@@ -182,7 +184,7 @@ export default function ContentStudio() {
       const adminId=authState.user.id;
       const [setsResult,learnersResult,resourcesResult,assignmentsResult,subjectsResult,localResourceRecords]=await Promise.all([
         supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
-        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,course').eq('role','learner').eq('account_status','active').order('preferred_name'),
+        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,course,institution_type,qualification_level').eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
         supabase.from('exercise_assignments').select('id,exercise_set_id,learner_id,due_at,available_at,assigned_at').order('assigned_at',{ascending:false}),
         supabase.from('student_subjects').select('learner_id,name').order('name'),

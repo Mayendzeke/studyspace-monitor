@@ -1,4 +1,5 @@
 import ContentStudio from './components/ContentStudio'
+import LabsManagementPage from './components/LabsManagementPage'
 import ClassroomStudio from './components/ClassroomStudio'
 import MonitorTodaySession from './components/MonitorTodaySession'
 import HomeworkBuilder from './components/HomeworkBuilder'
@@ -22,14 +23,14 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Activity, ArrowUpRight, Bell, BookOpen, PenTool,
+  Activity, ArrowUpRight, Bell, BookOpen, PenTool, FlaskConical,
   CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Brain, Moon, Sun,
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | "Today's Session" | 'Learners' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | "Today's Session" | 'Learners' | 'Labs' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -37,6 +38,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: "Today's Session", icon: CalendarDays },
   { label: 'Learners', icon: Users },
+  { label: 'Labs', icon: FlaskConical },
   { label: 'Content Studio', icon: PenTool },
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Timetable', icon: CalendarDays },
@@ -342,6 +344,7 @@ function App() {
           {page === 'Overview' && <Overview navigate={navigate} supabaseConfigured={isSupabaseConfigured} />}
           {page === "Today's Session" && <MonitorTodaySession onCreateLesson={() => navigate('Classroom Studio')} />}
           {page === 'Learners' && <LearnersPage onCreatePin={() => navigate('Access PINs')} />}
+          {page === 'Labs' && <LabsManagementPage />}
           {page === 'Timetable' && <TeacherWeeklyTimetable />}
           {page === 'Messages' && <MessagesPage onOpenHomework={() => setPage('Classroom Studio')} />}
           {page === 'Guardian verification' && <GuardianVerificationPage />}

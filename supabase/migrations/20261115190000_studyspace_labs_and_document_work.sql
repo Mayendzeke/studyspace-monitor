@@ -31,11 +31,11 @@ create policy "lab_work_owner_manage"
   on public.student_lab_work for all to authenticated
   using (
     (learner_id = auth.uid() and public.is_active_studyspace_learner())
-    or public.is_studyspace_admin()
+    or (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2')
   )
   with check (
     (learner_id = auth.uid() and public.is_active_studyspace_learner())
-    or public.is_studyspace_admin()
+    or (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2')
   );
 grant select, insert, update, delete on public.student_lab_work to authenticated;
 
@@ -60,8 +60,8 @@ alter table public.lab_assignments enable row level security;
 drop policy if exists "lab_assignments_admin_manage" on public.lab_assignments;
 create policy "lab_assignments_admin_manage"
   on public.lab_assignments for all to authenticated
-  using (public.is_studyspace_admin())
-  with check (public.is_studyspace_admin());
+  using (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2')
+  with check (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2');
 drop policy if exists "lab_assignments_learner_read" on public.lab_assignments;
 create policy "lab_assignments_learner_read"
   on public.lab_assignments for select to authenticated
@@ -81,8 +81,8 @@ alter table public.lab_controls enable row level security;
 drop policy if exists "lab_controls_admin_manage" on public.lab_controls;
 create policy "lab_controls_admin_manage"
   on public.lab_controls for all to authenticated
-  using (public.is_studyspace_admin())
-  with check (public.is_studyspace_admin());
+  using (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2')
+  with check (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2');
 drop policy if exists "lab_controls_learner_read" on public.lab_controls;
 create policy "lab_controls_learner_read"
   on public.lab_controls for select to authenticated
@@ -112,7 +112,7 @@ create policy "document_work_owner_manage"
 drop policy if exists "document_work_admin_submitted_read" on public.student_document_work;
 create policy "document_work_admin_submitted_read"
   on public.student_document_work for select to authenticated
-  using (public.is_studyspace_admin() and submitted = true);
+  using (public.is_studyspace_admin() and coalesce(((select auth.jwt()) ->> 'aal'), '') = 'aal2' and submitted = true);
 grant select, insert, update, delete on public.student_document_work to authenticated;
 
 -- Keep timestamps consistent without depending on another migration's

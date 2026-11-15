@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import AssessmentReviewQueue from './AssessmentReviewQueue'
 import { extractPastPaperQuestions, type ImportedPaperQuestion } from '../lib/pastPaper'
 import { Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
+import { EDUCATION_STAGES, STAGE_LABELS, isTertiaryStage } from '../lib/educationPathways'
 
 type QuestionType = 'multiple_choice' | 'fill_blank' | 'true_false' | 'matching' | 'word_puzzle' | 'short_answer'
 type Difficulty = 'Foundation' | 'Standard' | 'Advanced'
@@ -36,7 +37,7 @@ const questionTypes: { value: QuestionType; label: string }[] = [
   { value: 'word_puzzle', label: 'Word puzzle' }, { value: 'short_answer', label: 'Written response' },
 ]
 const categories: ResourceCategory[] = ['Notes', 'Revision', 'Worksheet', 'Past paper', 'Reference', 'Other']
-const standardEducationLevels = ['Secondary High']
+const standardEducationLevels = [...EDUCATION_STAGES]
 const newQuestion = (): Question => ({
   id: crypto.randomUUID(), type: 'multiple_choice', prompt: '', options: ['', '', '', ''],
   answer: '', acceptedAnswers: [], pairs: [{left:'',right:''},{left:'',right:''}],
@@ -55,7 +56,7 @@ const bytes = (n:number) => n < 1024*1024 ? `${(n/1024).toFixed(0)} KB` : `${(n/
 const readDrafts = (): ExerciseDraft[] => readJson<ExerciseDraft[]>(DRAFTS_KEY, []).map(d => ({
   ...d,
   status: d.status || 'draft',
-  level: 'Secondary High',
+  level: d.level || 'Secondary High',
   questions: (d.questions || []).map(q => ({
     ...q,
     acceptedAnswers: q.acceptedAnswers || [],
@@ -69,7 +70,7 @@ export default function ContentStudio() {
   const [drafts,setDrafts] = useState<ExerciseDraft[]>(readDrafts)
   const [assignments,setAssignments] = useState<AssignmentDraft[]>(() => readJson(ASSIGNMENTS_KEY,[]))
   const [resources,setResources] = useState<ResourceRecord[]>([])
-  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string;education_level:string;course:string}[]>([])
+  const [learners,setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;grade:string;curriculum:string;education_level:string;course:string;institution_type:string;qualification_level:string}[]>([])
   const [registeredSubjectRows,setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
   const [courseFilter,setCourseFilter] = useState('')
   const [subjectOptions,setSubjectOptions] = useState<string[]>([])
@@ -104,7 +105,7 @@ export default function ContentStudio() {
     const keys = new Map(answerKeys.map((item:any)=>[item.question_id,item.answer_key||{}]));
     return {
       id: String(set.id), title: String(set.title||''), subject: String(set.subject_name||''),
-      level: 'Secondary High', grade: String(set.grade||''),
+      level: String(set.education_level || 'Secondary High'), grade: String(set.grade||''),
       curriculum: String(set.curriculum||''), instructions: String(set.instructions||''),
       duration: Number(set.duration_minutes||30), dueDate: set.due_date||'',
       status: (set.review_status||'draft') as Status, updatedAt: String(set.updated_at||set.created_at),
@@ -182,7 +183,7 @@ export default function ContentStudio() {
       const adminId=authState.user.id;
       const [setsResult,learnersResult,resourcesResult,assignmentsResult,subjectsResult,localResourceRecords]=await Promise.all([
         supabase.from('exercise_sets').select('*').eq('created_by',adminId).order('updated_at',{ascending:false}),
-        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,course').eq('role','learner').eq('account_status','active').order('preferred_name'),
+        supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,course,institution_type,qualification_level').eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase.from('learning_resources').select('*').eq('created_by',adminId).order('created_at',{ascending:false}),
         supabase.from('exercise_assignments').select('id,exercise_set_id,learner_id,due_at,available_at,assigned_at').order('assigned_at',{ascending:false}),
         supabase.from('student_subjects').select('learner_id,name').order('name'),
@@ -271,7 +272,7 @@ export default function ContentStudio() {
   const subjects=Array.from(new Set(resources.map(r=>r.subject).filter(Boolean))).sort()
   const learnerLevels=standardEducationLevels;
   const levelLearners=learners.filter(item=>!level||item.education_level===level);
-  const isTertiaryLevel=level==='College'||level==='University';
+  const isTertiaryLevel=isTertiaryStage(level);
   const learnerCourses=Array.from(new Set(levelLearners.map(item=>item.course?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
   // Course filters are learner-derived; when no tertiary course is on file, year selection remains available.
   const gradeLearners=levelLearners.filter(item=>!courseFilter||item.course?.trim()===courseFilter);
@@ -279,7 +280,7 @@ export default function ContentStudio() {
   const scopedLearners=gradeLearners.filter(item=>!grade||item.grade===grade);
   const assignmentAudience=level?scopedLearners:learners;
   const learnerCurricula=Array.from(new Set(scopedLearners.map(item=>item.curriculum?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
-  const gradeFieldLabel=level==='Secondary High'?'Form / grade':'Grade / year';
+  const gradeFieldLabel=level==='Primary'?'Primary grade':level==='Secondary High'||level==='High School'?'Form':level==='Matric'?'Advanced studies year':isTertiaryLevel?'Year / semester':'Grade / year';
   const scopedLearnerIds=new Set(scopedLearners.map(item=>item.id));
   const builderSubjectOptions=Array.from(new Set(registeredSubjectRows.filter(row=>scopedLearnerIds.has(row.learner_id)).map(row=>row.name))).sort((a,b)=>a.localeCompare(b));
   const filteredResources=resources.filter(r=>{
@@ -509,7 +510,7 @@ export default function ContentStudio() {
     if(!selected||selected.status!=='approved'){setNotice('Select an approved assessment first.');return}
     if(!supabase){setNotice('Connect the Studyspace cloud before assigning assessments.');return}
     const targets=assignmentTarget==='All learners'
-      ? learners
+      ? levelLearners
       : assignmentTarget==='Matching learners'
         ? assignmentAudience
         : assignmentAudience.filter(student=>student.id===selectedLearner)
@@ -567,7 +568,7 @@ export default function ContentStudio() {
         <div className="panel-heading"><div><h2>Assessment details</h2><p>Define the class and assessment settings</p></div><span className="studio-draft-count">{drafts.length} assessments</span></div>
         <div className="studio-form-grid">
           <label className="studio-field studio-field-wide">Assessment title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Algebra: Linear equations test"/></label>
-          <label className="studio-field">1. Education level<select value={level} onChange={e=>{setLevel(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">Choose level from registered learners</option>{learnerLevels.map(item=><option key={item}>{item}</option>)}</select></label>
+          <label className="studio-field">1. Education level<select value={level} onChange={e=>{setLevel(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">Choose level from registered learners</option>{learnerLevels.map(item=><option key={item} value={item}>{STAGE_LABELS[item] || item}</option>)}</select></label>
           {isTertiaryLevel&&(learnerCourses.length>0
             ? <label className="studio-field">2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setGrade('');setSubject('');setSelectedLearner('')}}><option value="">All courses / programmes</option>{learnerCourses.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
             : <p className="builder-hint">No course or programme is recorded for active {level.toLowerCase()} learners yet. Their registered year of study is still available below.</p>)}
@@ -639,7 +640,7 @@ export default function ContentStudio() {
     {tab==='assign'&&<div className="studio-builder-layout"><section className="panel assignment-setup-panel"><div className="panel-heading"><div><h2>Review and approve</h2><p>Only validated assessments can move to approved</p></div><ShieldCheck size={19}/></div>
       {drafts.length===0?<div className="draft-empty">Create an assessment first.</div>:drafts.map(d=><div className="review-card" key={d.id}><div><strong>{d.title}</strong><small>{d.subject} · {d.questions.length} questions · {d.questions.reduce((s,q)=>s+q.points,0)} marks</small><span className={`status-chip status-${d.status}`}>{d.status}</span></div><div className="review-actions"><button className="subtle-button" onClick={()=>loadDraft(d)}>Edit</button>{d.status!=='approved'&&<button className="primary-button" onClick={()=>setStatus(d,'approved')}><Check size={14}/> Approve</button>}{d.status==='approved'&&<button className="subtle-button" onClick={()=>setStatus(d,'draft')}>Return to draft</button>}</div></div>)}
       <div className="settings-divider"/><h2>Assignment preparation</h2><p className="builder-hint">Choose active learners. Published assessments appear in their Student Planner; correct answers remain server-side.</p>
-      <div className="studio-form-grid"><label className="studio-field studio-field-wide">Approved assessment<select value={assignmentExercise} onChange={e=>setAssignmentExercise(e.target.value)}><option value="">Choose an approved assessment</option>{drafts.filter(d=>d.status==='approved').map(d=><option key={d.id} value={d.id}>{d.title} — {d.subject}</option>)}</select></label><label className="studio-field">Intended recipients<select value={assignmentTarget} onChange={e=>setAssignmentTarget(e.target.value)}><option>One learner</option><option value="Matching learners" disabled={!level||!assignmentAudience.length}>Matching learners in selected group</option><option value="All learners">All learners (Secondary High)</option></select></label>{assignmentTarget==='One learner'&&<label className="studio-field">Learner<select value={selectedLearner} onChange={e=>setSelectedLearner(e.target.value)}><option value="">Choose an active learner</option>{assignmentAudience.map(student=><option key={student.id} value={student.id}>{student.preferred_name||student.full_name||student.student_id||'Learner'} · {student.student_id||'No ID'}</option>)}</select></label>}<label className="studio-field">Due date<input type="date" value={assignmentDue} onChange={e=>setAssignmentDue(e.target.value)}/></label><label className="studio-field studio-field-wide">Availability<select value={assignmentAvailability} onChange={e=>setAssignmentAvailability(e.target.value)}><option>Immediately after publishing</option><option>Schedule for due date</option></select></label></div><div className="studio-actions"><button className="primary-button" onClick={createAssignment}><Save size={15}/> Save assignment plan</button></div>
+      <div className="studio-form-grid"><label className="studio-field studio-field-wide">Approved assessment<select value={assignmentExercise} onChange={e=>setAssignmentExercise(e.target.value)}><option value="">Choose an approved assessment</option>{drafts.filter(d=>d.status==='approved').map(d=><option key={d.id} value={d.id}>{d.title} — {d.subject}</option>)}</select></label><label className="studio-field">Intended recipients<select value={assignmentTarget} onChange={e=>setAssignmentTarget(e.target.value)}><option>One learner</option><option value="Matching learners" disabled={!level||!assignmentAudience.length}>Matching learners in selected group</option><option value="All learners" disabled={!level||!levelLearners.length}>All active learners in selected level</option></select></label>{assignmentTarget==='One learner'&&<label className="studio-field">Learner<select value={selectedLearner} onChange={e=>setSelectedLearner(e.target.value)}><option value="">Choose an active learner</option>{assignmentAudience.map(student=><option key={student.id} value={student.id}>{student.preferred_name||student.full_name||student.student_id||'Learner'} · {student.student_id||'No ID'}</option>)}</select></label>}<label className="studio-field">Due date<input type="date" value={assignmentDue} onChange={e=>setAssignmentDue(e.target.value)}/></label><label className="studio-field studio-field-wide">Availability<select value={assignmentAvailability} onChange={e=>setAssignmentAvailability(e.target.value)}><option>Immediately after publishing</option><option>Schedule for due date</option></select></label></div><div className="studio-actions"><button className="primary-button" onClick={createAssignment}><Save size={15}/> Save assignment plan</button></div>
       </section><aside className="panel draft-sidebar"><div className="panel-heading"><div><h2>Assignment plans</h2><p>Cloud assignment records</p></div><Send size={18}/></div>{assignments.length===0?<div className="draft-empty">Your assignment plans will appear here.</div>:assignments.map(a=>{const d=drafts.find(x=>x.id===a.exerciseId);return <div className="saved-draft" key={a.id}><div><strong>{d?.title||'Assessment'}</strong><small>{a.target} · {a.dueDate||'No due date'}</small><small>{a.availability}</small></div></div>})}</aside></div>}
     {tab==='assign'&&<AssessmentReviewQueue/>}
     <footer className="page-footer"><span>STUDYSPACE MONITOR · CONTENT STUDIO</span><span>Cloud-backed assessments and resources</span></footer>

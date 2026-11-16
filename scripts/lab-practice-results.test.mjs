@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const monitor = readFileSync("src/components/LabsManagementPage.tsx", "utf8");
-const migration = readFileSync("supabase/migrations/20261116094000_lab_practice_attempts_admin_read.sql", "utf8");
-const realtime = readFileSync("supabase/migrations/20261116094100_lab_practice_attempts_monitor_realtime.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20261116094103_lab_practice_attempts_admin_read.sql", "utf8");
+const realtime = readFileSync("supabase/migrations/20261116094429_lab_practice_attempts_monitor_realtime.sql", "utf8");
 const styles = readFileSync("src/styles.css", "utf8");
 
 test("Monitor reads only submitted Lab practice attempts through a dedicated results view", () => {

@@ -40,6 +40,11 @@ test("Monitor learner profile editing preserves all five stages and tertiary det
 test("Content Studio filters registered learners by the same pathway stages", () => {
   assert.match(studio, /const learnerLevels=EDUCATION_STAGES/);
   assert.match(studio, /const isTertiaryLevel=isTertiaryStage\(level\)/);
+  assert.match(studio, /institutionTypeFilter/);
+  assert.match(studio, /qualificationFilter/);
+  assert.match(studio, /standardGrades=gradeOptionsFor\(level\)/);
+  assert.match(studio, /TERTIARY_INSTITUTION_TYPES\.map/);
+  assert.match(studio, /TERTIARY_QUALIFICATIONS\.map/);
   assert.match(studio, /Year \/ semester/);
   assert.match(studio, /All active learners/);
   assert.doesNotMatch(studio, /standardEducationLevels/);

@@ -50,7 +50,7 @@ jobs:
         run: node --test scripts/lab-practice-results.test.mjs
       - name: Verify migration source matches the applied ledger
         run: node --test scripts/migration-ledger-source.test.mjs
-      - name: Verify the single Secondary High learner level
+      - name: Verify the five-stage learner education pathway
         run: node --test scripts/education-level-standard.test.mjs
       - name: Verify shared StudySpace brand tokens
         run: node --test scripts/brand-token-protocol.test.mjs

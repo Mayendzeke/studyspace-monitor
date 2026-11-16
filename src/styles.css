@@ -2361,3 +2361,102 @@ html,body,#root{height:100%;min-height:0;overflow:hidden}
 .testimonial-3d-card blockquote{font:500 14px/1.75 'DM Sans',sans-serif;letter-spacing:0;quotes:'“' '”';}
 .testimonial-3d-card blockquote::before{content:open-quote;color:var(--purple);font:800 22px/0 Manrope,sans-serif;margin-right:4px}
 .testimonial-3d-card blockquote::after{content:close-quote;color:var(--purple);font:800 22px/0 Manrope,sans-serif;margin-left:4px}
+
+
+/* Labs Command Centre */
+.monitor-labs-page{display:grid;gap:16px;min-width:0}
+.monitor-labs-hero{display:flex;align-items:center;gap:15px;padding:22px;border:1px solid var(--border);border-radius:19px;background:linear-gradient(115deg,color-mix(in srgb,var(--purple) 12%,var(--panel)),var(--panel-strong));box-shadow:var(--raised-small)}
+.monitor-labs-hero-icon{width:54px;height:54px;flex:0 0 54px;display:grid;place-items:center;border:1px solid var(--border);border-radius:16px;background:var(--panel-strong);color:var(--purple)}
+.monitor-labs-hero-copy{min-width:0}
+.monitor-labs-hero-copy .eyebrow{font-size:8px;letter-spacing:1.1px;color:var(--purple)}
+.monitor-labs-hero h1{margin:4px 0;font:800 24px Manrope,sans-serif;letter-spacing:-.7px;color:var(--text)}
+.monitor-labs-hero p{margin:0;font-size:10px;line-height:1.55;color:var(--muted)}
+.monitor-labs-hero>.primary-button{margin-left:auto;flex:0 0 auto}
+.monitor-labs-tabs{display:flex;gap:6px;overflow:auto;padding:4px;border:1px solid var(--border);border-radius:13px;background:var(--panel)}
+.monitor-labs-tabs button{display:flex;align-items:center;gap:7px;flex:0 0 auto;padding:9px 12px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--muted);font-size:10px;font-weight:700}
+.monitor-labs-tabs button.active{border-color:var(--border);background:var(--panel-strong);color:var(--purple);box-shadow:var(--raised-small)}
+.monitor-labs-alert{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid rgba(37,145,105,.22);border-radius:10px;background:color-mix(in srgb,#269777 7%,var(--panel));color:var(--mint);font-size:10px}
+.monitor-labs-alert.is-error{border-color:rgba(180,35,58,.24);background:color-mix(in srgb,#b4233a 7%,var(--panel));color:var(--danger)}
+.monitor-labs-alert button{margin-left:auto;border:0;background:transparent;color:inherit}
+.monitor-labs-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.monitor-labs-stat-grid article{display:grid;gap:7px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel);box-shadow:var(--raised-small)}
+.monitor-labs-stat-grid article>span{min-height:28px;font-size:9px;line-height:1.4;color:var(--muted)}
+.monitor-labs-stat-grid article>strong{font:800 25px Manrope,sans-serif;color:var(--text)}
+.monitor-labs-stat-grid article>small{display:flex;align-items:center;gap:5px;font-size:8px;color:var(--muted)}
+.monitor-labs-area-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.monitor-labs-area-card{display:grid;gap:7px;min-width:0;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel);box-shadow:var(--raised-small)}
+.monitor-labs-area-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.monitor-labs-area-top em{font-size:8px;font-style:normal;padding:4px 7px;border-radius:20px;background:rgba(38,151,119,.09);color:var(--mint)}
+.monitor-labs-area-top em.is-paused{background:rgba(180,35,58,.09);color:var(--danger)}
+.monitor-labs-area-card h3{margin:3px 0 0;font:800 14px Manrope,sans-serif;color:var(--text)}
+.monitor-labs-area-card>strong{font-size:10px;color:var(--text)}
+.monitor-labs-area-card>p{margin:0;font-size:9px;color:var(--muted)}
+.monitor-labs-area-card>button{display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding:8px 0 0;border:0;border-top:1px solid var(--border);background:transparent;color:var(--purple);font-size:9px;font-weight:800}
+.monitor-labs-panel{display:grid;gap:13px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--panel);box-shadow:var(--raised-small);min-width:0}
+.monitor-labs-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.monitor-labs-panel-head>div{min-width:0}
+.monitor-labs-panel-head .eyebrow{font-size:8px;letter-spacing:1px;color:var(--purple)}
+.monitor-labs-panel-head h2{margin:4px 0;font:800 17px Manrope,sans-serif;color:var(--text)}
+.monitor-labs-panel-head p{margin:0;font-size:9px;line-height:1.5;color:var(--muted)}
+.monitor-labs-panel-head>.secondary-button,.monitor-labs-panel-head>.primary-button{flex:0 0 auto}
+.monitor-labs-filters{display:flex;gap:8px;flex-wrap:wrap}
+.monitor-labs-filters label{display:flex;align-items:center;gap:7px;flex:1 1 220px;min-width:0;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-strong);color:var(--muted)}
+.monitor-labs-filters input{width:100%;min-width:0;min-height:35px;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:9px}
+.monitor-labs-filters select{min-height:36px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel-strong);color:var(--text);font-size:9px}
+.monitor-labs-table-wrap{width:100%;overflow:auto;border:1px solid var(--border);border-radius:11px;background:var(--panel-strong)}
+.monitor-labs-table{width:100%;min-width:760px;border-collapse:collapse;font-size:9px}
+.monitor-labs-table th{padding:10px;text-align:left;background:var(--surface-2);color:var(--muted);font-size:8px;letter-spacing:.3px;white-space:nowrap}
+.monitor-labs-table td{padding:10px;border-top:1px solid var(--border);color:var(--muted);vertical-align:middle}
+.monitor-labs-table td strong{color:var(--text);font-size:9px}
+.monitor-labs-status{display:inline-flex;padding:4px 7px;border-radius:20px;background:rgba(101,91,208,.1);color:var(--purple);font-size:8px;text-transform:capitalize;white-space:nowrap}
+.monitor-labs-status.status-submitted{background:rgba(38,151,119,.1);color:var(--mint)}
+.monitor-labs-status.status-completed{background:rgba(63,135,190,.1);color:#3f87be}
+.monitor-labs-review-button{padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--purple);font-size:8px;font-weight:800}
+.monitor-labs-empty{display:grid;justify-items:center;gap:8px;padding:26px;text-align:center;color:var(--muted)}
+.monitor-labs-empty svg{color:var(--purple)}
+.monitor-labs-empty strong{font-size:11px;color:var(--text)}
+.monitor-labs-empty p{max-width:400px;margin:0;font-size:9px;line-height:1.5}
+.monitor-labs-assignment-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--panel-strong)}
+.monitor-labs-assignment-form label,.monitor-labs-review-dialog>label{display:grid;gap:6px;min-width:0;color:var(--muted);font-size:9px}
+.monitor-labs-assignment-form label.wide{grid-column:1/-1}
+.monitor-labs-assignment-form input,.monitor-labs-assignment-form select,.monitor-labs-assignment-form textarea,.monitor-labs-review-dialog input,.monitor-labs-review-dialog textarea{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;font-size:10px}
+.monitor-labs-assignment-form .monitor-labs-check{display:flex;align-items:center;gap:8px}
+.monitor-labs-assignment-form .monitor-labs-check input{width:16px;height:16px;accent-color:var(--purple)}
+.monitor-labs-form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
+.monitor-labs-assignment-list{display:grid;gap:8px}
+.monitor-labs-assignment-list article{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:13px;border:1px solid var(--border);border-radius:11px;background:var(--panel-strong)}
+.monitor-labs-assignment-list article>div{display:grid;gap:5px;min-width:0}
+.monitor-labs-assignment-list .eyebrow{font-size:8px;color:var(--purple)}
+.monitor-labs-assignment-list h3{margin:0;font:800 13px Manrope,sans-serif;color:var(--text)}
+.monitor-labs-assignment-list p{margin:0;font-size:9px;line-height:1.5;color:var(--muted)}
+.monitor-labs-assignment-list small{font-size:8px;color:var(--muted)}
+.monitor-labs-assignment-list .text-button{flex:0 0 auto;color:var(--danger);font-size:8px}
+.monitor-labs-document-list{display:grid;gap:8px}
+.monitor-labs-document-list article{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--panel-strong)}
+.monitor-labs-document-icon{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:10px;background:rgba(38,151,119,.1);color:var(--mint)}
+.monitor-labs-document-copy{display:grid;gap:4px;min-width:0;flex:1}
+.monitor-labs-document-copy strong{font-size:10px;color:var(--text);overflow-wrap:anywhere}
+.monitor-labs-document-copy span,.monitor-labs-document-copy small{font-size:8px;line-height:1.4;color:var(--muted)}
+.monitor-labs-document-list article>em{padding:5px 8px;border-radius:20px;background:rgba(38,151,119,.1);color:var(--mint);font-size:8px;font-style:normal}
+.monitor-labs-control-list{display:grid;gap:9px}
+.monitor-labs-control-list article{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--panel-strong)}
+.monitor-labs-control-icon{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:11px;background:var(--surface-2);color:var(--purple)}
+.monitor-labs-control-copy{display:grid;gap:4px;flex:1;min-width:0}
+.monitor-labs-control-copy strong{font-size:10px;color:var(--text)}
+.monitor-labs-control-copy span{font-size:8px;color:var(--muted)}
+.monitor-labs-control-copy input{width:min(100%,430px);padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);font-size:8px}
+.monitor-labs-toggle{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:8px;white-space:nowrap}
+.monitor-labs-toggle input{accent-color:var(--purple)}
+.monitor-labs-review-backdrop{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;padding:18px;background:rgba(12,16,27,.62);backdrop-filter:blur(9px)}
+.monitor-labs-review-dialog{width:min(560px,100%);max-height:min(88vh,800px);display:grid;gap:12px;overflow:auto;padding:18px;border:1px solid var(--border);border-radius:18px;background:var(--panel);box-shadow:0 20px 70px rgba(0,0,0,.3)}
+.monitor-labs-review-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.monitor-labs-review-head .eyebrow{font-size:8px;color:var(--purple)}
+.monitor-labs-review-head h2{margin:4px 0;font:800 18px Manrope,sans-serif;color:var(--text)}
+.monitor-labs-review-head p{margin:0;font-size:9px;color:var(--muted)}
+.monitor-labs-result-preview{display:grid;gap:6px;padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-strong)}
+.monitor-labs-result-preview strong{font-size:9px;color:var(--text)}
+.monitor-labs-result-preview pre{max-height:130px;overflow:auto;margin:0;font:8px/1.5 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.monitor-labs-review-dialog>label{font-size:9px}
+@media(max-width:980px){.monitor-labs-area-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.monitor-labs-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.monitor-labs-hero{align-items:flex-start;flex-wrap:wrap;padding:15px}.monitor-labs-hero-icon{width:43px;height:43px;flex-basis:43px}.monitor-labs-hero-copy{flex:1}.monitor-labs-hero h1{font-size:20px}.monitor-labs-hero>.primary-button{margin-left:58px}.monitor-labs-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.monitor-labs-stat-grid article{padding:10px}.monitor-labs-stat-grid article>strong{font-size:22px}.monitor-labs-area-grid{grid-template-columns:1fr 1fr;gap:7px}.monitor-labs-area-card{padding:10px}.monitor-labs-area-card h3{font-size:12px}.monitor-labs-panel{padding:12px}.monitor-labs-panel-head{align-items:flex-start}.monitor-labs-panel-head h2{font-size:15px}.monitor-labs-assignment-form{grid-template-columns:1fr}.monitor-labs-assignment-form label.wide,.monitor-labs-form-actions{grid-column:auto}.monitor-labs-control-list article{align-items:flex-start;flex-wrap:wrap}.monitor-labs-control-copy{flex-basis:calc(100% - 55px)}.monitor-labs-toggle{margin-left:49px}.monitor-labs-tabs button{padding:8px 9px;font-size:9px}}
+@media(max-width:380px){.monitor-labs-area-grid{grid-template-columns:1fr}.monitor-labs-stat-grid article>span{font-size:8px}}

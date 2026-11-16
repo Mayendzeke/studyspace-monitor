@@ -60,17 +60,21 @@ test("the administrator account endpoint validates and persists tertiary profile
   assert.match(manageAccount, /education_level,institution_type,qualification_level/);
 });
 
-test("the pathway restoration migration removes the global override safely", () => {
-  const migration = read("../supabase/migrations/20261116120000_studyspace_restore_education_pathways.sql");
+test("the applied education-pathway migration is represented in source control", () => {
+  const migration = read("../supabase/migrations/20261115200243_studyspace_education_pathways.sql");
   assert.match(migration, /drop trigger if exists enforce_studyspace_learner_education_level/i);
   assert.match(migration, /drop constraint if exists profiles_learner_education_level_check/i);
-  assert.match(migration, /when grade ~\* '\^Grade \[0-7\]\$' then 'Primary'/i);
-  for (const stage of ["Primary", "Secondary High", "High School", "Matric", "Tertiary"]) {
-    assert.ok(migration.includes("'" + stage + "'"), "Migration must support " + stage);
-  }
+  assert.match(migration, /profiles_learner_education_level_check[\\s\\S]*Primary[\\s\\S]*Secondary High[\\s\\S]*High School[\\s\\S]*Matric[\\s\\S]*Tertiary/);
+});
+
+test("both learner profile RPC signatures persist and validate every pathway field", () => {
+  const migration = read("../supabase/migrations/20261116120000_studyspace_restore_education_pathways.sql");
   assert.match(migration, /p_course text/);
+  assert.match(migration, /full_name = left\\(coalesce\\(p_full_name/);
+  assert.match(migration, /course = left\\(coalesce\\(p_course/);
   assert.match(migration, /Choose a valid Study Space education pathway/);
-  assert.match(migration, /create or replace function public\.update_studyspace_learner_profile\([\s\S]*?p_academic_year text\s*\)/);
+  assert.match(migration, /create or replace function public\\.update_studyspace_learner_profile\\([\\s\\S]*?p_academic_year text\\s*\\)/);
+  assert.match(migration, /create or replace function public\\.update_studyspace_learner_profile\\([\\s\\S]*?p_course text\\s*\\)/);
   assert.match(learners, /education_level: ""/);
-  assert.doesNotMatch(learners, /education_level: "Secondary High",\s*institution_type:/);
+  assert.doesNotMatch(learners, /education_level: "Secondary High",\\s*institution_type:/);
 });

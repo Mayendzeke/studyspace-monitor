@@ -73,7 +73,7 @@ test("both learner profile RPC signatures persist and validate every pathway fie
   assert.match(migration, /full_name = left\(coalesce\(p_full_name/);
   assert.match(migration, /course = left\(coalesce\(p_course/);
   assert.match(migration, /Choose a valid Study Space education pathway/);
-  assert.match(migration, /create or replace function public\.update_studyspace_learner_profile\([\s\S]*?p_academic_year text\s*\)/);
+  assert.match(migration, /create or replace function public\.update_studyspace_learner_profile\([\s\S]*?p_academic_year text,\s*p_course text/);
   assert.match(migration, /create or replace function public\.update_studyspace_learner_profile\([\s\S]*?p_course text\s*\)/);
   assert.match(learners, /education_level: ""/);
   assert.doesNotMatch(learners, /education_level: "Secondary High",\s*institution_type:/);

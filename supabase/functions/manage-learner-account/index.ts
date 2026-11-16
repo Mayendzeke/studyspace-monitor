@@ -32,6 +32,9 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EDUCATION_STAGES = ["Primary", "Secondary High", "High School", "Matric", "Tertiary"];
+const TERTIARY_INSTITUTION_TYPES = ["University", "College", "Technical / TVET", "Other"];
+const TERTIARY_QUALIFICATIONS = ["Certificate", "Higher Certificate", "Diploma", "Advanced Diploma", "Associate Degree", "Bachelor's Degree", "Honours Degree", "Postgraduate Certificate", "Postgraduate Diploma", "Master's Degree", "Doctorate / PhD", "Other"];
 const MAX_STORAGE_PAGE = 1000;
 const MAX_STORAGE_DEPTH = 8;
 
@@ -159,7 +162,7 @@ Deno.serve(async (request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: learner, error: learnerError } = await admin
     .from("profiles")
-    .select("id,role,account_status,student_id,full_name,preferred_name,date_of_birth,subscription_tier,subscription_expires_at")
+    .select("id,role,account_status,student_id,full_name,preferred_name,date_of_birth,subscription_tier,subscription_expires_at,education_level,institution_type,qualification_level,course")
     .eq("id", learnerId)
     .single();
   if (learnerError || !learner || learner.role !== "learner") {
@@ -208,6 +211,8 @@ Deno.serve(async (request) => {
       country: 80,
       institution: 160,
       education_level: 80,
+      institution_type: 60,
+      qualification_level: 80,
       grade: 80,
       curriculum: 120,
       academic_year: 30,
@@ -233,6 +238,35 @@ Deno.serve(async (request) => {
       }
     }
     if (!Object.keys(updates).length) return json(400, { error: "No learner profile changes were provided." });
+
+    const requestedLevel = updates.education_level ?? learner.education_level ?? "Secondary High";
+    const legacyTertiaryType = ["College", "University", "Technical / TVET"].includes(requestedLevel);
+    const resultingLevel = legacyTertiaryType ? "Tertiary" : requestedLevel;
+    if (updates.education_level !== undefined) {
+      if (!EDUCATION_STAGES.includes(resultingLevel)) {
+        return json(400, { error: "Choose Primary, Secondary High, High School, Matric or Tertiary as the education stage." });
+      }
+      updates.education_level = resultingLevel;
+    }
+    const academicProfileTouched = ["education_level", "institution_type", "qualification_level", "course"].some(key => updates[key] !== undefined);
+    if (resultingLevel === "Tertiary" && academicProfileTouched) {
+      const institutionType = updates.institution_type ?? learner.institution_type ?? (legacyTertiaryType ? requestedLevel : "");
+      const qualificationLevel = updates.qualification_level ?? learner.qualification_level ?? "";
+      const course = updates.course ?? learner.course ?? "";
+      if (!TERTIARY_INSTITUTION_TYPES.includes(institutionType)) {
+        return json(400, { error: "Choose a valid tertiary institution type." });
+      }
+      if (!TERTIARY_QUALIFICATIONS.includes(qualificationLevel)) {
+        return json(400, { error: "Choose a valid tertiary qualification level." });
+      }
+      if (!String(course).trim()) return json(400, { error: "Enter the tertiary course or programme." });
+      updates.institution_type = institutionType;
+      updates.qualification_level = qualificationLevel;
+    } else if (resultingLevel !== "Tertiary" && updates.education_level !== undefined) {
+      updates.institution_type = "School";
+      updates.qualification_level = "";
+    }
+
     const nextTier = updates.subscription_tier === undefined ? null : updates.subscription_tier;
     const nextExpiry = updates.subscription_expires_at === undefined ? null : updates.subscription_expires_at;
     if (nextTier && !["Weekly", "2 Weeks", "Monthly"].includes(nextTier)) {
@@ -273,7 +307,7 @@ Deno.serve(async (request) => {
       .update(updates)
       .eq("id", learnerId)
       .eq("role", "learner")
-      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,account_status,updated_at")
+      .select("id,student_id,full_name,preferred_name,country,institution,course,education_level,institution_type,qualification_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,account_status,updated_at")
       .single();
     if (error || !updated) return json(500, { error: "Learner profile could not be saved." });
 

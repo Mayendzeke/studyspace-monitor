@@ -243,7 +243,7 @@ Deno.serve(async (request) => {
     const legacyTertiaryType = ["College", "University", "Technical / TVET"].includes(requestedLevel);
     const resultingLevel = legacyTertiaryType ? "Tertiary" : requestedLevel;
     if (updates.education_level !== undefined) {
-      if (!EDUCATION_STAGES.includes(resultingLevel)) {
+      if (!EDUCATION_STAGES.includes(resultingLevel as typeof EDUCATION_STAGES[number])) {
         return json(400, { error: "Choose Primary, Secondary High, High School, Matric or Tertiary as the education stage." });
       }
       updates.education_level = resultingLevel;

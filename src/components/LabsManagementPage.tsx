@@ -75,7 +75,7 @@ export default function LabsManagementPage(){
     if(!supabase){setError("StudySpace database is not connected.");setLoading(false);return;}
     setRefreshing(true);setError("");
     try{
-      const [learnerResult,workResult,assignmentResult,documentResult,controlResult]=await Promise.all([
+      const [learnerResult,workResult,assignmentResult,documentResult,practiceResult,controlResult]=await Promise.all([
         supabase.from("profiles").select("id,full_name,preferred_name,account_status,role").eq("role","learner").order("created_at",{ascending:false}).limit(1000),
         supabase.from("student_lab_work").select("*").order("updated_at",{ascending:false}).limit(500),
         supabase.from("lab_assignments").select("*").order("created_at",{ascending:false}).limit(500),

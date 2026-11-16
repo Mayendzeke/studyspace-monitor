@@ -6,6 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
+import { EDUCATION_STAGES, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, isTertiaryStage } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -20,6 +21,8 @@ type Learner = {
   institution: string;
   course: string;
   education_level: string;
+  institution_type: string;
+  qualification_level: string;
   grade: string;
   curriculum: string;
   academic_year: string;
@@ -33,7 +36,7 @@ type Learner = {
 type ProfileForm = Pick<
   Learner,
   "full_name" | "preferred_name" | "country" | "institution" | "course" |
-  "education_level" | "grade" | "curriculum" | "academic_year"
+  "education_level" | "institution_type" | "qualification_level" | "grade" | "curriculum" | "academic_year"
 > & { subscription_tier: string; subscription_expires_at: string };
 
 type GuardianRecord = {
@@ -72,6 +75,8 @@ const emptyForm: ProfileForm = {
   institution: "",
   course: "",
   education_level: "Secondary High",
+  institution_type: SCHOOL_INSTITUTION_TYPE,
+  qualification_level: "",
   grade: "",
   curriculum: "",
   academic_year: "",
@@ -177,7 +182,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     }
     setLoading(true);
     const { data, error: queryError } = await supabase.from("profiles")
-      .select("id,student_id,full_name,preferred_name,account_status,date_of_birth,created_at,updated_at,country,institution,course,education_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
+      .select("id,student_id,full_name,preferred_name,account_status,date_of_birth,created_at,updated_at,country,institution,course,education_level,institution_type,qualification_level,grade,curriculum,academic_year,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,trial_reminder_shown_at")
       .eq("role", "learner")
       .order("created_at", { ascending: false });
 
@@ -253,6 +258,8 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   }
 
   function openEdit(learner: Learner) {
+    const legacyTertiaryType = ["College", "University", "Technical / TVET"].includes(learner.education_level || "");
+    const restoredLevel = legacyTertiaryType ? "Tertiary" : learner.education_level;
     setEditTarget(learner);
     setPaymentConfirmed(false);
     setPaymentTransactionReference("");
@@ -264,7 +271,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       country: learner.country || "",
       institution: learner.institution || "",
       course: learner.course || "",
-      education_level: "Secondary High",
+      education_level: EDUCATION_STAGES.includes(restoredLevel as typeof EDUCATION_STAGES[number]) ? restoredLevel : "Secondary High",
+      institution_type: learner.institution_type || (legacyTertiaryType ? learner.education_level : SCHOOL_INSTITUTION_TYPE),
+      qualification_level: learner.qualification_level || "",
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",
       academic_year: learner.academic_year || "",
@@ -299,12 +308,26 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !editTarget || savingProfile) return;
+    if (!EDUCATION_STAGES.includes(profileForm.education_level as typeof EDUCATION_STAGES[number])) {
+      setError("Choose a valid education stage.");
+      return;
+    }
+    if (isTertiaryStage(profileForm.education_level) && (!profileForm.institution_type || !profileForm.qualification_level || !profileForm.course.trim())) {
+      setError("For higher education, choose the institution type and qualification, and enter the course or programme.");
+      return;
+    }
     setSavingProfile(true);
     setError("");
     setNotice("");
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("manage-learner-account", {
-        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: { ...profileForm, education_level: "Secondary High", subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : "" } },
+        body: { learnerId: editTarget.id, action: "update_profile", paymentConfirmed, paymentTransactionReference: paymentTransactionReference.trim(), profile: {
+          ...profileForm,
+          education_level: profileForm.education_level,
+          institution_type: isTertiaryStage(profileForm.education_level) ? profileForm.institution_type : SCHOOL_INSTITUTION_TYPE,
+          qualification_level: isTertiaryStage(profileForm.education_level) ? profileForm.qualification_level : "",
+          subscription_expires_at: profileForm.subscription_expires_at ? new Date(profileForm.subscription_expires_at).toISOString() : ""
+        } },
       });
       if (invokeError) throw new Error(await functionError(invokeError, "The learner profile could not be saved."));
       if (!data?.success) throw new Error(data?.error || "The learner profile could not be saved.");
@@ -376,11 +399,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   function exportCsv() {
     const headings = [
       "Student ID", "Full name", "Preferred name", "School / institution", "Country",
-      "Education level", "Course / programme", "Grade / year", "Curriculum", "Academic year", "Account status", "Joined",
+      "Education level", "Institution type", "Qualification", "Course / programme", "Grade / year", "Curriculum", "Academic year", "Account status", "Joined",
     ];
     const rows = learners.map(item => [
       item.student_id, item.full_name, item.preferred_name, item.institution, item.country,
-      item.education_level, item.course, item.grade, item.curriculum, item.academic_year,
+      item.education_level, item.institution_type, item.qualification_level, item.course, item.grade, item.curriculum, item.academic_year,
       item.account_status, item.created_at,
     ]);
     const csv = [headings, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");
@@ -512,6 +535,10 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <div><span>Curriculum</span><strong>{viewTarget.curriculum || "Not set"}</strong></div>
               <div><span>Academic year</span><strong>{viewTarget.academic_year || "Not set"}</strong></div>
               <div><span>Education level</span><strong>{viewTarget.education_level || "Not set"}</strong></div>
+              {isTertiaryStage(viewTarget.education_level) && <>
+                <div><span>Institution type</span><strong>{viewTarget.institution_type || "Not set"}</strong></div>
+                <div><span>Qualification</span><strong>{viewTarget.qualification_level || "Not set"}</strong></div>
+              </>}
             </div>
             <section className="learner-view-subjects">
               <strong>Registered subjects</strong>
@@ -560,9 +587,18 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 <label>Preferred name<input maxLength={80} value={profileForm.preferred_name} onChange={event => setProfileForm(current => ({ ...current, preferred_name: event.target.value }))}/></label>
                 <label>School / institution<input maxLength={160} value={profileForm.institution} onChange={event => setProfileForm(current => ({ ...current, institution: event.target.value }))} placeholder="School or institution name"/></label>
                 <label>Country<input maxLength={80} value={profileForm.country} onChange={event => setProfileForm(current => ({ ...current, country: event.target.value }))}/></label>
-                <label>Education level<select value="Secondary High" disabled aria-label="Education level"><option>Secondary High</option></select></label>
-                <label>Form / grade<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder="e.g. Form 1, Form 5 or Lower Sixth"/></label>
-                {/university|college|tertiary/i.test(profileForm.education_level) && <label>Course / programme<input maxLength={160} value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, BSc Nursing, Diploma in IT"/></label>}
+                <label>Education level<select required value={profileForm.education_level} onChange={event => setProfileForm(current => ({
+                  ...current,
+                  education_level: event.target.value,
+                  institution_type: event.target.value === "Tertiary" ? (current.institution_type === SCHOOL_INSTITUTION_TYPE ? "" : current.institution_type) : SCHOOL_INSTITUTION_TYPE,
+                  qualification_level: event.target.value === "Tertiary" ? current.qualification_level : ""
+                }))}><option value="">Choose education stage</option>{EDUCATION_STAGES.map(stage => <option key={stage} value={stage}>{stage}</option>)}</select></label>
+                <label>{profileForm.education_level === "Primary" ? "Grade" : isTertiaryStage(profileForm.education_level) ? "Year / semester" : "Form / grade"}<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={profileForm.education_level === "Primary" ? "e.g. Grade 4" : profileForm.education_level === "Tertiary" ? "e.g. Year 1 or Semester 2" : profileForm.education_level === "Matric" ? "e.g. Form 6 or A-Level" : profileForm.education_level === "High School" ? "e.g. Form 4 or Form 5" : "e.g. Form 1, Form 2 or Form 3"}/></label>
+                {isTertiaryStage(profileForm.education_level) && <>
+                  <label>Institution type<select required value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{TERTIARY_INSTITUTION_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></label>
+                  <label>Qualification level<select required value={profileForm.qualification_level} onChange={event => setProfileForm(current => ({ ...current, qualification_level: event.target.value }))}><option value="">Choose qualification</option>{TERTIARY_QUALIFICATIONS.map(qualification => <option key={qualification} value={qualification}>{qualification}</option>)}</select></label>
+                  <label>Course / programme<input maxLength={160} required value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, Diploma in IT or BSc Nursing"/></label>
+                </>}
                 <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>
                 <label>Subscription tier<select value={profileForm.subscription_tier} onChange={event => { const tier = event.target.value; const plan = SUBSCRIPTION_PLANS.find(option => option.value === tier); setProfileForm(current => ({ ...current, subscription_tier: tier, subscription_expires_at: plan ? expiryFromNow(plan.days) : "" })); }}><option value="">No subscription / no expiry</option>{SUBSCRIPTION_PLANS.map(plan => <option key={plan.value} value={plan.value}>{plan.label}</option>)}</select></label>

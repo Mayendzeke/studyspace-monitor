@@ -121,14 +121,14 @@ create or replace function public.set_studyspace_labs_updated_at()
 returns trigger
 language plpgsql
 set search_path = public
-as $
+as $$
 begin
   new.updated_at := now();
   return new;
 end;
-$;
+$$;
 
-do $
+do $$
 declare table_name text;
 begin
   foreach table_name in array array['student_lab_work','lab_assignments','lab_controls','student_document_work']
@@ -139,7 +139,7 @@ begin
       'touch_' || table_name || '_updated_at', table_name
     );
   end loop;
-end $;
+end $$;
 
 -- Enable Supabase Realtime for live student/monitor collaboration when the
 -- standard publication is present. Existing memberships are left untouched.

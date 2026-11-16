@@ -16,7 +16,16 @@ type Learner = {id:string;full_name:string;preferred_name:string;account_status:
 type Assignment = {id:string;learner_id:string;lab_area:Area;activity_key:string;title:string;instructions:string;due_at:string|null;required:boolean;status:string;created_at:string};
 type DocumentWork = {learner_id:string;resource_key:string;document_name:string;page_count:number;annotations:any[];form_values:Record<string,string>;submitted:boolean;submitted_at:string|null;updated_at:string};
 type Control = {lab_area:Area;enabled:boolean;student_message:string};
-type Tab = "Overview"|"Live work"|"Assignments"|"Submissions"|"Controls";
+type PracticeResultItem = {questionId?:string;prompt?:string;given?:string;correctAnswer?:string;correct?:boolean;explanation?:string;points?:number;earnedPoints?:number};
+type PracticeAttempt = {
+  id:string;learner_id:string;subject_name:string;topic:string;
+  material_snapshot:Record<string,any>;responses:Record<string,string>;
+  result:{items?:PracticeResultItem[];[key:string]:any};
+  score:number|null;max_score:number|null;percentage:number|null;
+  duration_seconds:number;mode:string;status:string;attempt_number:number;
+  retake_mode:string;created_at:string;submitted_at:string|null;
+};
+type Tab = "Overview"|"Live work"|"Assignments"|"Submissions"|"Practice results"|"Controls";
 const areas: {key:Area;label:string;icon:typeof FlaskConical;color:string}[]=[
   {key:"maths",label:"Mathematics",icon:Activity,color:"#7164d8"},
   {key:"physics",label:"Physics",icon:Atom,color:"#3f87be"},
@@ -33,6 +42,7 @@ export default function LabsManagementPage(){
   const [work,setWork]=useState<LabWork[]>([]);
   const [assignments,setAssignments]=useState<Assignment[]>([]);
   const [documents,setDocuments]=useState<DocumentWork[]>([]);
+  const [practiceAttempts,setPracticeAttempts]=useState<PracticeAttempt[]>([]);
   const [controls,setControls]=useState<Control[]>(defaultControls);
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
@@ -65,19 +75,21 @@ export default function LabsManagementPage(){
     if(!supabase){setError("StudySpace database is not connected.");setLoading(false);return;}
     setRefreshing(true);setError("");
     try{
-      const [learnerResult,workResult,assignmentResult,documentResult,controlResult]=await Promise.all([
+      const [learnerResult,workResult,assignmentResult,documentResult,practiceResult,controlResult]=await Promise.all([
         supabase.from("profiles").select("id,full_name,preferred_name,account_status,role").eq("role","learner").order("created_at",{ascending:false}).limit(1000),
         supabase.from("student_lab_work").select("*").order("updated_at",{ascending:false}).limit(500),
         supabase.from("lab_assignments").select("*").order("created_at",{ascending:false}).limit(500),
         supabase.from("student_document_work").select("*").eq("submitted",true).order("submitted_at",{ascending:false}).limit(300),
+        supabase.from("lab_practice_attempts").select("id,learner_id,subject_name,topic,material_snapshot,responses,result,score,max_score,percentage,duration_seconds,mode,status,attempt_number,retake_mode,created_at,submitted_at").eq("status","submitted").order("submitted_at",{ascending:false}).limit(500),
         supabase.from("lab_controls").select("lab_area,enabled,student_message"),
       ]);
-      const firstError=learnerResult.error||workResult.error||assignmentResult.error||documentResult.error||controlResult.error;
+      const firstError=learnerResult.error||workResult.error||assignmentResult.error||documentResult.error||practiceResult.error||controlResult.error;
       if(firstError) throw firstError;
       setLearners((learnerResult.data||[]) as Learner[]);
       setWork((workResult.data||[]) as LabWork[]);
       setAssignments((assignmentResult.data||[]) as Assignment[]);
       setDocuments((documentResult.data||[]) as DocumentWork[]);
+      setPracticeAttempts((practiceResult.data||[]) as PracticeAttempt[]);
       const incoming=(controlResult.data||[]) as Control[];
       setControls(defaultControls.map(item=>incoming.find(row=>row.lab_area===item.lab_area)||item));
     }catch(reason){
@@ -93,6 +105,7 @@ export default function LabsManagementPage(){
       .on("postgres_changes",{event:"*",schema:"public",table:"student_lab_work"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"lab_assignments"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"student_document_work"},()=>void refresh())
+      .on("postgres_changes",{event:"*",schema:"public",table:"lab_practice_attempts"},()=>void refresh())
       .on("postgres_changes",{event:"*",schema:"public",table:"lab_controls"},()=>void refresh())
       .subscribe();
     return ()=>{void client.removeChannel(channel);};
@@ -170,7 +183,7 @@ export default function LabsManagementPage(){
     </header>
 
     <nav className="monitor-labs-tabs" aria-label="Labs sections">
-      {(["Overview","Live work","Assignments","Submissions","Controls"] as Tab[]).map(item=><button type="button" key={item} className={tab===item?"active":""} onClick={()=>setTab(item)}>{item==="Overview"?<Activity size={15}/>:item==="Live work"?<Users size={15}/>:item==="Assignments"?<ClipboardCheck size={15}/>:item==="Submissions"?<FileCheck2 size={15}/>:<SlidersHorizontal size={15}/>}<span>{item}</span></button>)}
+      {(["Overview","Live work","Assignments","Submissions","Practice results","Controls"] as Tab[]).map(item=><button type="button" key={item} className={tab===item?"active":""} onClick={()=>setTab(item)}>{item==="Overview"?<Activity size={15}/>:item==="Live work"?<Users size={15}/>:item==="Assignments"?<ClipboardCheck size={15}/>:item==="Submissions"?<FileCheck2 size={15}/>:item==="Practice results"?<Activity size={15}/>:<SlidersHorizontal size={15}/>}<span>{item}</span>{item==="Practice results"&&practiceAttempts.length>0&&<i>{practiceAttempts.length}</i>}</button>)}
     </nav>
 
     {error&&<div className="monitor-labs-alert is-error" role="alert"><ShieldAlert size={16}/>{error}</div>}
@@ -182,6 +195,7 @@ export default function LabsManagementPage(){
         <article><span>Active in the last 15 minutes</span><strong>{loading?"—":recentActive}</strong><small><Activity size={13}/> live work sessions</small></article>
         <article><span>Waiting for review</span><strong>{loading?"—":pendingWork}</strong><small><ClipboardCheck size={13}/> submitted investigations</small></article>
         <article><span>Document submissions</span><strong>{loading?"—":submittedDocs}</strong><small><FileCheck2 size={13}/> completed papers shared with you</small></article>
+        <article><span>Personal practice attempts</span><strong>{loading?"—":practiceAttempts.length}</strong><small><Activity size={13}/> formative learner practice</small></article>
       </div>
       <div className="monitor-labs-area-grid">{areas.map(item=>{const Icon=item.icon;const areaWork=work.filter(row=>row.lab_area===item.key);const control=controls.find(row=>row.lab_area===item.key);return <article key={item.key} className="monitor-labs-area-card"><div className="monitor-labs-area-top"><span style={{color:item.color}}><Icon size={20}/></span><em className={control?.enabled===false?"is-paused":"is-enabled"}>{control?.enabled===false?"Paused":"Available"}</em></div><h3>{item.label} Lab</h3><strong>{areaWork.length} work record(s)</strong><p>{areaWork.filter(row=>row.status==="submitted"&&!row.reviewed_at).length} awaiting teacher review</p><button type="button" onClick={()=>{setAreaFilter(item.key);setTab("Live work");}}>Open activity <span>→</span></button></article>})}</div>
       <section className="monitor-labs-panel"><div className="monitor-labs-panel-head"><div><span className="eyebrow">RECENT ACTIVITY</span><h2>Latest learner work</h2></div><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={refreshing}><RefreshCw size={14}/> Refresh</button></div><WorkTable rows={work.slice(0,8)} learnerById={learnerById} onReview={row=>{setReviewing(row);setReviewScore(row.score==null?"":String(row.score));setReviewFeedback(row.feedback||"");}}/></section>
@@ -200,6 +214,23 @@ export default function LabsManagementPage(){
 
     {tab==="Submissions"&&<section className="monitor-labs-panel"><div className="monitor-labs-panel-head"><div><span className="eyebrow">LEARNER-SHARED WORK</span><h2>Document submissions</h2><p>Only papers students have explicitly submitted are visible here. Personal drafts remain private.</p></div></div>
       <div className="monitor-labs-document-list">{documents.map(item=><article key={item.learner_id+item.resource_key}><div className="monitor-labs-document-icon"><FileCheck2 size={18}/></div><div className="monitor-labs-document-copy"><strong>{item.document_name||"Completed document"}</strong><span>{displayName(learnerById.get(item.learner_id))} · {item.page_count} page(s) · {item.annotations?.length||0} annotation(s) · {Object.keys(item.form_values||{}).length} filled field(s)</span><small>Submitted {when(item.submitted_at||item.updated_at)}</small></div><em>Submitted</em></article>)}{!documents.length&&<div className="monitor-labs-empty"><FileCheck2 size={22}/><strong>No papers submitted yet.</strong><p>Student PDF work appears here only after a learner presses Submit paper to teacher.</p></div>}</div>
+    </section>}
+
+    {tab==="Practice results"&&<section className="monitor-labs-panel"><div className="monitor-labs-panel-head"><div><span className="eyebrow">FORMATIVE LEARNING ANALYTICS</span><h2>Student practice results</h2><p>Review self-marked Lab practice, misconceptions and explanations. These are learning signals, not official school assessment marks.</p></div><button type="button" className="secondary-button" onClick={()=>void refresh()} disabled={refreshing}><RefreshCw size={14}/> Refresh</button></div>
+      <div className="monitor-labs-filters"><label><Search size={15}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search learner, subject or topic…"/></label></div>
+      <div className="monitor-labs-practice-list">{practiceAttempts.filter(item=>{
+        const learner=learnerById.get(item.learner_id);
+        const needle=search.trim().toLowerCase();
+        return !needle||[displayName(learner),learner?.full_name||"",item.subject_name,item.topic].some(value=>value.toLowerCase().includes(needle));
+      }).map(item=>{
+        const learner=learnerById.get(item.learner_id);
+        const results=Array.isArray(item.result?.items)?item.result.items:[];
+        return <article className="monitor-labs-practice-card" key={item.id}>
+          <header><div><span className="eyebrow">PERSONAL PRACTICE · {item.mode.toUpperCase()}</span><h3>{item.topic}</h3><p>{displayName(learner)} · {item.subject_name} · {when(item.submitted_at||item.created_at)}</p></div><strong>{item.percentage??0}%</strong></header>
+          <div className="monitor-labs-practice-meta"><span>{item.score??0} / {item.max_score??0} marks</span><span>{Math.round(item.duration_seconds/60)} min</span><span>Attempt {item.attempt_number}</span><span>{results.filter(row=>row.correct).length} / {results.length} correct</span></div>
+          <details><summary>Review answers and explanations ({results.length})</summary><div className="monitor-labs-practice-answers">{results.map((row,index)=><article key={row.questionId||index}><span>Question {index+1} · {row.correct?"Correct":"Needs review"}</span><strong>{row.prompt||"Question"}</strong><p><b>Student answer:</b> {row.given||"Not answered"}</p><p><b>Expected answer:</b> {row.correctAnswer||"—"}</p><small>{row.explanation||"No explanation was saved for this question."}</small></article>)}</div></details>
+        </article>;
+      })}{!practiceAttempts.length&&<div className="monitor-labs-empty"><Activity size={22}/><strong>No personal practice attempts yet.</strong><p>Completed learner practice from the shared Labs hub will appear here after the learner submits an attempt.</p></div>}</div>
     </section>}
 
     {tab==="Controls"&&<section className="monitor-labs-panel"><div className="monitor-labs-panel-head"><div><span className="eyebrow">PLATFORM CONTROLS</span><h2>Lab availability</h2><p>Pause a subject while maintaining its saved student work and records.</p></div></div>

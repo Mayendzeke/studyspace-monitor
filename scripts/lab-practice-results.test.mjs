@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const monitor = readFileSync("src/components/LabsManagementPage.tsx", "utf8");
 const migration = readFileSync("supabase/migrations/20261116094000_lab_practice_attempts_admin_read.sql", "utf8");
+const realtime = readFileSync("supabase/migrations/20261116094100_lab_practice_attempts_monitor_realtime.sql", "utf8");
 const styles = readFileSync("src/styles.css", "utf8");
 
 test("Monitor reads only submitted Lab practice attempts through a dedicated results view", () => {
@@ -21,6 +22,8 @@ test("Practice results access is read-only and requires administrator MFA", () =
   assert.ok(migration.includes("public.is_studyspace_admin()"));
   assert.ok(migration.includes("= 'aal2'"));
   assert.doesNotMatch(migration, /for\s+(insert|update|delete|all)/i);
+  assert.ok(realtime.includes("pg_publication_tables"));
+  assert.ok(realtime.includes("alter publication supabase_realtime add table public.lab_practice_attempts"));
 });
 
 test("Practice results are clearly separated from official school marks", () => {

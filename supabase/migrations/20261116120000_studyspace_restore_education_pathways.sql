@@ -1,34 +1,8 @@
--- Restore the five supported learner pathways.
--- The 20261115180750 migration incorrectly forced every learner into
--- Secondary High, destroying the ability to save Primary, High School,
--- Matric and Tertiary profiles. This migration removes that global override.
+-- Repair both profile RPC signatures so every learner field is saved consistently.
 
 begin;
 
-drop trigger if exists enforce_studyspace_learner_education_level on public.profiles;
-drop function if exists public.enforce_studyspace_learner_education_level();
-
--- Preserve the five valid learner stages established by the later
--- studyspace_education_pathways migration. Reassert the constraint without
--- rewriting learner records or defaulting their stage.
-drop trigger if exists enforce_studyspace_learner_education_level on public.profiles;
-drop function if exists public.enforce_studyspace_learner_education_level();
-
-alter table public.profiles
-  drop constraint if exists profiles_learner_education_level_check;
-
-alter table public.profiles
-  add constraint profiles_learner_education_level_check
-  check (
-    role <> 'learner'
-    or education_level = any (array[
-      'Primary',
-      'Secondary High',
-      'High School',
-      'Matric',
-      'Tertiary'
-    ]::text[])
-  );
+-- The five-stage constraint is restored in migration 20261115200243.
 
 -- Validate the exact pathway values used by both frontends at the profile RPC.
 create or replace function public.update_studyspace_learner_profile(

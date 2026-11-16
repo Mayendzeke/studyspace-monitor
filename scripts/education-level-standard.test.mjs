@@ -59,3 +59,18 @@ test("the administrator account endpoint validates and persists tertiary profile
   assert.match(manageAccount, /TERTIARY_QUALIFICATIONS\.includes/);
   assert.match(manageAccount, /education_level,institution_type,qualification_level/);
 });
+
+test("the pathway restoration migration removes the global override safely", () => {
+  const migration = read("../supabase/migrations/20261116120000_studyspace_restore_education_pathways.sql");
+  assert.match(migration, /drop trigger if exists enforce_studyspace_learner_education_level/i);
+  assert.match(migration, /drop constraint if exists profiles_learner_education_level_check/i);
+  assert.match(migration, /when grade ~\* '\^Grade \[0-7\]\$' then 'Primary'/i);
+  for (const stage of ["Primary", "Secondary High", "High School", "Matric", "Tertiary"]) {
+    assert.ok(migration.includes("'" + stage + "'"), "Migration must support " + stage);
+  }
+  assert.match(migration, /p_course text/);
+  assert.match(migration, /Choose a valid Study Space education pathway/);
+  assert.match(migration, /create or replace function public\.update_studyspace_learner_profile\([\s\S]*?p_academic_year text\s*\)/);
+  assert.match(learners, /education_level: ""/);
+  assert.doesNotMatch(learners, /education_level: "Secondary High",\s*institution_type:/);
+});

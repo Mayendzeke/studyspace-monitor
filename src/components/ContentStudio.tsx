@@ -215,7 +215,15 @@ export default function ContentStudio() {
         catch{/* Preserve an offline-only draft when the network or schema is unavailable. */}
       }
       if(loaded.length||!readDrafts().length) setDrafts(loaded);
-      const activeLearners=(learnersResult.data||[]) as typeof learners;
+      const activeLearners=(learnersResult.data||[]).map((item:any)=>{
+        const legacyTertiaryType=["College","University","Technical / TVET"].includes(String(item.education_level||""));
+        return {
+          ...item,
+          education_level:legacyTertiaryType?"Tertiary":String(item.education_level||"Secondary High"),
+          institution_type:item.institution_type|| (legacyTertiaryType?String(item.education_level):""),
+          qualification_level:item.qualification_level||"",
+        };
+      }) as typeof learners;
       setLearners(activeLearners);
       const subjectRows=(subjectsResult.data||[]).map((row:any)=>({learner_id:String(row.learner_id),name:String(row.name||'').trim()})).filter((row:any)=>row.name);
       setRegisteredSubjectRows(subjectRows);
@@ -274,10 +282,19 @@ export default function ContentStudio() {
   const learnerLevels=EDUCATION_STAGES;
   const levelLearners=learners.filter(item=>!level||item.education_level===level);
   const isTertiaryLevel=isTertiaryStage(level);
-  const learnerCourses=Array.from(new Set(levelLearners.map(item=>item.course?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
-  // Course filters are learner-derived; when no tertiary course is on file, year selection remains available.
-  const gradeLearners=levelLearners.filter(item=>!courseFilter||item.course?.trim()===courseFilter);
-  const learnerGrades=Array.from(new Set(gradeLearners.map(item=>item.grade?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
+  const tertiaryLearners=isTertiaryLevel ? levelLearners.filter(item=>
+    (!institutionTypeFilter||item.institution_type===institutionTypeFilter) &&
+    (!qualificationFilter||item.qualification_level===qualificationFilter)
+  ) : levelLearners;
+  const learnerCourses=Array.from(new Set(tertiaryLearners.map(item=>item.course?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
+  // Filters stay scoped to active learners already registered at this education stage.
+  const gradeLearners=tertiaryLearners.filter(item=>!courseFilter||item.course?.trim()===courseFilter);
+  const registeredGradeValues=Array.from(new Set(gradeLearners.map(item=>item.grade?.trim()).filter((value):value is string=>!!value)));
+  const standardGrades=gradeOptionsFor(level);
+  const learnerGrades=[
+    ...standardGrades.filter(item=>registeredGradeValues.includes(item)),
+    ...registeredGradeValues.filter(item=>!standardGrades.includes(item)).sort((a,b)=>a.localeCompare(b))
+  ];
   const scopedLearners=gradeLearners.filter(item=>!grade||item.grade===grade);
   const assignmentAudience=level?scopedLearners:learners;
   const learnerCurricula=Array.from(new Set(scopedLearners.map(item=>item.curriculum?.trim()).filter((value):value is string=>!!value))).sort((a,b)=>a.localeCompare(b));
@@ -290,7 +307,7 @@ export default function ContentStudio() {
   }).sort((a,b)=>resourceSort==='name'?a.name.localeCompare(b.name):resourceSort==='oldest'?a.savedAt.localeCompare(b.savedAt):b.savedAt.localeCompare(a.savedAt))
 
   const resetBuilder=()=>{
-    setActiveId(null);setTitle('');setSubject('');setLevel('');setGrade('');setCourseFilter('');setCurriculum('')
+    setActiveId(null);setTitle('');setSubject('');setLevel('');setGrade('');setCourseFilter('');setInstitutionTypeFilter('');setQualificationFilter('');setCurriculum('')
     setInstructions('Read each question carefully and answer all questions.');setDuration(30);setDueDate('')
     setQuestions([newQuestion()]);setEditing(0);setPreview(false)
   }
@@ -569,12 +586,16 @@ export default function ContentStudio() {
         <div className="panel-heading"><div><h2>Assessment details</h2><p>Define the class and assessment settings</p></div><span className="studio-draft-count">{drafts.length} assessments</span></div>
         <div className="studio-form-grid">
           <label className="studio-field studio-field-wide">Assessment title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Algebra: Linear equations test"/></label>
-          <label className="studio-field">1. Education level<select value={level} onChange={e=>{setLevel(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">Choose level from registered learners</option>{learnerLevels.map(item=><option key={item}>{item}</option>)}</select></label>
+          <label className="studio-field">1. Education level<select value={level} onChange={e=>{setLevel(e.target.value);setCourseFilter('');setInstitutionTypeFilter('');setQualificationFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">Choose level from registered learners</option>{learnerLevels.map(item=><option key={item}>{item}</option>)}</select></label>
+          {isTertiaryLevel&&<>
+            <label className="studio-field">2. Institution type<select value={institutionTypeFilter} onChange={e=>{setInstitutionTypeFilter(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">All institution types</option>{TERTIARY_INSTITUTION_TYPES.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+            <label className="studio-field">3. Qualification level<select value={qualificationFilter} onChange={e=>{setQualificationFilter(e.target.value);setCourseFilter('');setGrade('');setSubject('');setSubjectCustom(false);setSelectedLearner('')}}><option value="">All qualifications</option>{TERTIARY_QUALIFICATIONS.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+          </>}
           {isTertiaryLevel&&(learnerCourses.length>0
-            ? <label className="studio-field">2. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setGrade('');setSubject('');setSelectedLearner('')}}><option value="">All courses / programmes</option>{learnerCourses.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+            ? <label className="studio-field">4. Course / programme<select value={courseFilter} onChange={e=>{setCourseFilter(e.target.value);setGrade('');setSubject('');setSelectedLearner('')}}><option value="">All courses / programmes</option>{learnerCourses.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
             : <p className="builder-hint">No course or programme is recorded for active {level.toLowerCase()} learners yet. Their registered year of study is still available below.</p>)}
-          <label className="studio-field">{isTertiaryLevel?'3. ':'2. '}{gradeFieldLabel}<select value={grade} onChange={e=>{setGrade(e.target.value);setSubject('');setSubjectCustom(false);setSelectedLearner('')}} disabled={!level}><option value="">All grades / years</option>{learnerGrades.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
-          <label className="studio-field">{isTertiaryLevel ? "4." : "3."} Subject / module<select value={subjectCustom|| (subject&&!builderSubjectOptions.includes(subject))?'__other__':subject}
+          <label className="studio-field">{isTertiaryLevel?'5. ':'2. '}{gradeFieldLabel}<select value={grade} onChange={e=>{setGrade(e.target.value);setSubject('');setSubjectCustom(false);setSelectedLearner('')}} disabled={!level}><option value="">All grades / years</option>{learnerGrades.map(item=><option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="studio-field">{isTertiaryLevel ? "6." : "3."} Subject / module<select value={subjectCustom|| (subject&&!builderSubjectOptions.includes(subject))?'__other__':subject}
               onChange={e=>{const value=e.target.value;if(value==='__other__'){setSubjectCustom(true);setSubject('')}else{setSubjectCustom(false);setSubject(value)}}} disabled={!level}>
               <option value="">Choose from this level and grade</option>
               {builderSubjectOptions.map(name=><option key={name} value={name}>{name}</option>)}

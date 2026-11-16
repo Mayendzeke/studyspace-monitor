@@ -74,7 +74,7 @@ const emptyForm: ProfileForm = {
   country: "",
   institution: "",
   course: "",
-  education_level: "Secondary High",
+  education_level: "",
   institution_type: SCHOOL_INSTITUTION_TYPE,
   qualification_level: "",
   grade: "",

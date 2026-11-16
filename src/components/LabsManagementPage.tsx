@@ -12,7 +12,7 @@ type LabWork = {
   last_accessed_at: string; updated_at: string; reviewed_at?: string|null;
   reviewed_by?: string|null; score?: number|null; feedback?: string;
 };
-type Learner = {id:string;full_name:string;preferred_name:string;account_status:string;role:string};
+type Learner = {id:string;full_name:string;preferred_name:string;account_status:string;role:string;institution:string;education_level:string;grade:string};
 type Assignment = {id:string;learner_id:string;lab_area:Area;activity_key:string;title:string;instructions:string;due_at:string|null;required:boolean;status:string;created_at:string};
 type DocumentWork = {learner_id:string;resource_key:string;document_name:string;page_count:number;annotations:any[];form_values:Record<string,string>;submitted:boolean;submitted_at:string|null;updated_at:string};
 type Control = {lab_area:Area;enabled:boolean;student_message:string};
@@ -53,6 +53,10 @@ export default function LabsManagementPage(){
   const [statusFilter,setStatusFilter]=useState("all");
   const [assignOpen,setAssignOpen]=useState(false);
   const [learnerId,setLearnerId]=useState("");
+  const [assignTargetMode,setAssignTargetMode]=useState<"individual"|"class">("individual");
+  const [assignInstitution,setAssignInstitution]=useState("");
+  const [assignEducationLevel,setAssignEducationLevel]=useState("Secondary High");
+  const [assignGrade,setAssignGrade]=useState("");
   const [assignArea,setAssignArea]=useState<Area>("physics");
   const [assignTitle,setAssignTitle]=useState("");
   const [assignInstructions,setAssignInstructions]=useState("");
@@ -70,13 +74,16 @@ export default function LabsManagementPage(){
   const pendingWork=useMemo(()=>work.filter(item=>item.status==="submitted"&&!item.reviewed_at).length,[work]);
   const recentActive=useMemo(()=>work.filter(item=>Date.now()-Date.parse(item.last_accessed_at||item.updated_at)<15*60*1000&&item.status==="in_progress").length,[work]);
   const submittedDocs=useMemo(()=>documents.filter(item=>item.submitted).length,[documents]);
+  const classInstitutions=useMemo(()=>[...new Set(learners.filter(item=>item.account_status==="active"&&item.institution?.trim()).map(item=>item.institution.trim()))].sort(),[learners]);
+  const classGrades=useMemo(()=>[...new Set(learners.filter(item=>item.account_status==="active"&&item.institution===assignInstitution&&item.education_level===assignEducationLevel&&item.grade?.trim()).map(item=>item.grade.trim()))].sort(),[learners,assignInstitution,assignEducationLevel]);
+  const classTargetCount=useMemo(()=>learners.filter(item=>item.account_status==="active"&&item.institution===assignInstitution&&item.education_level===assignEducationLevel&&item.grade===assignGrade).length,[learners,assignInstitution,assignEducationLevel,assignGrade]);
 
   const refresh=useCallback(async()=>{
     if(!supabase){setError("StudySpace database is not connected.");setLoading(false);return;}
     setRefreshing(true);setError("");
     try{
       const [learnerResult,workResult,assignmentResult,documentResult,practiceResult,controlResult]=await Promise.all([
-        supabase.from("profiles").select("id,full_name,preferred_name,account_status,role").eq("role","learner").order("created_at",{ascending:false}).limit(1000),
+        supabase.from("profiles").select("id,full_name,preferred_name,account_status,role,institution,education_level,grade").eq("role","learner").order("created_at",{ascending:false}).limit(1000),
         supabase.from("student_lab_work").select("*").order("updated_at",{ascending:false}).limit(500),
         supabase.from("lab_assignments").select("*").order("created_at",{ascending:false}).limit(500),
         supabase.from("student_document_work").select("*").eq("submitted",true).order("submitted_at",{ascending:false}).limit(300),
@@ -122,20 +129,28 @@ export default function LabsManagementPage(){
 
   async function createAssignment(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    if(!supabase||!learnerId||!assignTitle.trim()||savingAssignment)return;
+    if(!supabase||!assignTitle.trim()||savingAssignment)return;
+    const targets=assignTargetMode==="individual"
+      ? learners.filter(item=>item.id===learnerId&&item.account_status==="active")
+      : learners.filter(item=>item.account_status==="active"&&item.institution===assignInstitution&&item.education_level===assignEducationLevel&&item.grade===assignGrade);
+    if(!targets.length){setError(assignTargetMode==="individual"?"Choose an active learner.":"No active learners match the selected school, level and grade.");return;}
     setSavingAssignment(true);setError("");setNotice("");
     try{
       const {data:auth,error:authError}=await supabase.auth.getUser();
       if(authError||!auth.user)throw new Error("Sign in again before assigning a practical.");
-      const {error:insertError}=await supabase.from("lab_assignments").insert({
-        learner_id:learnerId,lab_area:assignArea,activity_key:assignArea==="maths"?"maths-workspace":"science-workspace",
-        title:assignTitle.trim(),instructions:assignInstructions.trim(),
-        due_at:assignDue?new Date(assignDue).toISOString():null,required:assignRequired,
-        status:"assigned",assigned_by:auth.user.id,
+      const dueAt=assignDue?new Date(assignDue).toISOString():null;
+      const rows=targets.map(learner=>{
+        const assignmentId=crypto.randomUUID();
+        return {
+          id:assignmentId,learner_id:learner.id,lab_area:assignArea,activity_key:"assignment:"+assignmentId,
+          title:assignTitle.trim(),instructions:assignInstructions.trim(),due_at:dueAt,required:assignRequired,
+          status:"assigned",assigned_by:auth.user.id,
+        };
       });
+      const {error:insertError}=await supabase.from("lab_assignments").insert(rows);
       if(insertError)throw insertError;
-      setNotice("Lab practical assigned. It will appear in the student's relevant lab.");
-      setAssignOpen(false);setAssignTitle("");setAssignInstructions("");setAssignDue("");
+      setNotice("Lab practical assigned to "+targets.length+" learner(s). It will appear in each learner's relevant Lab.");
+      setAssignOpen(false);setAssignTitle("");setAssignInstructions("");setAssignDue("");setLearnerId("");
       await refresh();
     }catch(reason){setError(reason instanceof Error?reason.message:"The practical could not be assigned.");}
     finally{setSavingAssignment(false);}
@@ -208,7 +223,7 @@ export default function LabsManagementPage(){
     </section>}
 
     {tab==="Assignments"&&<section className="monitor-labs-panel"><div className="monitor-labs-panel-head"><div><span className="eyebrow">TEACHER WORKFLOW</span><h2>Assigned practicals</h2><p>Assign a task to an individual learner and track the submitted work from Live work.</p></div><button type="button" className="primary-button" onClick={()=>setAssignOpen(value=>!value)}><Plus size={15}/> New practical</button></div>
-      {assignOpen&&<form className="monitor-labs-assignment-form" onSubmit={createAssignment}><label>Student<select required value={learnerId} onChange={event=>setLearnerId(event.target.value)}><option value="">Choose a learner</option>{learners.filter(item=>item.account_status==="active").map(item=><option key={item.id} value={item.id}>{displayName(item)}</option>)}</select></label><label>Lab area<select value={assignArea} onChange={event=>setAssignArea(event.target.value as Area)}>{areas.map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label className="wide">Practical title<input required maxLength={140} value={assignTitle} onChange={event=>setAssignTitle(event.target.value)} placeholder="e.g. Investigate the relationship between voltage and current"/></label><label className="wide">Instructions<textarea rows={3} maxLength={2000} value={assignInstructions} onChange={event=>setAssignInstructions(event.target.value)} placeholder="Describe the question, expected evidence and success criteria…"/></label><label>Due date<input type="datetime-local" value={assignDue} onChange={event=>setAssignDue(event.target.value)}/></label><label className="monitor-labs-check"><input type="checkbox" checked={assignRequired} onChange={event=>setAssignRequired(event.target.checked)}/> Required practical</label><div className="monitor-labs-form-actions"><button type="button" className="secondary-button" onClick={()=>setAssignOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={savingAssignment}>{savingAssignment?"Assigning…":"Assign practical"}</button></div></form>}
+      {assignOpen&&<form className="monitor-labs-assignment-form" onSubmit={createAssignment}><label>Assign to<select value={assignTargetMode} onChange={event=>setAssignTargetMode(event.target.value as "individual"|"class")}><option value="individual">One learner</option><option value="class">Class / group</option></select></label>{assignTargetMode==="individual"?<label>Student<select required value={learnerId} onChange={event=>setLearnerId(event.target.value)}><option value="">Choose a learner</option>{learners.filter(item=>item.account_status==="active").map(item=><option key={item.id} value={item.id}>{displayName(item)}</option>)}</select></label>:<><label>School / institution<select required value={assignInstitution} onChange={event=>{setAssignInstitution(event.target.value);setAssignGrade("");}}><option value="">Choose a school</option>{classInstitutions.map(item=><option key={item} value={item}>{item}</option>)}</select></label><label>Education level<select value={assignEducationLevel} onChange={event=>{setAssignEducationLevel(event.target.value);setAssignGrade("");}}><option>Primary</option><option>Secondary High</option><option>High School</option><option>Matric</option><option>Tertiary</option></select></label><label>Grade / form<select required value={assignGrade} onChange={event=>setAssignGrade(event.target.value)}><option value="">Choose a grade</option>{classGrades.map(item=><option key={item} value={item}>{item}</option>)}</select></label><p className="monitor-labs-class-count">{classTargetCount} active learner(s) match this class.</p></>}<label>Lab area<select value={assignArea} onChange={event=>setAssignArea(event.target.value as Area)}>{areas.map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label className="wide">Practical title<input required maxLength={140} value={assignTitle} onChange={event=>setAssignTitle(event.target.value)} placeholder="e.g. Investigate the relationship between voltage and current"/></label><label className="wide">Instructions<textarea rows={3} maxLength={2000} value={assignInstructions} onChange={event=>setAssignInstructions(event.target.value)} placeholder="Describe the question, expected evidence and success criteria…"/></label><label>Due date<input type="datetime-local" value={assignDue} onChange={event=>setAssignDue(event.target.value)}/></label><label className="monitor-labs-check"><input type="checkbox" checked={assignRequired} onChange={event=>setAssignRequired(event.target.checked)}/> Required practical</label><div className="monitor-labs-form-actions"><button type="button" className="secondary-button" onClick={()=>setAssignOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={savingAssignment}>{savingAssignment?"Assigning…":"Assign practical"}</button></div></form>}
       <div className="monitor-labs-assignment-list">{assignments.filter(item=>item.status!=="cancelled").map(item=><article key={item.id}><div><span className="eyebrow">{areaLabel(item.lab_area)} · {item.required?"REQUIRED":"PRACTICE"}</span><h3>{item.title}</h3><p>{item.instructions||"No extra instructions."}</p><small>{displayName(learnerById.get(item.learner_id))} · Due {when(item.due_at)} · Assigned {when(item.created_at)}</small></div><button type="button" className="text-button" onClick={()=>void cancelAssignment(item)}>Cancel</button></article>)}{!assignments.filter(item=>item.status!=="cancelled").length&&<div className="monitor-labs-empty"><ClipboardCheck size={21}/><strong>No practicals assigned yet.</strong><p>Use New practical to assign the first activity.</p></div>}</div>
     </section>}
 

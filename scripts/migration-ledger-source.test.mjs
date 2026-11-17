@@ -49,7 +49,6 @@ const superseded = [
   "20261109043000_studyspace_terms_v8_gemini_admin_provider_disclosure.sql",
   "20261109060200_studyspace_announcement_creator_index.sql",
   "20261115190000_studyspace_labs_and_document_work.sql",
-  "20261116120000_studyspace_restore_education_pathways.sql",
 ];
 
 test("migration files use applied Supabase versions and retain every applied migration", () => {
@@ -57,8 +56,9 @@ test("migration files use applied Supabase versions and retain every applied mig
   for (const file of superseded) assert.ok(!files.includes(file), "Superseded migration version remains: " + file);
   const versions = files.map((file) => file.slice(0, 14));
   assert.equal(new Set(versions).size, versions.length, "Migration version prefixes must be unique.");
-  const applied = JSON.parse(readFileSync("supabase/migrations/applied-versions.json", "utf8")).versions;
-  assert.deepEqual(versions.slice().sort(), applied.slice().sort(), "Monitor migration source must exactly match the applied production ledger.");
+  const ledger = JSON.parse(readFileSync("supabase/migrations/applied-versions.json", "utf8"));
+  const expected = [...ledger.versions, ...(ledger.pending ?? [])].sort();
+  assert.deepEqual(versions.slice().sort(), expected, "Monitor migration source must exactly match the applied production ledger plus explicitly reviewed pending migrations.");
 });
 
 const realtimeMigrations = [

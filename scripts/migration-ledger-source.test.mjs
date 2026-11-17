@@ -34,6 +34,7 @@ const required = [
   "20261116070440_studyspace_labs_and_document_work.sql",
   "20261116200743_allow_incomplete_learner_education_profile.sql",
   "20261117073500_studyspace_fix_learner_profile_rpc_persistence.sql",
+  "20261117073929_studyspace_fix_learner_profile_rpc_persistence_reapply.sql",
 ];
 
 const superseded = [

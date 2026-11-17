@@ -29,6 +29,11 @@ const required = [
   "20261111132915_studyspace_remove_grouped_subject_having_from_auto_groups.sql",
   "20261112203306_studyspace_fix_gamification_rpc_output_ambiguity.sql",
   "20261112203307_studyspace_add_student_access_pin_fk_indexes.sql",
+  "20261115192917_studyspace_complete_lab_learning_ecosystem.sql",
+  "20261115194857_studyspace_harden_lab_data_security.sql",
+  "20261116070440_studyspace_labs_and_document_work.sql",
+  "20261116200743_allow_incomplete_learner_education_profile.sql",
+  "20261117073500_studyspace_fix_learner_profile_rpc_persistence.sql",
 ];
 
 const superseded = [
@@ -44,6 +49,7 @@ const superseded = [
   "20261109031500_studyspace_age9_mia_education_terms_v7.sql",
   "20261109043000_studyspace_terms_v8_gemini_admin_provider_disclosure.sql",
   "20261109060200_studyspace_announcement_creator_index.sql",
+  "20261115190000_studyspace_labs_and_document_work.sql",
 ];
 
 test("migration files use applied Supabase versions and retain every applied migration", () => {
@@ -51,6 +57,9 @@ test("migration files use applied Supabase versions and retain every applied mig
   for (const file of superseded) assert.ok(!files.includes(file), "Superseded migration version remains: " + file);
   const versions = files.map((file) => file.slice(0, 14));
   assert.equal(new Set(versions).size, versions.length, "Migration version prefixes must be unique.");
+  const ledger = JSON.parse(readFileSync("supabase/migrations/applied-versions.json", "utf8"));
+  const expected = [...ledger.versions, ...(ledger.pending ?? [])].sort();
+  assert.deepEqual(versions.slice().sort(), expected, "Monitor migration source must exactly match the applied production ledger plus explicitly reviewed pending migrations.");
 });
 
 const realtimeMigrations = [
@@ -69,5 +78,18 @@ test("all Realtime publication migrations are present and idempotent", () => {
       sql.toLowerCase().includes("alter publication supabase_realtime add table public." + table),
       file + " must publish public." + table + ".",
     );
+  }
+});
+
+
+test("every Edge Function has checked-in source and explicit JWT configuration", () => {
+  const config = readFileSync("supabase/config.toml", "utf8");
+  const directories = readdirSync("supabase/functions", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"));
+  for (const entry of directories) {
+    const name = entry.name;
+    const source = readFileSync("supabase/functions/" + name + "/index.ts", "utf8");
+    assert.ok(source.trim().length > 0, "Missing Edge Function source: " + name);
+    assert.match(config, new RegExp("\\[functions\\." + name + "\\]\\s*\\nverify_jwt\\s*=\\s*(true|false)"), "Missing explicit JWT configuration: " + name);
   }
 });

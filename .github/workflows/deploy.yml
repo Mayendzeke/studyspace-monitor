@@ -28,36 +28,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Verify scheduled homework fallback authentication configuration
-        run: node --test scripts/homework-fallback-auth-config.test.mjs
-      - name: Verify Monitor MIΛ response content variants
-        run: node --test scripts/mia-monitor-response-shape.test.mjs
-      - name: Verify Study Materials resource upload and navigation
-        run: node --test scripts/study-materials-resource-workflow.test.mjs
-      - name: Verify learner password reset safeguards
-        run: node --test scripts/manage-learner-account-password.test.mjs
-      - name: Verify administrator Gemini free-tier and Gemma fallback policy
-        run: node --test scripts/admin-ai-provider-policy.test.mjs
-      - name: Verify lesson recap response content variants
-        run: node --test scripts/lesson-recap-response-shape.test.mjs
-      - name: Verify gamification RPC output-parameter qualification
-        run: node --test scripts/gamification-rpc-ambiguity.test.mjs
-      - name: Verify student access PIN foreign-key indexes
-        run: node --test scripts/student-access-pin-indexes.test.mjs
-      - name: Verify class and individual Lab assignments
-        run: node --test scripts/class-lab-assignment.test.mjs
-      - name: Verify Monitor Lab practice results and MFA read policy
-        run: node --test scripts/lab-practice-results.test.mjs
-      - name: Verify migration source matches the applied ledger
-        run: node --test scripts/migration-ledger-source.test.mjs
-      - name: Verify the five-stage learner education pathway
-        run: node --test scripts/education-level-standard.test.mjs
-      - name: Verify shared StudySpace brand tokens
-        run: node --test scripts/brand-token-protocol.test.mjs
-      - name: Verify Monitor finalization regressions
-        run: node --test scripts/monitor-finalization.test.mjs
-      - name: Verify shared StudySpace logo and testimonial export
-        run: node --test scripts/testimonial-brand-consistency.test.mjs
+      - name: Run complete automated regression suite
+        run: npm test
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

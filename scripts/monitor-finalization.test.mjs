@@ -53,11 +53,15 @@ test('Monitor top bar remains sticky with a theme-aware surface', () => {
   ), 'a theme-aware sticky topbar rule must exist');
 });
 
-test('deployment workflow checks the actual teacher timetable component', () => {
+test('deployment workflow runs the complete suite, including the actual teacher timetable checks', () => {
   const workflow = read('.github/workflows/deploy.yml');
-  assert.match(workflow, /node --test scripts\/monitor-finalization\.test\.mjs/);
-  assert.match(workflow, /src\/components\/TeacherWeeklyTimetable\.tsx/);
-  assert.doesNotMatch(workflow, /src\/components\/AdminTimetablePage\.tsx/);
+  const packageJson = JSON.parse(read('package.json'));
+  const timetable = read('src/components/TeacherWeeklyTimetable.tsx');
+  assert.match(workflow, /run: npm test/);
+  assert.equal(packageJson.scripts.test, 'node --test scripts/*.test.mjs');
+  assert.match(timetable, /todayClasses/);
+  assert.match(timetable, /Today's classes/);
+  assert.doesNotMatch(timetable, /AdminTimetablePage/);
 });
 
 

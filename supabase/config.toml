@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.manage-learner-account]
 verify_jwt = true
 
+[functions.change-student-password]
+verify_jwt = true
+
 [functions.manage-guardian-verification]
 verify_jwt = true
 
@@ -28,6 +31,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.submit-exercise-attempt]
+verify_jwt = true
+
+[functions.mark-class-homework]
+verify_jwt = true
+
+[functions.lab-learning-engine]
 verify_jwt = true
 
 [functions.jaas-token]

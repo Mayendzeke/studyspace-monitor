@@ -68,7 +68,7 @@ test("the applied education-pathway migration is represented in source control",
 });
 
 test("both learner profile RPC signatures persist and validate every pathway field", () => {
-  const migration = read("../supabase/migrations/20261116120000_studyspace_restore_education_pathways.sql");
+  const migration = read("../supabase/migrations/20261117073500_studyspace_fix_learner_profile_rpc_persistence.sql");
   assert.match(migration, /p_course text/);
   assert.match(migration, /full_name = left\(coalesce\(p_full_name/);
   assert.match(migration, /course = left\(coalesce\(p_course/);

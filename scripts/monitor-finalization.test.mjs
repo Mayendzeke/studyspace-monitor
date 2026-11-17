@@ -58,7 +58,7 @@ test('deployment workflow runs the complete suite, including the actual teacher 
   const packageJson = JSON.parse(read('package.json'));
   const timetable = read('src/components/TeacherWeeklyTimetable.tsx');
   assert.match(workflow, /run: npm test/);
-  assert.match(packageJson.scripts.test, /node --test scripts\\/\\*\\.test\\.mjs/);
+  assert.equal(packageJson.scripts.test, 'node --test scripts/*.test.mjs');
   assert.match(timetable, /todayClasses/);
   assert.match(timetable, /Today's classes/);
   assert.doesNotMatch(timetable, /AdminTimetablePage/);

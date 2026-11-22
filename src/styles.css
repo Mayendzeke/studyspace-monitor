@@ -2486,3 +2486,135 @@ html,body,#root{height:100%;min-height:0;overflow:hidden}
 @media(max-width:620px){.monitor-labs-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.monitor-labs-practice-card>header{align-items:flex-start}}
 
 .monitor-labs-class-count{grid-column:1/-1;margin:0;padding:8px 10px;border:1px solid rgba(113,100,216,.2);border-radius:9px;background:rgba(113,100,216,.06);color:var(--purple);font-size:9px;font-weight:700}
+
+
+/* Study Space enhanced neumorphic layer: additive visual layer, feature-safe. */
+:root {
+  --raised: 9px 9px 20px #c6cbd5, -9px -9px 20px #ffffff;
+  --raised-small: 5px 5px 11px #c8cdd7, -5px -5px 11px #ffffff;
+  --inset: inset 5px 5px 10px #c8cdd7, inset -5px -5px 10px #ffffff;
+  --raised-hover: 12px 12px 25px #c2c8d3, -12px -12px 25px #ffffff;
+  --depth-transition: 220ms cubic-bezier(.2,.75,.25,1);
+  --edge-highlight: rgba(255,255,255,.72);
+}
+:root[data-theme='dark'] {
+  --raised: 9px 9px 20px #171b26, -9px -9px 20px #293143;
+  --raised-small: 5px 5px 11px #171b26, -5px -5px 11px #293143;
+  --inset: inset 5px 5px 10px #171b26, inset -5px -5px 10px #293143;
+  --raised-hover: 12px 12px 26px #151923, -12px -12px 26px #2b354a;
+  --edge-highlight: rgba(255,255,255,.045);
+}
+.app-shell { isolation: isolate; }
+.sidebar {
+  box-shadow: 5px 0 22px rgba(48,56,75,.045), inset -1px 0 0 var(--edge-highlight);
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
+  box-shadow: 0 8px 22px rgba(30,38,58,.055);
+}
+.panel,
+.stat-card,
+.settings-card,
+.studio-panel,
+.assignment-panel,
+.sidebar-profile,
+.help-card,
+.setup-banner,
+.warning-banner,
+.pin-step,
+.quick-action,
+.monitor-labs-practice-card {
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--edge-highlight));
+  box-shadow: var(--raised), inset 1px 1px 0 var(--edge-highlight);
+  transition: box-shadow var(--depth-transition), transform var(--depth-transition), border-color var(--depth-transition), background-color var(--depth-transition);
+  transform-style: preserve-3d;
+}
+.stat-card,
+.panel,
+.settings-card { border-radius: 17px; }
+.nav-item,
+.primary-button,
+.subtle-button,
+.text-button,
+.icon-button,
+.quick-action,
+.theme-switch,
+.monitor-labs-tabs button,
+.filter-tabs button,
+button.secondary-button {
+  transition: box-shadow var(--depth-transition), transform var(--depth-transition), background-color var(--depth-transition), border-color var(--depth-transition), color var(--depth-transition), filter var(--depth-transition);
+}
+.primary-button,
+button.secondary-button,
+.subtle-button,
+.theme-switch {
+  box-shadow: var(--raised-small), inset 1px 1px 0 var(--edge-highlight);
+}
+button:active,
+.nav-item:active,
+.quick-action:active,
+.monitor-labs-tabs button:active { transform: translateY(1px) scale(.985); box-shadow: var(--inset); }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+select,
+textarea {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--inset);
+  transition: box-shadow var(--depth-transition), border-color var(--depth-transition), background-color var(--depth-transition);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--purple) 48%, transparent);
+  outline-offset: 3px;
+}
+:root[data-theme='dark'] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea { background: #202432; }
+.nav-item.active {
+  box-shadow: var(--inset), inset 3px 0 0 var(--purple);
+}
+@media (hover: hover) and (pointer: fine) {
+  .panel:hover,
+  .stat-card:hover,
+  .settings-card:hover,
+  .studio-panel:hover,
+  .assignment-panel:hover,
+  .monitor-labs-practice-card:hover {
+    transform: translateY(-3px) perspective(900px) rotateX(.3deg);
+    box-shadow: var(--raised-hover), inset 1px 1px 0 var(--edge-highlight);
+    border-color: color-mix(in srgb, var(--purple) 22%, var(--border));
+  }
+  .primary-button:hover,
+  button.secondary-button:hover,
+  .subtle-button:hover,
+  .quick-action:hover { transform: translateY(-2px); box-shadow: var(--raised); }
+  .nav-item:hover,
+  .icon-button:hover,
+  .monitor-labs-tabs button:hover { transform: translateY(-1px); }
+}
+@media (max-width: 760px) {
+  .topbar { top: 0; }
+  .panel,
+  .stat-card,
+  .settings-card,
+  .studio-panel { box-shadow: var(--raised-small), inset 1px 1px 0 var(--edge-highlight); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

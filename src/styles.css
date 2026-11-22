@@ -2618,3 +2618,24 @@ a:focus-visible {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Seamless handoff of the pencil-drawn splash logo into Monitor brand positions. */
+.studyspace-splash-logo,
+.app-shell .sidebar .brand-mark .brand-logo-image,
+.auth-screen .auth-brand .brand-logo-image { view-transition-name:studyspace-logo-flight; }
+.auth-screen .auth-brand .brand-mark { background:transparent; box-shadow:none; border-radius:0; }
+.auth-screen .auth-brand .brand-logo-image { display:block; width:100%; height:100%; object-fit:contain; border-radius:inherit; }
+@supports (view-transition-name:studyspace-logo-flight) {
+  ::view-transition-group(studyspace-logo-flight) { animation-duration:900ms; animation-timing-function:cubic-bezier(.2,.78,.2,1); }
+  ::view-transition-old(studyspace-logo-flight),
+  ::view-transition-new(studyspace-logo-flight) { animation:none; mix-blend-mode:normal; }
+  ::view-transition-old(root) { animation:studyspace-splash-root-exit 220ms ease-out both; }
+  ::view-transition-new(root) { animation:none; }
+}
+@keyframes studyspace-splash-root-exit { to { opacity:0; } }
+@media(prefers-reduced-motion:reduce) {
+  .studyspace-splash-logo,
+  .app-shell .sidebar .brand-mark .brand-logo-image,
+  .auth-screen .auth-brand .brand-logo-image { view-transition-name:none; }
+}

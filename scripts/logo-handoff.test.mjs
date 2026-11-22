@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const css=readFileSync(new URL("../src/styles.css",import.meta.url),"utf8");
+const app=readFileSync(new URL("../src/App.tsx",import.meta.url),"utf8");
+const splash=readFileSync(new URL("../src/components/SplashScreen.tsx",import.meta.url),"utf8");
+const mfa=readFileSync(new URL("../src/components/AdminMfaGate.tsx",import.meta.url),"utf8");
+const helper=readFileSync(new URL("../src/lib/logoTransition.ts",import.meta.url),"utf8");
+test("Monitor splash retains the pencil-drawn graduation-cap design",()=>{assert.match(splash,/studyspace-logo-cap-top/);assert.match(css,/@keyframes studyspace-cap-draw/);assert.doesNotMatch(css,/water-fill|water-filling/i);});
+test("Monitor logo hands off to sidebar, sign-in and MFA brand positions",()=>{assert.match(css,/studyspace-logo-flight/);assert.match(css,/\.app-shell \.sidebar \.brand-mark \.brand-logo-image/);assert.match(css,/\.auth-screen \.auth-brand \.brand-logo-image/);assert.match(app,/runLogoHandoff/);assert.match(app,/splashDestinationReady/);assert.match(mfa,/Preparing secure verification/);assert.match(helper,/startViewTransition/);});
+test("Monitor waits for authentication and MFA checks and respects reduced motion",()=>{assert.match(app,/adminCheckComplete/);assert.match(app,/mfaCheckComplete/);assert.match(helper,/prefers-reduced-motion/);});

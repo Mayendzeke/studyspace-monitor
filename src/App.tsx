@@ -21,6 +21,7 @@ import AuthGate from './components/AuthGate'
 import AdminMfaGate from './components/AdminMfaGate'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
+import { runLogoHandoff } from './lib/logoTransition'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool, FlaskConical,
@@ -86,6 +87,9 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [splashElapsed, setSplashElapsed] = useState(false)
+  const [splashDelayElapsed, setSplashDelayElapsed] = useState(false)
+  const [adminCheckComplete, setAdminCheckComplete] = useState(false)
+  const [mfaCheckComplete, setMfaCheckComplete] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [isStandalone, setIsStandalone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches)
@@ -116,9 +120,22 @@ function App() {
   }, [helpCardOpen])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSplashElapsed(true), 4800)
+    const timer = window.setTimeout(() => setSplashDelayElapsed(true), 4800)
     return () => window.clearTimeout(timer)
   }, [])
+
+  const splashDestinationReady = !authLoading && (
+    passwordRecovery ||
+    !isSupabaseConfigured ||
+    !supabase ||
+    !session ||
+    (adminCheckComplete && !adminLoading && mfaCheckComplete)
+  )
+
+  useEffect(() => {
+    if (!splashDelayElapsed || !splashDestinationReady || splashElapsed) return
+    runLogoHandoff(() => setSplashElapsed(true))
+  }, [splashDelayElapsed, splashDestinationReady, splashElapsed])
 
   useEffect(() => {
     const displayMode = window.matchMedia('(display-mode: standalone)')
@@ -210,8 +227,14 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!supabase || !session) { setAdminAllowed(false); return }
+    if (!supabase || !session) {
+      setAdminAllowed(false)
+      setAdminLoading(false)
+      setAdminCheckComplete(true)
+      return
+    }
     let alive = true
+    setAdminCheckComplete(false)
     setAdminLoading(true)
     supabase.from('profiles').select('role,account_status,preferred_name,full_name').eq('id', session.user.id).single().then(({ data, error }) => {
       if (!alive) return
@@ -225,18 +248,28 @@ function App() {
         setAuthError('')
       }
       setAdminLoading(false)
+      setAdminCheckComplete(true)
     })
     return () => { alive = false }
   }, [session])
 
   useEffect(() => {
-    if (!supabase || !session) return;
-    let alive = true;
+    if (!supabase || !session) {
+      setMfaVerified(false)
+      setMfaCheckComplete(true)
+      return
+    }
+    let alive = true
+    setMfaVerified(false)
+    setMfaCheckComplete(false)
     supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
-      if (!alive || error) return;
-      if (data.currentLevel === 'aal2') setMfaVerified(true);
-    }).catch(() => { /* The MFA gate remains the secure fallback. */ });
-    return () => { alive = false };
+      if (!alive) return
+      if (!error) setMfaVerified(data.currentLevel === 'aal2')
+      setMfaCheckComplete(true)
+    }).catch(() => {
+      if (alive) setMfaCheckComplete(true)
+    })
+    return () => { alive = false }
   }, [session]);
 
   const navigate = (next: Page) => {
@@ -244,7 +277,7 @@ function App() {
     setMobileOpen(false)
   }
 
-  if (!splashElapsed) return <SplashScreen theme={theme} displayName={adminName} />
+  if (!splashElapsed || !splashDestinationReady) return <SplashScreen theme={theme} displayName={adminName} />
   if (passwordRecovery) return <AuthGate mode="recovery" error={authError} onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (!isSupabaseConfigured || !supabase) return <AuthGate mode="unconfigured" error="" onError={setAuthError} installAvailable={Boolean(installPrompt)} onInstall={() => void installMonitor()} />
   if (authLoading || adminLoading) return <SplashScreen theme={theme} displayName={adminName} />

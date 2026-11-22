@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Activity, GraduationCap, LockKeyhole, ShieldCheck, Download } from 'lucide-react'
+import { Activity, LockKeyhole, ShieldCheck, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type Props = { mode: 'unconfigured' | 'signin' | 'recovery'; error: string; onError: (message: string) => void; installAvailable: boolean; onInstall: () => void }

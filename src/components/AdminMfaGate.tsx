@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import SplashScreen from './SplashScreen'
 
 type Props = { onVerified: () => void; theme?: 'light' | 'dark'; displayName?: string }
 export default function AdminMfaGate({ onVerified, theme = 'light', displayName = 'Ayanda Zwane' }: Props) {
@@ -74,11 +73,11 @@ export default function AdminMfaGate({ onVerified, theme = 'light', displayName 
     finally{setBusy(false)}
   }
 
-  if(loading)return <div className="auth-screen"><section className="auth-card">
+  if(loading)return <div className="auth-screen" data-theme={theme}><section className="auth-card">
     <div className="auth-brand"><div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt="Study Space"/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
     <div className="auth-lock-icon"><Activity size={26}/></div>
     <h1>Preparing secure verification</h1>
-    <p>Checking your administrator authenticator before opening Monitor.</p>
+    <p>Checking {displayName}’s administrator authenticator before opening Monitor.</p>
   </section></div>
   return <div className="auth-screen"><form className="auth-card" onSubmit={verify}>
     <div className="auth-brand"><div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt="Study Space"/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>

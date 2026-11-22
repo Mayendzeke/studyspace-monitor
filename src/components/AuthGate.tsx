@@ -66,7 +66,7 @@ export default function AuthGate({ mode, error, onError, installAvailable, onIns
   }
 
   if (mode === 'unconfigured') return <div className="auth-screen"><section className="auth-card">
-    <div className="auth-brand"><div className="brand-mark"><GraduationCap size={23}/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
+    <div className="auth-brand"><div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt="Study Space"/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
     {installControl}
     <div className="auth-lock-icon"><LockKeyhole size={25}/></div>
     <h1>Administrator access is locked</h1>
@@ -76,7 +76,7 @@ export default function AuthGate({ mode, error, onError, installAvailable, onIns
   </section></div>
 
   return <div className="auth-screen"><form className="auth-card" onSubmit={submit}>
-    <div className="auth-brand"><div className="brand-mark"><GraduationCap size={23}/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
+    <div className="auth-brand"><div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt="Study Space"/></div><div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div></div>
     <div className="auth-lock-icon"><LockKeyhole size={25}/></div>
     <h1>{screen === 'signin' ? 'Administrator sign in' : screen === 'reset' ? 'Reset your password' : 'Choose a new password'}</h1>
     <p>{screen === 'signin' ? 'Sign in with your administrator account. Only active administrator profiles can open this workspace.' : screen === 'reset' ? 'Supabase Auth will send a secure password-reset link to your registered email.' : 'Set a new password for your Supabase account.'}</p>

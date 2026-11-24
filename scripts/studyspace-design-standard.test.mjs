@@ -8,14 +8,14 @@ const standard = readFileSync(new URL("../STUDYSPACE_DEVELOPMENT_STANDARD.md", i
 const pullRequest = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
 
 test("Monitor Study Space brand control returns to the home page", () => {
-  assert.match(app, /className="brand-home-link" onClick={() => navigate('Overview')}/);
-  assert.match(brandStyles, /.brand-home-link:focus-visible/);
+  assert.ok(app.includes('className="brand-home-link" onClick={() => navigate(\\'Overview\\')}'));
+  assert.ok(brandStyles.includes(".brand-home-link:focus-visible"));
 });
 
 test("the uniform Study Space visual standard is part of the repository release process", () => {
-  assert.match(standard, /Mandatory design and experience rule/);
-  assert.match(standard, /Every development change, bug fix, refactor, integration, and upgrade/);
-  assert.match(pullRequest, /follows `STUDYSPACE_DEVELOPMENT_STANDARD.md`/);
-  assert.match(pullRequest, /Desktop and mobile layouts have been checked/);
-  assert.match(pullRequest, /Light and dark themes have been checked/);
+  assert.ok(standard.includes("Mandatory design and experience rule"));
+  assert.ok(standard.includes("Every development change, bug fix, refactor, integration, and upgrade"));
+  assert.ok(pullRequest.includes("STUDYSPACE_DEVELOPMENT_STANDARD.md"));
+  assert.ok(pullRequest.includes("Desktop and mobile layouts have been checked"));
+  assert.ok(pullRequest.includes("Light and dark themes have been checked"));
 });

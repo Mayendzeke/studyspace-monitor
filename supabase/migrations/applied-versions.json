@@ -128,6 +128,7 @@
     "20261124140241"
   ],
   "pending": [
-    "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql"
+    "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
+    "20261124140243_study_material_generation_packs.sql"
   ]
 }

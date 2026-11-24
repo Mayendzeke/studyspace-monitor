@@ -37,3 +37,20 @@ test("existing trial expiry timestamps are preserved and reminders follow actual
   assert.match(migration, /trial_expires_at - interval ''24 hours''/);
   assert.doesNotMatch(migration, /UPDATE public\.profiles\s+SET trial_expires_at/i);
 });
+
+test("assessment scheduler uses the learner's configurable question count and keeps AI questions unverified", () => {
+  const scheduler = read("supabase/functions/assessment-scheduler/index.ts");
+  const helper = read("supabase/functions/assessment-scheduler/scheduler.ts");
+  assert.match(scheduler, /2026-11-24-v9/);
+  assert.match(scheduler, /question_count/);
+  assert.match(scheduler, /questionCount=Math\.max\(1,Math\.min\(100,Number\(prefs\.question_count\)\|\|10\)\)/);
+  assert.match(scheduler, /verification_status:"pending"/);
+  assert.match(helper, /questionCount=10/);
+});
+
+test("late assessment submissions remain allowed and are recorded", () => {
+  const submit = read("supabase/functions/submit-exercise-attempt/index.ts");
+  assert.match(submit, /submitted_late/);
+  assert.match(submit, /minutesLate/);
+  assert.match(submit, /2026-11-24-v9/);
+});

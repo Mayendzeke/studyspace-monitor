@@ -262,6 +262,11 @@ Deno.serve(async request => {
   }).select("id,submitted_at").single();
   if (attemptError) return json(503, { error: "Your answers could not be saved. Please try again." });
 
+  // Keep the central assessment programme in sync with the submitted assignment.
+  const { error: scheduleUpdateError } = await admin.from("assessment_schedule_items")
+    .update({ status: "completed" }).eq("exercise_assignment_id", assignment.id).eq("learner_id", authData.user.id);
+  if (scheduleUpdateError) console.error("Assessment programme completion update failed", scheduleUpdateError);
+
   return json(200, {
     success: true,
     attemptId: attempt.id,

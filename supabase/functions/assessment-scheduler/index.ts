@@ -491,7 +491,6 @@ Deno.serve(async request=>{
   }
   const pending=dueCandidates.filter((item:any)=>{
     if(item.metadata?.waiting_for_study_pack&&!readyPackSubjectIds.has(String(item.subject_id||""))&&!readyPackSubjectNames.has(String(item.subject_name||"").trim().toLowerCase()))return false;
-    if(item.metadata?.waiting_for_study_pack&&!readyPackSubjectIds.has(String(item.subject_id||""))&&!readyPackSubjectNames.has(String(item.subject_name||"").trim().toLowerCase()))return false;
     if(!item.metadata?.waiting_for_material_approval)return true;
     return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
   }).slice(0,2);

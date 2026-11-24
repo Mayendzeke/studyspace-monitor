@@ -117,6 +117,48 @@ The Monitor repository owns shared-backend migrations and Edge Function source. 
 6. Align the public website, terms/privacy references and production release checks.
 
 
+## Implementation update — 24 November 2026
+
+The initial audit above records the pre-implementation baseline. The following changes have since been made in the current working branches; they are source changes, not yet proof of production behaviour.
+
+### Working-branch implementation
+
+- **Monitor backend branch:** `fix/align-48-hour-trial-20261124`
+  - Added the central assessment scheduler and balanced schedule builder.
+  - Added stored study-pack generation for readable learner uploads and teacher-assigned resources.
+  - Added a curriculum research engine that uses non-identifying academic profile context and web-grounded research where available.
+  - Curriculum guides are saved as pending review items. They are not published automatically.
+  - Added the Monitor AI Material Review page. Approval publishes a private Markdown resource and assigns it to the learner; rejection prevents publication.
+  - Added queued, stored on-demand practice requests and assignment-source classification.
+  - Assessment question generation now calls the shared assessment provider directly; it does not call the live MIΛ chat endpoint.
+  - Increased MIΛ response limits to remove the 1,200-character truncation that could cut off explanations.
+  - Added migrations `20261124140243_study_material_generation_packs.sql` and `20261124140244_practice_assessment_requests.sql`.
+
+- **Student app branch:** `feat/central-assessment-engine`
+  - Added the Student Library study-pack status and automatic preparation hand-off.
+  - Replaced the legacy MIΛ-dependent practice-test generator with a stored practice-request workflow.
+  - Separated practice assignments from teacher assignments and kept scheduled assessments visible in the non-practice assignment view.
+  - The Student app requests practice preparation through the central assessment scheduler and refreshes when the stored assignment becomes ready.
+
+- **Public website main branch**
+  - Updated the trial from seven days to 48 hours.
+  - Updated the feature descriptions for automatic study guides and the weekly/monthly/quarterly assessment programme.
+  - Updated Terms and Privacy effective dates and the data-certificate notice.
+  - Website CI completed successfully for the latest website update observed during this audit.
+
+### Required release gates — still open
+
+1. Resolve the current merge conflicts in the Monitor and Student pull requests.
+2. Run the latest Monitor and Student regression suites, Deno type checks and production builds against the exact final branch heads.
+3. Confirm the pending migrations are present in the correct order and apply them to the shared Supabase project.
+4. Deploy the updated Edge Functions from the Monitor repository only.
+5. Confirm the public Student and Monitor Pages deployments use the matching frontend/backend versions.
+6. Test with real test accounts: new learner registration, under-18 guardian approval, 48-hour trial start/expiry, post-trial PIN, resource approval, study-pack creation, scheduled assessments, practice tests, answer submission and results.
+7. Verify RLS and private storage from both learner and Monitor roles.
+8. Record separate outcomes for source tests, deployed endpoint checks and real-account end-to-end tests.
+
+**Release rule:** Do not mark the platform production-ready solely because a branch builds or a migration file exists. The matching migrations, Edge Functions, Student UI and Monitor UI must be deployed together, and the workflows above must be verified.
+
 ## Assessment automation contract
 
 - Every registered subject stays in the weekly programme; the Balanced policy distributes workload across real available study periods and reports capacity conflicts rather than silently dropping subjects.

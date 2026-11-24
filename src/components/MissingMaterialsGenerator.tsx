@@ -15,6 +15,7 @@ export default function MissingMaterialsGenerator() {
   const [learnerId,setLearnerId] = useState("");
   const [subject,setSubject] = useState("");
   const [topic,setTopic] = useState("");
+  const [language,setLanguage] = useState("English");
   const [loading,setLoading] = useState(true);
   const [busy,setBusy] = useState(false);
   const [notice,setNotice] = useState("");
@@ -53,7 +54,7 @@ export default function MissingMaterialsGenerator() {
     setBusy(true); setError(""); setNotice("");
     try {
       const {data,error:invokeError} = await supabase.functions.invoke("mia-monitor-assistant",{
-        body:{action:"prepare_material",learnerId,subjectName:subject,topic:topic.trim()},
+        body:{action:"prepare_material",learnerId,subjectName:subject,topic:topic.trim(),language},
       });
       if (invokeError) {
         const context = (invokeError as {context?:Response}).context;
@@ -83,9 +84,12 @@ export default function MissingMaterialsGenerator() {
           <option value="">Choose a registered subject</option>{learnerSubjects.map((item,index)=><option key={item.learner_id+"-"+index} value={item.name}>{item.name}</option>)}
         </select></label>
         <label>Topic (optional)<input value={topic} onChange={event=>setTopic(event.target.value)} maxLength={180} placeholder="Leave blank for curriculum-guided selection" disabled={busy}/></label>
+        <label>Learning language<select value={language} onChange={event=>setLanguage(event.target.value)} disabled={busy}>
+          {["English","SiSwati","French","Portuguese","Afrikaans","Arabic","Mandarin Chinese","Spanish","Other"].map(value=><option key={value} value={value}>{value}</option>)}
+        </select></label>
         <button type="button" className="primary-button" onClick={()=>void prepare()} disabled={busy || !learnerId || !subject}><FileText size={15}/>{busy?"Preparing…":"Prepare for review"}</button>
       </div>
-      {profile && <p className="mia-material-profile-context">Academic context: {[profile.country,profile.institution,profile.institution_type,profile.education_level,profile.grade,profile.course,profile.curriculum,profile.academic_year,profile.qualification_level].filter(Boolean).join(" · ")}</p>}
+      {profile && <p className="mia-material-profile-context">Academic context: {[profile.country,profile.institution,profile.institution_type,profile.education_level,profile.grade,profile.course,profile.curriculum,profile.academic_year,profile.qualification_level,language].filter(Boolean).join(" · ")}</p>}
     </>}
     {notice && <p className="mia-material-success" role="status">{notice} Open Learning materials in Monitor to review it.</p>}
     {error && <p className="mia-error" role="alert">{error}</p>}

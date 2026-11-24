@@ -115,18 +115,18 @@ async function approvedNotes(admin:any,learnerId:string,subject:string) {
   const notes:string[]=[];
   for(const pack of packs||[]) {
     const content=pack.content||{};
-    const concepts=Array.isArray(content.concept_sections)?content.concept_sections.map((item:any)=>String(item.heading||"")+": "+String(item.explanation||"")).join("\\n"):"";
-    const terms=Array.isArray(content.key_terms)?content.key_terms.map((item:any)=>String(item.term||"")+": "+String(item.definition||"")).join("\\n"):"";
-    notes.push("# "+String(pack.file_name||subject)+"\\nTopic: "+String(pack.topic||"")+"\\n"+String(pack.source_text||"").slice(0,5000)+"\\nStudy summary: "+String(content.summary||"")+"\\nKey terms:\\n"+terms+"\\nConcepts:\\n"+concepts);
+    const concepts=Array.isArray(content.concept_sections)?content.concept_sections.map((item:any)=>String(item.heading||"")+": "+String(item.explanation||"")).join("\n"):"";
+    const terms=Array.isArray(content.key_terms)?content.key_terms.map((item:any)=>String(item.term||"")+": "+String(item.definition||"")).join("\n"):"";
+    notes.push("# "+String(pack.file_name||subject)+"\nTopic: "+String(pack.topic||"")+"\n"+String(pack.source_text||"").slice(0,5000)+"\nStudy summary: "+String(content.summary||"")+"\nKey terms:\n"+terms+"\nConcepts:\n"+concepts);
   }
   for(const resource of [...(resources||[]),...(personal||[])]) {
-    if(!resource.storage_path||!/^text\\/(plain|markdown)/i.test(String(resource.mime_type||"")))continue;
+    if(!resource.storage_path||!/^text\/(plain|markdown)/i.test(String(resource.mime_type||"")))continue;
     const {data,error}=await admin.storage.from("studyspace-resources").download(resource.storage_path);
     if(error||!data)continue;
     const text=await data.text();
-    if(text.trim())notes.push("# "+String(resource.title||subject)+"\\nTopic: "+String(resource.topic||"")+"\\n"+text.slice(0,5000));
+    if(text.trim())notes.push("# "+String(resource.title||subject)+"\nTopic: "+String(resource.topic||"")+"\n"+text.slice(0,5000));
   }
-  return notes.join("\\n\\n").slice(0,30000);
+  return notes.join("\n\n").slice(0,30000);
 }
 async function requestMaterialReview(url:string,publishable:string,service:string,learnerId:string,subject:string) {
   const response=await fetch(url+"/functions/v1/mia-monitor-assistant",{

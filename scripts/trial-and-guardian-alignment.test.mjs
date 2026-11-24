@@ -93,3 +93,16 @@ test("private study material engine uses the shared learner AI provider and curr
   assert.match(sharedProvider, /SECONDARY_MODEL/);
   assert.doesNotMatch(engine, /providerNotice|model:\s*generated\.model|provider:\s*generated\.provider/);
 });
+
+test("curriculum material generation is research-grounded, profile-aware and queued for Monitor approval", () => {
+  const engine = read("supabase/functions/curriculum-material-engine/index.ts");
+  const provider = read("supabase/functions/_shared/monitor-ai-provider.ts");
+  assert.match(engine, /CURRENT_TERMS_VERSION="2026-11-24-v9"/);
+  assert.match(engine, /googleSearch:true/);
+  assert.match(engine, /learning_material_review_queue/);
+  assert.match(engine, /status:"pending"/);
+  assert.match(engine, /profile_snapshot/);
+  assert.match(engine, /source_references/);
+  assert.match(provider, /google_search/);
+  assert.match(engine, /assertNoPersonalIdentifiers/);
+});

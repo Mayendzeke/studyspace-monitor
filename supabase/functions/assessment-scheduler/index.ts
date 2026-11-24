@@ -471,14 +471,31 @@ Deno.serve(async request=>{
     }
   }
   const {data:finalItems}=await admin.from("assessment_schedule_items")
-    .select("id,subject_name,assessment_type,scheduled_at,duration_minutes,question_count,status,exercise_assignment_id,metadata")
-    .eq("schedule_run_id",runId).order("scheduled_at");
-  const allPublished=(finalItems||[]).length>0&&(finalItems||[]).every((item:any)=>item.exercise_assignment_id);
-  const finalStatus=schedule.conflicts.length?"capacity_conflict":allPublished?"published":"planned";
-  await admin.from("assessment_schedule_runs").update({status:finalStatus}).eq("id",runId);
+    .select("id,schedule_run_id,subject_name,assessment_type,scheduled_at,duration_minutes,question_count,status,exercise_assignment_id,metadata")
+    .in("schedule_run_id",runIds).order("scheduled_at");
+  const savedItems=finalItems||[];
+  for(const [periodType,periodRunId] of Object.entries(periodRuns)){
+    const periodItems=savedItems.filter((item:any)=>item.schedule_run_id===periodRunId);
+    const periodConflictCount=allConflicts.filter((item:any)=>item.periodType===periodType).length;
+    const periodPublished=periodItems.length>0&&periodItems.every((item:any)=>item.exercise_assignment_id);
+    const periodStatus=periodConflictCount?"capacity_conflict":periodPublished?"published":"planned";
+    await admin.from("assessment_schedule_runs").update({status:periodStatus}).eq("id",periodRunId);
+  }
+  const allPublished=savedItems.length>0&&savedItems.every((item:any)=>item.exercise_assignment_id);
+  const finalStatus=allConflicts.length?"capacity_conflict":allPublished?"published":"planned";
+  const finalDuePending=savedItems.filter((item:any)=>{
+    if(item.exercise_assignment_id||item.status!=="scheduled"||Date.parse(String(item.scheduled_at))>Date.now()+7*24*60*60*1000)return false;
+    if(!item.metadata?.waiting_for_material_approval)return true;
+    return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
+  });
+  const hasMore=finalDuePending.length>0;
   return json(200,{
-    success:true,status:finalStatus,scheduleRunId:runId,weekStart:monday,subjectCount:subjects.length,
-    scheduledCount:(finalItems||[]).length,generatedCount,conflicts:schedule.conflicts,items:finalItems||[],
-    message:generatedCount?"Your weekly assessments have been prepared and saved.":"Your weekly programme is saved. Use Prepare next batch to generate more stored tests.",
+    success:true,status:finalStatus,scheduleRunId:periodRuns.weekly,monthlyRunId:periodRuns.monthly,quarterlyRunId:periodRuns.quarterly,
+    weekStart:monday,monthStart:month.start,quarterStart:quarter.start,subjectCount:subjects.length,
+    scheduledCount:savedItems.length,generatedCount,pendingCount:finalDuePending.length,hasMore,
+    conflicts:allConflicts,items:savedItems,
+    message:generatedCount
+      ?"Your ready assessments have been prepared and saved. Monthly and quarterly tests are scheduled for their assessment periods."
+      :"Your weekly, monthly and quarterly assessment programme is saved. Tests are prepared automatically as their dates approach.",
   });
 });

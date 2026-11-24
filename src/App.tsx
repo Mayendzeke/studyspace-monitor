@@ -5,6 +5,7 @@ import MonitorTodaySession from './components/MonitorTodaySession'
 import HomeworkBuilder from './components/HomeworkBuilder'
 import HomeworkHelpInbox from './components/HomeworkHelpInbox'
 import AssessmentReviewQueue from './components/AssessmentReviewQueue'
+import LearningMaterialReviewQueue from './components/LearningMaterialReviewQueue'
 import LearnerEngagementPage from './components/LearnerEngagementPage'
 import LearnersPage from './components/LearnersPage'
 import TeacherWeeklyTimetable from './components/TeacherWeeklyTimetable'
@@ -32,7 +33,7 @@ import {
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,
 } from 'lucide-react'
 
-type Page = 'Overview' | "Today's Session" | 'Learners' | 'Labs' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
+type Page = 'Overview' | "Today's Session" | 'Learners' | 'Labs' | 'Timetable' | 'Messages' | 'Guardian verification' | 'Subscriptions' | 'MIΛ' | 'Content Studio' | 'Learning material review' | 'Classroom Studio' | 'Access PINs' | 'Academic progress' | 'Learning engagement' | 'Testimonials' | 'Settings'
 type Theme = 'light' | 'dark'
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 
@@ -42,6 +43,7 @@ const navigation: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: 'Learners', icon: Users },
   { label: 'Labs', icon: FlaskConical },
   { label: 'Content Studio', icon: PenTool },
+  { label: 'Learning material review', icon: BookOpen },
   { label: 'Classroom Studio', icon: BookOpen },
   { label: 'Timetable', icon: CalendarDays },
   { label: 'Academic progress', icon: Activity },
@@ -387,6 +389,7 @@ function App() {
           {page === 'Subscriptions' && <SubscriptionsPage />}
           {page === 'MIΛ' && <MiaStudio />}
           {page === 'Content Studio' && <ContentStudio />}
+          {page === 'Learning material review' && <LearningMaterialReviewQueue />}
           {page === 'Classroom Studio' && <><ClassroomStudio /><HomeworkBuilder /><HomeworkHelpInbox /><AssessmentReviewQueue /></>}
           {page === 'Access PINs' && <PinPage />}
           {page === 'Academic progress' && <AcademicProgressPage />}

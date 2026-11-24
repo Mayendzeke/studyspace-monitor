@@ -81,7 +81,7 @@ Deno.serve(async (request: Request) => {
           && same(row.institution, profile.institution) && same(row.course, profile.course);
       }).slice(0, 20);
       const { data: literatureRows, error: literatureError } = await admin.from("literature_text_registry")
-        .select("qualification,grade,curriculum,subject_name,learning_language,title,author,editor,genre,anthology,prescribed_status,examination_years,syllabus_url,catalogue_url,source_references,notes")
+        .select("qualification,grade,curriculum,subject_name,learning_language,title,author,editor,genre,anthology,prescribed_status,examination_years,syllabus_url,catalogue_url,source_references,notes,last_checked_at")
         .eq("country", String(profile.country).trim()).ilike("subject_name", subjectName).eq("learning_language", requestedLanguage).limit(100);
       if (literatureError) return json(503, { error: "The literature set-text register could not be checked. No material was generated." });
       const matchedLiteratureTexts = (literatureRows ?? []).filter((row: Record<string, unknown>) => {
@@ -140,6 +140,8 @@ Deno.serve(async (request: Request) => {
         "Do not invent syllabus statements, textbook titles, source URLs, authors, publishers or citations.",
         "Only include a source URL if you are confident it is real and relevant. If uncertain, leave the URL empty and state what official source the administrator should verify.",
         "For literature and language subjects, identify exact current set texts for the learner country, examination board, qualification, grade and examination year using literature_set_texts and the official syllabus. Cover confirmed prescribed novels, plays, short-story collections, poems and anthologies, not generic literature themes.",
+        "Treat prescribed_status=confirmed_current as an examination-board-confirmed set text only for the exact qualification and examination cycle. publisher_reported, recommended, historical and unconfirmed entries are discovery leads, not proof of prescription; label them honestly and never build a supposedly required exam guide from them without corroboration.",
+        "When no confirmed current set-text list exists for a language or qualification, use the official syllabus learning outcomes and assessment format, create original unseen comprehension and genre practice, and flag the set-text list for administrator verification instead of inventing prescribed books.",
         "For every prescribed set text, create original, text-specific study notes: author and context, accurate plot or argument overview, structure, characters and relationships, themes, setting, narrative voice, language and literary techniques, key moments, interpretation, and exam-focused essay, passage-based or empathic practice with marking guidance.",
         "For poetry, cover speaker, situation, structure, form, sound, imagery, diction, tone, shifts, themes and supported interpretations. For drama, cover stagecraft, dialogue, conflict, dramatic irony and character development. For prose, cover narrative viewpoint, plot structure, setting, characterisation and style.",
         "For comprehension practice, create substantial original unseen passages appropriate to the learner level and language, followed by specific retrieval, inference, vocabulary-in-context, language-analysis, summary and evaluation questions with marks and answer guidance. Never create vague questions detached from a supplied passage.",

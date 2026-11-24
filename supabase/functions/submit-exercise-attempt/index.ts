@@ -88,7 +88,6 @@ Deno.serve(async request => {
     .eq("learner_id", authData.user.id).maybeSingle();
   if (assignmentError || !assignment) return json(404, { error: "This assessment is not assigned to your account." });
   if (new Date(assignment.available_at).getTime() > Date.now()) return json(403, { error: "This assessment is scheduled and is not available yet." });
-  if (assignment.due_at && new Date(assignment.due_at).getTime() < Date.now()) return json(403, { error: "The deadline for this assessment has passed. Your teacher can advise you on next steps." });
   const { data: set, error: setError } = await admin.from("exercise_sets")
     .select("id,title,is_published,question_count").eq("id", assignment.exercise_set_id).maybeSingle();
   if (setError || !set?.is_published) return json(404, { error: "This assessment is not currently available." });
@@ -246,8 +245,12 @@ Deno.serve(async request => {
 
   const markedAt = aiMarkedCount > 0 ? new Date().toISOString() : null;
   const markingStatus = manualReview > 0 ? "teacher_review" : aiMarkedCount > 0 ? "ai_marked" : "not_required";
+  const submittedLate = Boolean(assignment.due_at && Date.parse(assignment.due_at) < Date.now());
+  const minutesLate = submittedLate ? Math.max(0, Math.ceil((Date.now() - Date.parse(assignment.due_at!)) / 60000)) : 0;
   const { data: attempt, error: attemptError } = await admin.from("exercise_attempts").insert({
     assignment_id: assignment.id,
+    submitted_late: submittedLate,
+    minutes_late: minutesLate,
     learner_id: authData.user.id,
     answers,
     score,
@@ -270,6 +273,8 @@ Deno.serve(async request => {
     manualReview,
     aiMarked: aiMarkedCount,
     markingStatus,
+    submittedLate,
+    minutesLate,
     markingNotice: aiMarkingFailure,
     progressRecorded: true,
     results,

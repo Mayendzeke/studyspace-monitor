@@ -54,3 +54,9 @@ test("late assessment submissions remain allowed and are recorded", () => {
   assert.match(submit, /minutesLate/);
   assert.match(submit, /2026-11-24-v9/);
 });
+
+test("submitting an assessment updates its central programme item", () => {
+  const submit = read("supabase/functions/submit-exercise-attempt/index.ts");
+  assert.match(submit, /assessment_schedule_items/);
+  assert.match(submit, /update\(\{ status: "completed" \}\)/);
+});

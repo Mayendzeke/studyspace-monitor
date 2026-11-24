@@ -169,15 +169,15 @@ async function approvedNotes(admin:any,learnerId:string,subject:string) {
   return notes.join("\n\n").slice(0,30000);
 }
 async function requestMaterialReview(url:string,publishable:string,service:string,learnerId:string,subject:string) {
-  const response=await fetch(url+"/functions/v1/mia-monitor-assistant",{
+  const response=await fetch(url+"/functions/v1/curriculum-material-engine",{
     method:"POST",
     headers:{Authorization:"Bearer "+service,apikey:publishable,Origin:APP_ORIGIN,"Content-Type":"application/json"},
-    body:JSON.stringify({action:"prepare_material",learnerId,subjectName:subject,topic:""}),
+    body:JSON.stringify({learnerId,subjectName:subject,topic:""}),
     signal:AbortSignal.timeout(120000),
   });
   const payload=await response.json().catch(()=>({}));
   if(!response.ok||payload?.success!==true)throw new Error(String(payload?.error||"The Monitor material preparation workflow could not be started."));
-  return payload as Record<string,unknown>;
+  return {...payload,reviewId:payload.queueId} as Record<string,unknown>;
 }
 
 Deno.serve(async request=>{

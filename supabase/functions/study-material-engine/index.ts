@@ -147,13 +147,17 @@ Deno.serve(async request=>{
   if(subjectsError)return json(503,{error:"Your registered subjects could not be checked."});
   const subject=(subjects||[]).find((row:any)=>String(row.name||"").trim().toLowerCase()===subjectName.toLowerCase());
   if(!subject)return json(400,{error:"This file must be linked to a subject registered on your StudySpace account."});
+  const resumePracticeRequests=async()=>{
+    await admin.from("learner_practice_requests").update({status:"queued",updated_at:new Date().toISOString()})
+      .eq("learner_id",learnerId).eq("subject_id",subject.id).in("status",["waiting_for_material","waiting_for_study_pack"]);
+  };
   const sourceHash=await sha256(JSON.stringify({text:extractedText,subjectName,topic,country:profile.country,institution_type:profile.institution_type,grade:profile.grade,qualification_level:profile.qualification_level,curriculum:profile.curriculum,academic_year:profile.academic_year}));
   let existingQuery=admin.from("learner_study_packs").select("id,status,content,version,source_hash,updated_at")
     .eq("learner_id",learnerId).eq("source_hash",sourceHash);
   existingQuery=sourceType==="teacher_resource"?existingQuery.eq("learning_resource_id",resourceId):existingQuery.eq("personal_resource_id",resourceId);
   const {data:existing,error:existingError}=await existingQuery.maybeSingle();
   if(existingError)return json(503,{error:"Your existing study pack could not be checked."});
-  if(existing?.status==="ready"&&!force)return json(200,{success:true,status:"ready",packId:existing.id,sourceHash,content:existing.content});
+  if(existing?.status==="ready"&&!force){await resumePracticeRequests();return json(200,{success:true,status:"ready",packId:existing.id,sourceHash,content:existing.content});}
   if(existing?.status==="generating"&&!force&&Date.now()-Date.parse(String(existing.updated_at||""))<10*60*1000)return json(200,{success:true,status:"generating",packId:existing.id,sourceHash});
   if(extractedText.trim().length<120) {
     const lowTextStatus=unsupported?"unsupported":"needs_ocr";
@@ -224,8 +228,9 @@ Deno.serve(async request=>{
       status:"ready",content:pack,error_message:null,updated_at:new Date().toISOString(),
     }).eq("id",packId).eq("learner_id",learnerId);
     if(saveError)throw new Error("The study pack was generated but could not be saved.");
-    await admin.from("ai_generation_usage").update({output_characters:generated.text.length,provider:"cloudflare-workers-ai"})
+    await admin.from("ai_generation_usage").update({output_characters:generated.text.length,provider:generated.provider||"multi-provider"})
       .eq("id",usage.id).eq("actor_id",learnerId);
+    await resumePracticeRequests();
     return json(200,{success:true,status:"ready",packId,sourceHash,content:pack});
   } catch(error) {
     const message=error instanceof Error?error.message:"Study material generation failed.";

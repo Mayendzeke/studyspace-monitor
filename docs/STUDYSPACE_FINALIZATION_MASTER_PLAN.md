@@ -115,3 +115,13 @@ The Monitor repository owns shared-backend migrations and Edge Function source. 
 4. Complete MIΛ provider reliability and its hand-off to the central learning/assessment records.
 5. Verify the remaining Student, Monitor and shared workflows end to end.
 6. Align the public website, terms/privacy references and production release checks.
+
+
+## Assessment automation contract
+
+- Every registered subject stays in the weekly programme; the Balanced policy distributes workload across real available study periods and reports capacity conflicts rather than silently dropping subjects.
+- Weekly subject tests default to 10 questions, with a learner-controlled question-count preference.
+- Every subject also receives a monthly comprehensive test and a quarterly examination, scheduled separately from weekly practice.
+- Near-term tests are prepared automatically in bounded batches. Future monthly and quarterly tests are stored in the programme and generated as their dates approach.
+- The Monitor repository owns the scheduler and submission Edge Functions; the Student repository owns only the learner-facing programme and preferences.
+- Submitting an assessment marks its programme item complete, including when the submission is late.

@@ -42,7 +42,7 @@ export function subtractBusyWindows(windows:Record<string,unknown>[], busy:Recor
   return output;
 }
 
-export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:Record<string,unknown>[], dailyLimit:number) {
+export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:Record<string,unknown>[], dailyLimit:number, questionCount=10) {
   const days=DAYS.map(day=>({day,workload:0,minutes:0,hard:0,count:0}));
   const remaining=slots.map((slot,index)=>({
     ...slot,id:String(slot.id||"slot-"+index),
@@ -73,7 +73,7 @@ export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:R
     if(profile.difficulty>=4.5)day.hard++;
     assignments.push({
       subjectId:subject.id,subjectName:String(subject.name),day:slot.day,slotId:slot.id,start,end,
-      durationMinutes:profile.minutes,questionCount:10,difficultyScore:Math.round(profile.difficulty*100)/100,
+      durationMinutes:profile.minutes,questionCount:clamp(Math.round(number(questionCount,10)),1,100),difficultyScore:Math.round(profile.difficulty*100)/100,
       workloadScore:Math.round(profile.workload*100)/100,subjectType:String(subject.subject_type||"mixed"),
       creditHours:number(subject.credit_hours,1),weeklyMinutesTarget:number(subject.weekly_minutes_target,60),
     });

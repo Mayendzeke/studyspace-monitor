@@ -38,7 +38,7 @@ async function authorizeAdmin(request: Request) {
   if (assuranceError || assurance.currentLevel !== "aal2") throw new Response(JSON.stringify({ error: "Complete administrator multi-factor authentication before using MIΛ." }), { status: 403, headers });
   const { data: profile, error: profileError } = await caller.from("profiles").select("role,account_status").eq("id", auth.user.id).single();
   if (profileError || profile?.role !== "admin" || profile.account_status !== "active") throw new Response(JSON.stringify({ error: "Active administrator access is required." }), { status: 403, headers });
-  return { userId: auth.user.id, url, service };
+  return { userId: auth.user.id, url, service, internal: false };
 }
 
 Deno.serve(async (request: Request) => {
@@ -46,9 +46,16 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   if (!originAllowed(request.headers.get("Origin") ?? "")) return json(403, { error: "This StudySpace origin is not allowed." });
   try {
-    const auth = await authorizeAdmin(request);
     let body: { message?: unknown; history?: unknown; action?: unknown };
     try { body = await request.json(); } catch { return json(400, { error: "Invalid request body." }); }
+    const authorization = request.headers.get("Authorization") ?? "";
+    const token = authorization.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim() ?? "";
+    const internalService = serviceKey();
+    const internalUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const auth = token && internalService && token === internalService
+      ? { userId: null, url: internalUrl, service: internalService, internal: true }
+      : await authorizeAdmin(request);
+    if (auth.internal && body.action !== "prepare_material") return json(403, { error: "Internal access is restricted to material preparation." });
 
     if (body.action === "prepare_material") {
       const learnerId = String((body as Record<string, unknown>).learnerId ?? "").trim();
@@ -63,6 +70,11 @@ Deno.serve(async (request: Request) => {
       if (subjectsError) return json(503, { error: "The learner's registered subjects could not be checked." });
       const registered = (subjects ?? []).find((row: { name: string }) => row.name.trim().toLocaleLowerCase() === subjectName.toLocaleLowerCase());
       if (!registered) return json(400, { error: "The selected subject is not registered on this learner's profile." });
+      const { data: existingPending, error: pendingError } = await admin.from("learning_material_review_queue")
+        .select("id").eq("learner_id", learnerId).eq("subject_name", subjectName).eq("status", "pending")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (pendingError) return json(503, { error: "Existing material review requests could not be checked." });
+      if (existingPending) return json(200, { success: true, needsGeneration: false, status: "pending_review", reviewId: existingPending.id, message: "Learning material is already awaiting administrator review. It will not be generated twice." });
       const [{ data: personalResources, error: personalError }, { data: assignments, error: assignmentsError }] = await Promise.all([
         admin.from("learner_personal_resources").select("title,subject_name,topic,resource_type").eq("learner_id", learnerId).ilike("subject_name", subjectName),
         admin.from("resource_assignments").select("resource_id").eq("learner_id", learnerId),
@@ -135,7 +147,7 @@ Deno.serve(async (request: Request) => {
         source_verification: groundedSources.length ? "Google Search grounded; pending administrator curriculum verification" : "No grounding sources returned; pending administrator source verification",
       };
       const { data: queued, error: queueError } = await admin.from("learning_material_review_queue").insert({
-        learner_id: learnerId, requested_by: auth.userId,
+        learner_id: learnerId, requested_by: auth.userId || null,
         title: String(material.title || subjectName + " study material").slice(0,240),
         summary: String(material.summary || "").slice(0,1200), subject_name: subjectName,
         topic: String(material.topic || requestedTopic || "").slice(0,180),
@@ -149,7 +161,7 @@ Deno.serve(async (request: Request) => {
       }).select("id").single();
       if (queueError || !queued) return json(503, { error: "The generated material could not be saved to the approval queue. It was not published to the learner." });
       const { error: auditError } = await admin.from("audit_events").insert({
-        actor_id: auth.userId, event_type: "learning_material_prepared_for_review",
+        actor_id: auth.userId || null, event_type: "learning_material_prepared_for_review",
         target_type: "learning_material", target_id: queued.id,
         details: { learner_id: learnerId, subject_name: subjectName, topic: requestedTopic, provider: generated.provider, model: generated.model, fallback_used: generated.fallbackUsed },
       });

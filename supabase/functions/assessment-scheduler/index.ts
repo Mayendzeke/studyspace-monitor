@@ -503,7 +503,7 @@ Deno.serve(async request=>{
       if(publishError)throw new Error("The assessment could not be published.");
       const dueAt=zonedTimeToIso(scheduledDate,"23:59",timezone);
       const {data:assignment,error:assignmentError}=await admin.from("exercise_assignments").insert({
-        exercise_set_id:set.id,learner_id:auth.user.id,assigned_by:auth.user.id,
+        exercise_set_id:set.id,learner_id:auth.user.id,assigned_by:auth.user.id,assignment_type:"scheduled_assessment",
         available_at:item.scheduled_at,due_at:dueAt,
       }).select("id").single();
       if(assignmentError||!assignment)throw new Error("The assessment assignment could not be created.");

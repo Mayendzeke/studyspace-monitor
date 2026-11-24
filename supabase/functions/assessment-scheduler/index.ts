@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildBalancedSchedule, subtractBusyWindows } from "./scheduler.ts";
+import { buildBalancedSchedule, subtractBusyWindows, expandPeriodWindows } from "./scheduler.ts";
 
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "https://mayendzeke.github.io";
 const headers = {
@@ -31,6 +31,28 @@ function dateForDay(monday:string,day:string) {
   const [year,month,date]=monday.split("-").map(Number);
   return new Date(Date.UTC(year,month-1,date+(DAY_OFFSET[day]??0))).toISOString().slice(0,10);
 }
+function addDays(date:string,amount:number) {
+  const value=new Date(date+"T12:00:00Z");
+  value.setUTCDate(value.getUTCDate()+amount);
+  return value.toISOString().slice(0,10);
+}
+function monthBounds(date:string) {
+  const [year,month]=date.split("-").map(Number);
+  return {
+    start:year+"-"+String(month).padStart(2,"0")+"-01",
+    end:new Date(Date.UTC(year,month,0)).toISOString().slice(0,10),
+  };
+}
+function quarterBounds(date:string) {
+  const [year,month]=date.split("-").map(Number);
+  const startMonth=Math.floor((month-1)/3)*3+1;
+  const endMonth=startMonth+2;
+  return {
+    start:year+"-"+String(startMonth).padStart(2,"0")+"-01",
+    end:new Date(Date.UTC(year,endMonth,0)).toISOString().slice(0,10),
+  };
+}
+const laterDate=(left:string,right:string)=>left>right?left:right;
 function zonedTimeToIso(date:string,time:string,timezone:string) {
   const [year,month,day]=date.split("-").map(Number);
   const [hour,minute]=time.split(":").map(Number);

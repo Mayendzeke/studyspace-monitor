@@ -68,6 +68,27 @@ Deno.serve(async (request: Request) => {
         .select("country,institution,institution_type,education_level,grade,curriculum,academic_year,course,qualification_level")
         .eq("id", learnerId).eq("role", "learner").eq("account_status", "active").maybeSingle();
       if (profileError || !profile) return json(404, { error: "The selected active learner profile could not be found." });
+      if (!String(profile.country || "").trim()) return json(422, { error: "Complete the learner country in their academic profile before generating material. The correct national curriculum cannot be identified without it." });
+      if (String(profile.education_level || "").toLowerCase() === "tertiary" && (!String(profile.institution || "").trim() || !String(profile.course || "").trim())) return json(422, { error: "Complete the tertiary institution and course or programme before generating material. The official module outline cannot be identified without them." });
+      const { data: registryRows, error: registryError } = await admin.from("curriculum_reference_registry")
+        .select("authority_name,institution,education_level,grade,curriculum,course,subject_name,module_code,module_name,language,source_type,title,publisher,source_url,version_label,academic_year,notes")
+        .eq("country", String(profile.country).trim()).eq("verified_status", "verified").limit(80);
+      if (registryError) return json(503, { error: "The verified curriculum reference library could not be checked. No material was generated." });
+      const matchedCurriculumSources = (registryRows ?? []).filter((row: Record<string, unknown>) => {
+        const same = (a: unknown, b: unknown) => !String(a || "").trim() || String(a).trim().toLowerCase() === String(b || "").trim().toLowerCase();
+        const generalFramework = /national curriculum|curriculum framework/i.test(String(row.title || ""));
+        return same(row.subject_name, subjectName) && (same(row.curriculum, profile.curriculum) || generalFramework)
+          && same(row.institution, profile.institution) && same(row.course, profile.course);
+      }).slice(0, 20);
+      const { data: literatureRows, error: literatureError } = await admin.from("literature_text_registry")
+        .select("qualification,grade,curriculum,subject_name,learning_language,title,author,editor,genre,anthology,prescribed_status,examination_years,syllabus_url,catalogue_url,source_references,notes")
+        .eq("country", String(profile.country).trim()).ilike("subject_name", subjectName).eq("learning_language", requestedLanguage).limit(100);
+      if (literatureError) return json(503, { error: "The literature set-text register could not be checked. No material was generated." });
+      const matchedLiteratureTexts = (literatureRows ?? []).filter((row: Record<string, unknown>) => {
+        const gradeMatches = !String(row.grade || "").trim() || !String(profile.grade || "").trim() || String(row.grade).toLowerCase().includes(String(profile.grade).toLowerCase()) || String(profile.grade).toLowerCase().includes(String(row.grade).toLowerCase());
+        const qualificationMatches = !String(row.qualification || "").trim() || !String(profile.qualification_level || "").trim() || String(row.qualification).toLowerCase().includes(String(profile.qualification_level).toLowerCase()) || String(profile.qualification_level).toLowerCase().includes(String(row.qualification).toLowerCase());
+        return gradeMatches && qualificationMatches;
+      }).slice(0, 60);
       const { data: subjects, error: subjectsError } = await admin.from("student_subjects").select("name,category,description").eq("learner_id", learnerId);
       if (subjectsError) return json(503, { error: "The learner's registered subjects could not be checked." });
       const registered = (subjects ?? []).find((row: { name: string }) => row.name.trim().toLocaleLowerCase() === subjectName.toLocaleLowerCase());
@@ -103,6 +124,8 @@ Deno.serve(async (request: Request) => {
         subject_category: String(registered.category || ""), subject_description: String(registered.description || ""),
         language: requestedLanguage,
         requested_topic: requestedTopic || "Identify the appropriate next topics from the matching curriculum",
+        curriculum_sources: matchedCurriculumSources.map((row: Record<string, unknown>) => ({ title: row.title, publisher: row.publisher || row.authority_name, source_url: row.source_url, source_type: row.source_type, version_label: row.version_label, academic_year: row.academic_year, subject_name: row.subject_name, module_code: row.module_code, module_name: row.module_name, notes: row.notes })),
+        literature_set_texts: matchedLiteratureTexts.map((row: Record<string, unknown>) => ({ title: row.title, author: row.author, editor: row.editor, genre: row.genre, anthology: row.anthology, prescribed_status: row.prescribed_status, examination_years: row.examination_years, syllabus_url: row.syllabus_url, catalogue_url: row.catalogue_url, source_references: row.source_references, notes: row.notes })),
         existing_resource_titles: existingMaterials.map((row: { title?: string }) => String(row.title || "")).slice(0, 20),
       };
       const materialSystem = [
@@ -110,20 +133,29 @@ Deno.serve(async (request: Request) => {
         "Prepare accurate, age-appropriate learning material for the exact academic context supplied.",
         "Prioritise the named country's official curriculum and examination authority, then reputable universities and recognised educational publishers.",
         "Cross-reference the exact country, named school or institution, curriculum, grade, course, module and subject before drafting. For tertiary learners, seek the institution official course outline, programme handbook and module learning outcomes. For school learners, seek the national curriculum and examination-board syllabus.",
+        "Use the administrator-verified curriculum reference sources included in the academic profile. Compare them with live official source results and the exact school or institution course outline; do not treat a broad national framework as a substitute for a subject syllabus.",
         "Use at least two independent authoritative sources where available. If official sources conflict or the exact course outline cannot be found, explain the gap and leave the material clearly marked for administrator verification rather than guessing.",
         "Write all student-facing material in the requested learning language, including notes, examples, exercises, question instructions and flashcards. Do not silently switch to English.",
         "Do not silently substitute another country's syllabus or assume that the same grade means the same curriculum.",
         "Do not invent syllabus statements, textbook titles, source URLs, authors, publishers or citations.",
         "Only include a source URL if you are confident it is real and relevant. If uncertain, leave the URL empty and state what official source the administrator should verify.",
+        "For literature and language subjects, identify exact current set texts for the learner country, examination board, qualification, grade and examination year using literature_set_texts and the official syllabus. Cover confirmed prescribed novels, plays, short-story collections, poems and anthologies, not generic literature themes.",
+        "For every prescribed set text, create original, text-specific study notes: author and context, accurate plot or argument overview, structure, characters and relationships, themes, setting, narrative voice, language and literary techniques, key moments, interpretation, and exam-focused essay, passage-based or empathic practice with marking guidance.",
+        "For poetry, cover speaker, situation, structure, form, sound, imagery, diction, tone, shifts, themes and supported interpretations. For drama, cover stagecraft, dialogue, conflict, dramatic irony and character development. For prose, cover narrative viewpoint, plot structure, setting, characterisation and style.",
+        "For comprehension practice, create substantial original unseen passages appropriate to the learner level and language, followed by specific retrieval, inference, vocabulary-in-context, language-analysis, summary and evaluation questions with marks and answer guidance. Never create vague questions detached from a supplied passage.",
+        "Do not reproduce copyrighted books, poems, stories, study guides or past-paper questions. Create original explanations and assessment items; use only brief quotations where legally appropriate and cite the source edition/page when supplied.",
         "Create original explanations, definitions, worked examples and practice activities. Do not reproduce copyrighted textbook chapters or past-paper questions verbatim.",
-        "Return JSON with title, summary, topic, material_type, markdown, learning_objectives, syllabus_alignment, practice_questions and source_references.",
+        "Return JSON with title, summary, topic, material_type, markdown, learning_objectives, syllabus_alignment, practice_questions, flashcards and source_references.",
         "markdown must be a complete structured student-ready study resource with explanations, worked examples, recap and self-check questions. Aim for useful depth.",
+        "For prescribed set texts, flashcards must cover actual characters, events, themes, terminology, literary methods and interpretations rather than generic subject definitions.",
         "source_references must be an array of objects with title, publisher, url and relevance. Never fabricate references.",
+        "Generate 8 to 15 concise revision flashcards from the same syllabus-aligned topics. Each card must have front and back strings. Write both sides entirely in the requested learning language.",
+        "Generate 8 to 15 useful flashcards from the same verified topics. Each card must contain concise front and back fields in the requested learning language.",
         "Do not include learner names, Student IDs, email addresses, phone numbers or other personal identifiers.",
       ].join(" ");
       const generated = await generateWithFallback("Prepare learning material using this exact learner academic profile and requested language: " + requestedLanguage + ". Cross-reference the relevant official syllabus or course outline and other authoritative sources before drafting. Existing resources were checked and no matching material was found. Return JSON only.\n" + JSON.stringify(profileContext), {
         maxTokens: 6500, jsonMode: true, googleSearch: true, systemPrompt: materialSystem,
-        requiredJsonKeys: ["title","summary","topic","material_type","markdown","learning_objectives","syllabus_alignment","practice_questions","source_references"],
+        requiredJsonKeys: ["title","summary","topic","material_type","markdown","learning_objectives","syllabus_alignment","practice_questions","flashcards","source_references"],
       });
       let material: Record<string, unknown>;
       try { material = JSON.parse(generated.text); } catch { return json(502, { error: "The AI providers returned invalid material structure. Nothing was added to the learner profile." }); }
@@ -150,6 +182,8 @@ Deno.serve(async (request: Request) => {
         learning_objectives: Array.isArray(material.learning_objectives) ? material.learning_objectives.slice(0,20) : [],
         syllabus_alignment: material.syllabus_alignment ?? "",
         practice_questions: Array.isArray(material.practice_questions) ? material.practice_questions.slice(0,30) : [],
+        flashcards: Array.isArray(material.flashcards) ? material.flashcards.slice(0, 60).filter((card: unknown) => card && typeof card === "object" && typeof (card as Record<string, unknown>).front === "string" && typeof (card as Record<string, unknown>).back === "string") : [],
+        flashcards: Array.isArray(material.flashcards) ? material.flashcards.slice(0, 60).filter((card: unknown) => card && typeof card === "object" && typeof (card as Record<string, unknown>).front === "string" && typeof (card as Record<string, unknown>).back === "string") : [],
         source_verification: groundedSources.length ? "Google Search grounded; pending administrator curriculum verification" : "No grounding sources returned; pending administrator source verification",
       };
       const { data: queued, error: queueError } = await admin.from("learning_material_review_queue").insert({

@@ -58,11 +58,11 @@ function accessActive(profile:Record<string,unknown>) {
   if(profile.subscription_tier) return Boolean(profile.subscription_expires_at&&Date.parse(String(profile.subscription_expires_at))>now);
   return Boolean(profile.trial_started_at&&profile.trial_expires_at&&Date.parse(String(profile.trial_started_at))<=now&&Date.parse(String(profile.trial_expires_at))>now);
 }
-async function generateQuestions(url:string,publishable:string,token:string,subject:string,difficulty:string,notesText:string) {
+async function generateQuestions(url:string,publishable:string,token:string,subject:string,difficulty:string,notesText:string,questionCount:number) {
   const response=await fetch(url+"/functions/v1/mia-assistant",{
     method:"POST",
     headers:{Authorization:"Bearer "+token,apikey:publishable,Origin:APP_ORIGIN,"Content-Type":"application/json"},
-    body:JSON.stringify({action:"generate_topic_test",subject,topic:"Weekly curriculum practice and current learning objectives",questionCount:10,difficulty,notesText}),
+    body:JSON.stringify({action:"generate_topic_test",subject,topic:"Weekly curriculum practice and current learning objectives",questionCount,difficulty,notesText}),
     signal:AbortSignal.timeout(90000),
   });
   const payload=await response.json().catch(()=>({}));
@@ -135,14 +135,14 @@ Deno.serve(async request=>{
   let body:Record<string,unknown>={};
   try{body=await request.json();}catch{return json(400,{error:"Invalid request body."});}
   const [{data:preferences,error:preferencesError},{data:subjects,error:subjectsError},{data:studentEntries,error:studentEntriesError},{data:members,error:membersError}]=await Promise.all([
-    admin.from("assessment_schedule_preferences").select("available_windows,daily_minutes_limit,preferred_assessment_days,timezone").eq("learner_id",auth.user.id).maybeSingle(),
+    admin.from("assessment_schedule_preferences").select("available_windows,daily_minutes_limit,preferred_assessment_days,timezone,question_count").eq("learner_id",auth.user.id).maybeSingle(),
     admin.from("student_subjects").select("id,name,category,description,difficulty_level,subject_type,credit_hours,weekly_minutes_target").eq("learner_id",auth.user.id).order("name"),
     admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",auth.user.id),
     admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",auth.user.id),
   ]);
   if(preferencesError||subjectsError||studentEntriesError||membersError)return json(503,{error:"Your subjects, timetable or assessment availability could not be loaded."});
   if(!subjects?.length)return json(200,{success:true,status:"no_subjects",message:"Add your subjects before creating a weekly assessment programme."});
-  const prefs=preferences||{available_windows:[],daily_minutes_limit:120,preferred_assessment_days:[1,2,3,4,5],timezone:"Africa/Mbabane"};
+  const prefs=preferences||{available_windows:[],daily_minutes_limit:120,preferred_assessment_days:[1,2,3,4,5],timezone:"Africa/Mbabane",question_count:10};
   let timezone=String(prefs.timezone||body.timezone||"Africa/Mbabane");
   try{new Intl.DateTimeFormat("en-GB",{timeZone:timezone});}catch{timezone="Africa/Mbabane";}
   const monday=mondayOf(localDate(new Date(),timezone));
@@ -193,8 +193,9 @@ Deno.serve(async request=>{
     recent_score:(scoreBySubject.get(subject.name)||[]).length?(scoreBySubject.get(subject.name)||[]).reduce((sum,value)=>sum+value,0)/(scoreBySubject.get(subject.name)||[]).length:undefined,
   }));
   const dailyLimit=Number(prefs.daily_minutes_limit)||120;
-  const schedule=buildBalancedSchedule(schedulerSubjects,freeSlots,dailyLimit);
-  const snapshot={profile:{country:profile.country,education_level:profile.education_level,grade:profile.grade,curriculum:profile.curriculum,course:profile.course,academic_year:profile.academic_year},subjects:schedulerSubjects,windows,freeSlots,dailyLimit,timezone};
+  const questionCount=Math.max(1,Math.min(100,Number(prefs.question_count)||10));
+  const schedule=buildBalancedSchedule(schedulerSubjects,freeSlots,dailyLimit,questionCount);
+  const snapshot={profile:{country:profile.country,education_level:profile.education_level,grade:profile.grade,curriculum:profile.curriculum,course:profile.course,academic_year:profile.academic_year},subjects:schedulerSubjects,windows,freeSlots,dailyLimit,questionCount,timezone};
   const scheduleHash=await sha(JSON.stringify(snapshot));
   const {data:existing}=await admin.from("assessment_schedule_runs").select("id,schedule_hash,status")
     .eq("learner_id",auth.user.id).eq("period_type","weekly").eq("period_start",monday).maybeSingle();
@@ -213,7 +214,7 @@ Deno.serve(async request=>{
     const newRows=schedule.assignments.filter((item:any)=>!assignedSubjects.has(item.subjectId)).map((item:any)=>({
       schedule_run_id:runId,learner_id:auth.user.id,subject_id:item.subjectId,subject_name:item.subjectName,
       assessment_type:"weekly_subject",scheduled_at:zonedTimeToIso(dateForDay(monday,String(item.day)),String(item.start),timezone),
-      duration_minutes:item.durationMinutes,question_count:10,difficulty_score:item.difficultyScore,
+      duration_minutes:item.durationMinutes,question_count:item.questionCount||questionCount,difficulty_score:item.difficultyScore,
       workload_score:item.workloadScore,status:"scheduled",
       schedule_key:"weekly:"+auth.user.id+":"+monday+":"+item.subjectId,
       version_seed:crypto.randomUUID(),
@@ -268,11 +269,12 @@ Deno.serve(async request=>{
       const exposed=new Set((exposures||[]).map((row:any)=>row.question_id));
       const freshPool=(pool||[]).filter((row:any)=>!exposed.has(row.id));
       const seed=String(item.version_seed||crypto.randomUUID());
+      const itemQuestionCount=Math.max(1,Math.min(100,Number(item.question_count)||questionCount));
       let questions:Record<string,unknown>[]=[];
       let selectedBank:any[]=[];
       let bankQuestionIds:string[]=[];
-      if(freshPool.length>=10){
-        selectedBank=shuffle(freshPool,seed).slice(0,10);
+      if(freshPool.length>=itemQuestionCount){
+        selectedBank=shuffle(freshPool,seed).slice(0,itemQuestionCount);
         questions=selectedBank.map((row:any)=>({
           question_type:row.question_type,prompt:row.prompt,options:row.content?.options||[],pairs:row.content?.pairs||[],
           clue:row.content?.clue||"",scramble:row.content?.scramble||"",answer:row.answer_key?.answer||"",
@@ -280,7 +282,7 @@ Deno.serve(async request=>{
         }));
       }else{
         const notesText=await approvedNotes(admin,auth.user.id,item.subject_name);
-        questions=await generateQuestions(url,publishable,token,item.subject_name,String(item.difficulty_score||"adaptive"),notesText);
+        questions=await generateQuestions(url,publishable,token,item.subject_name,String(item.difficulty_score||"adaptive"),notesText,itemQuestionCount);
         const bankRows=await Promise.all(questions.map(async(question:any)=>({
           country:String(profile.country||""),curriculum:String(profile.curriculum||""),education_level:String(profile.education_level||""),
           grade:String(profile.grade||""),course:String(profile.course||""),subject_name:item.subject_name,language:"English",
@@ -290,7 +292,7 @@ Deno.serve(async request=>{
           explanation:String(question.explanation||""),points:1,difficulty:String(question.difficulty||"adaptive"),
           source_type:"ai_generated",source_reference:"StudySpace MIΛ · schema validated",
           fingerprint:await sha([cohortKey,String(question.question_type),String(question.prompt).trim().toLocaleLowerCase()].join("|")),
-          verification_status:"verified",created_by:auth.user.id,
+          verification_status:"pending",created_by:auth.user.id,
         })));
         const {error:bankError}=await admin.from("assessment_question_bank").upsert(bankRows,{onConflict:"fingerprint",ignoreDuplicates:true});
         if(bankError)throw new Error("The generated questions could not be added to the shared question bank.");
@@ -306,9 +308,9 @@ Deno.serve(async request=>{
       }));
       const title="Weekly Test · "+item.subject_name+" · "+monday;
       const {data:set,error:setError}=await admin.from("exercise_sets").insert({
-        created_by:auth.user.id,title,instructions:"Complete all 10 questions. This test was prepared for your registered subject and academic profile.",
+        created_by:auth.user.id,title,instructions:"Complete all "+itemQuestionCount+" questions. This test was prepared for your registered subject and academic profile.",
         subject_name:item.subject_name,education_level:String(profile.education_level||""),grade:String(profile.grade||""),
-        curriculum:String(profile.curriculum||""),question_count:10,is_published:false,review_status:"draft",
+        curriculum:String(profile.curriculum||""),question_count:itemQuestionCount,is_published:false,review_status:"draft",
         duration_minutes:item.duration_minutes,due_date:dateForDay(monday,String(item.metadata?.day||"Monday")),
       }).select("id").single();
       if(setError||!set)throw new Error("Assessment storage could not be created.");
@@ -319,7 +321,7 @@ Deno.serve(async request=>{
         explanation:String(question.explanation||""),points:1,topic:String(question.topic||item.subject_name),difficulty:String(question.difficulty||"Standard"),
       }));
       const {data:savedQuestions,error:questionError}=await admin.from("exercise_questions").insert(questionRows).select("id,position").order("position");
-      if(questionError||!savedQuestions||savedQuestions.length!==10)throw new Error("The generated questions could not be saved completely.");
+      if(questionError||!savedQuestions||savedQuestions.length!==itemQuestionCount)throw new Error("The generated questions could not be saved completely.");
       const answerRows=questions.map((question:any,index:number)=>({
         question_id:savedQuestions[index].id,
         answer_key:{answer:String(question.answer||""),acceptedAnswers:[String(question.answer||"")],pairs:question.pairs||[],explanation:String(question.explanation||"")},

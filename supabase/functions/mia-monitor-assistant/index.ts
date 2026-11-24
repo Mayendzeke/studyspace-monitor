@@ -164,29 +164,23 @@ Deno.serve(async (request: Request) => {
       const markdown = typeof material.markdown === "string" ? material.markdown.trim() : "";
       if (markdown.length < 500 || markdown.length > 60000) return json(502, { error: "The generated material did not pass the minimum content-quality check." });
       const groundedSources = Array.isArray(generated.groundingSources) ? generated.groundingSources : [];
-      const sourceReferences = groundedSources.length
-        ? groundedSources.map((source: { title: string; uri: string }) => ({
-            title: String(source.title || source.uri).slice(0, 240),
-            publisher: "Google Search",
-            url: source.uri,
-            relevance: "Search-grounded source supplied by Gemini; administrator must verify curriculum relevance.",
-            verification_status: "administrator_review_required",
-          }))
-        : Array.isArray(material.source_references) ? material.source_references.slice(0, 12).map((source: unknown) => {
-            if (!source || typeof source !== "object") return null;
-            const row = source as Record<string, unknown>;
-            let safeUrl = "";
-            try { const parsedUrl = new URL(String(row.url || "")); if (parsedUrl.protocol === "https:") safeUrl = parsedUrl.toString(); } catch { /* Unverified URLs are omitted. */ }
-            return { title: String(row.title || "").slice(0,240), publisher: String(row.publisher || "").slice(0,160), url: safeUrl, relevance: String(row.relevance || "").slice(0,500), verification_status: "administrator_review_required" };
-          }).filter(Boolean) : [];
+      const sourceReferences = [
+        ...matchedCurriculumSources.map((source: Record<string, unknown>) => ({ title: String(source.title || ""), publisher: String(source.publisher || source.authority_name || ""), url: String(source.source_url || ""), relevance: String(source.notes || source.source_type || ""), verification_status: "registry_verified" })),
+        ...matchedLiteratureTexts.map((source: Record<string, unknown>) => ({ title: String(source.title || ""), publisher: String(source.editor || source.author || ""), url: String(source.syllabus_url || source.catalogue_url || ""), relevance: String(source.notes || source.genre || ""), verification_status: source.prescribed_status === "confirmed_current" ? "registry_verified" : "discovery_lead" })),
+        ...groundedSources.slice(0, 12).map((source: { title?: string; uri?: string }) => ({ title: String(source.title || source.uri || "").slice(0, 240), publisher: "Google Search", url: String(source.uri || ""), relevance: "Live search-grounded source; administrator must verify exact curriculum alignment.", verification_status: "administrator_review_required" }))
+      ].flatMap((source: { title: string; publisher: string; url: string; relevance: string; verification_status: string }) => {
+        try { const url = new URL(source.url); if (url.protocol !== "https:") return []; return [{ ...source, url: url.toString(), domain: url.hostname.toLowerCase() }]; } catch { return []; }
+      });
+      const sourceDomains = [...new Set(sourceReferences.map((source: { domain: string }) => source.domain))];
+      const officialSourceFound = sourceReferences.some((source: { domain: string; verification_status: string }) => source.verification_status === "registry_verified" && /examscouncil|\.gov\.|\.edu\.|\.ac\./i.test(source.domain));
+      if (sourceDomains.length < 2 || !officialSourceFound) return json(422, { error: "The research check did not find two independent source domains including an official examination, ministry, school or university source. Nothing was queued. Add the correct syllabus or course outline to the verified reference library and retry." });
       const content = {
         markdown,
         learning_objectives: Array.isArray(material.learning_objectives) ? material.learning_objectives.slice(0,20) : [],
         syllabus_alignment: material.syllabus_alignment ?? "",
         practice_questions: Array.isArray(material.practice_questions) ? material.practice_questions.slice(0,30) : [],
         flashcards: Array.isArray(material.flashcards) ? material.flashcards.slice(0, 60).filter((card: unknown) => card && typeof card === "object" && typeof (card as Record<string, unknown>).front === "string" && typeof (card as Record<string, unknown>).back === "string") : [],
-        flashcards: Array.isArray(material.flashcards) ? material.flashcards.slice(0, 60).filter((card: unknown) => card && typeof card === "object" && typeof (card as Record<string, unknown>).front === "string" && typeof (card as Record<string, unknown>).back === "string") : [],
-        source_verification: groundedSources.length ? "Google Search grounded; pending administrator curriculum verification" : "No grounding sources returned; pending administrator source verification",
+        source_verification: "Two or more independent source domains, including an official examination or education authority; administrator review required",
       };
       const { data: queued, error: queueError } = await admin.from("learning_material_review_queue").insert({
         learner_id: learnerId, requested_by: auth.userId || null,
@@ -199,6 +193,8 @@ Deno.serve(async (request: Request) => {
         course: profileContext.course, curriculum: profileContext.curriculum,
         academic_year: profileContext.academic_year, language: requestedLanguage,
         source_references: sourceReferences, profile_snapshot: profileContext,
+        research_status: "cross_referenced", source_domains: sourceDomains, source_count: sourceDomains.length,
+        quality_checks: { independent_source_domains: sourceDomains.length, official_source_found: officialSourceFound, country_checked: true, institution_checked: Boolean(profileContext.institution), curriculum_checked: Boolean(profileContext.curriculum), course_outline_checked: Boolean(profileContext.course || profileContext.qualification_level), literature_text_count: matchedLiteratureTexts.length, confirmed_set_text_count: matchedLiteratureTexts.filter((row: Record<string, unknown>) => row.prescribed_status === "confirmed_current").length, language_checked: requestedLanguage, flashcard_count: Array.isArray(content.flashcards) ? content.flashcards.length : 0 },
         generator: generated.provider + " · " + generated.model + (generated.fallbackUsed ? " · fallback" : ""),
       }).select("id").single();
       if (queueError || !queued) return json(503, { error: "The generated material could not be saved to the approval queue. It was not published to the learner." });

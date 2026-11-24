@@ -80,3 +80,16 @@ test("MIΛ keeps model and provider identities server-side and enforces current 
   assert.doesNotMatch(mia, /provider:\s*generated\.provider/);
   assert.doesNotMatch(mia, /usage_status"\) return json\(200, \{ success: true, provider:/);
 });
+
+test("private study material engine uses the shared learner AI provider and current terms", () => {
+  const engine = read("supabase/functions/study-material-engine/index.ts");
+  const sharedProvider = read("supabase/functions/_shared/ai-provider.ts");
+  assert.match(engine, /CURRENT_TERMS_VERSION = "2026-11-24-v9"/);
+  assert.match(engine, /from "\.\.\/_shared\/ai-provider\.ts"/);
+  assert.match(engine, /learner_study_packs/);
+  assert.match(engine, /source_text:extractedText/);
+  assert.match(engine, /status:"ready"/);
+  assert.match(sharedProvider, /GEMMA_MODEL/);
+  assert.match(sharedProvider, /SECONDARY_MODEL/);
+  assert.doesNotMatch(engine, /providerNotice|model:\s*generated\.model|provider:\s*generated\.provider/);
+});

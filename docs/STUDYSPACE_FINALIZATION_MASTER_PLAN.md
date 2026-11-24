@@ -87,7 +87,7 @@ The Monitor repository owns shared-backend migrations and Edge Function source. 
 - The shared Supabase project is ACTIVE_HEALTHY. The public application tables inspected have RLS enabled.
 - The Student Library already supports multiple common school-file formats, private personal storage, previews and a hand-off to MIΛ. WeeklyTest can use an uploaded or teacher-assigned note when generating a topic test.
 - The current Student Library flow does not yet demonstrate an automatic, persisted study-pack pipeline triggered by every new upload.
-- The current WeeklyTest flow supports optional note-based topic-test generation, but no active Student/Monitor code references the database assessment-schedule tables.
+- The current WeeklyTest flow supports optional note-based topic-test generation. No assessment-schedule references were found in the inspected Student app entry points, WeeklyTest component or Monitor app entry point; a full source-tree search remains part of implementation verification.
 - These database tables exist but are empty: assessment_question_bank, assessment_question_exposures, assessment_schedule_preferences, assessment_schedule_runs and assessment_schedule_items. No corresponding schedule engine function was found in the public function-name inspection. Their migration/source ownership must be reconciled before relying on them.
 - The database, deployed enrol-learner Edge Function, Student app copy and public website currently implement/advertise a 7-day trial, not the latest intended 48-hour policy.
 - The Monitor in-person guardian verification component currently sends terms version 2026-11-08-v6 while the database activation function requires 2026-11-09-v8.

@@ -37,6 +37,7 @@ jobs:
       - name: Type-check central assessment Edge Functions
         run: |
           deno check supabase/functions/assessment-scheduler/index.ts
+          deno check supabase/functions/study-material-engine/index.ts
           deno check supabase/functions/submit-exercise-attempt/index.ts
       - name: Report dependency audit
         run: |
@@ -302,7 +303,7 @@ jobs:
           if (!app.includes("scope: 'others'") || !app.includes('updateUser({ password: newPassword })')) throw new Error('Administrator password and session-security settings are incomplete.')
           if (!timetablePage.includes('.eq("teacher_id",id)') || !timetablePage.includes('One personal weekly plan')) throw new Error('The Monitor timetable must remain limited to the signed-in administrator’s own weekly teaching plan.')
           const termsVersion = '2026-11-24-v9'
-          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts', 'supabase/functions/assessment-scheduler/index.ts', 'supabase/functions/enrol-learner/index.ts', 'supabase/functions/mia-assistant/index.ts', 'supabase/functions/manage-guardian-verification/index.ts', 'supabase/functions/guardian-consent/index.ts']) {
+          for (const path of ['supabase/functions/jaas-token/index.ts', 'supabase/functions/submit-exercise-attempt/index.ts', 'supabase/functions/assessment-scheduler/index.ts', 'supabase/functions/study-material-engine/index.ts', 'supabase/functions/enrol-learner/index.ts', 'supabase/functions/mia-assistant/index.ts', 'supabase/functions/manage-guardian-verification/index.ts', 'supabase/functions/guardian-consent/index.ts']) {
             const source = readFileSync(path, 'utf8')
             if (!source.includes(termsVersion)) throw new Error(path + ' does not enforce the current StudySpace terms version.')
             if (source.includes('2026-11-07-v1')) throw new Error(path + ' still contains a stale StudySpace terms-version check.')

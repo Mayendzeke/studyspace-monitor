@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateWithFallback, type ProviderMessage } from "./provider.ts";
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN") ?? "https://mayendzeke.github.io";
-const CURRENT_TERMS_VERSION = "2026-11-09-v8";
+const CURRENT_TERMS_VERSION = "2026-11-24-v9";
 const cors = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

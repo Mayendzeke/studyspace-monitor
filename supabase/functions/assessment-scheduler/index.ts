@@ -80,11 +80,11 @@ function accessActive(profile:Record<string,unknown>) {
   if(profile.subscription_tier) return Boolean(profile.subscription_expires_at&&Date.parse(String(profile.subscription_expires_at))>now);
   return Boolean(profile.trial_started_at&&profile.trial_expires_at&&Date.parse(String(profile.trial_started_at))<=now&&Date.parse(String(profile.trial_expires_at))>now);
 }
-async function generateQuestions(url:string,publishable:string,token:string,subject:string,difficulty:string,notesText:string,questionCount:number) {
+async function generateQuestions(url:string,publishable:string,token:string,subject:string,difficulty:string,notesText:string,questionCount:number,topic:string) {
   const response=await fetch(url+"/functions/v1/mia-assistant",{
     method:"POST",
     headers:{Authorization:"Bearer "+token,apikey:publishable,Origin:APP_ORIGIN,"Content-Type":"application/json"},
-    body:JSON.stringify({action:"generate_topic_test",subject,topic:"Weekly curriculum practice and current learning objectives",questionCount,difficulty,notesText}),
+    body:JSON.stringify({action:"generate_topic_test",subject,topic,questionCount,difficulty,notesText}),
     signal:AbortSignal.timeout(90000),
   });
   const payload=await response.json().catch(()=>({}));

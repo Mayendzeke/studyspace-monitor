@@ -64,7 +64,8 @@ test("migration files use applied Supabase versions and retain every applied mig
   const versions = files.map((file) => file.slice(0, 14));
   assert.equal(new Set(versions).size, versions.length, "Migration version prefixes must be unique.");
   const ledger = JSON.parse(readFileSync("supabase/migrations/applied-versions.json", "utf8"));
-  const expected = [...ledger.versions, ...(ledger.pending ?? [])].sort();
+  const pendingVersions = (ledger.pending ?? []).map((file) => String(file).slice(0, 14));
+  const expected = [...ledger.versions, ...pendingVersions].sort();
   assert.deepEqual(versions.slice().sort(), expected, "Monitor migration source must exactly match the applied production ledger plus explicitly reviewed pending migrations.");
 });
 

@@ -120,13 +120,14 @@ export default function LearningMaterialReviewQueue() {
       if (assignmentError) throw assignmentError;
       assignmentCreated = true;
 
-      const { error: reviewError } = await supabase.from("learning_material_review_queue").update({
+      const { data: reviewed, error: reviewError } = await supabase.from("learning_material_review_queue").update({
         status: "approved",
         reviewed_by: auth.user.id,
         reviewed_at: new Date().toISOString(),
         published_resource_id: resourceId,
-      }).eq("id", item.id).eq("status", "pending");
+      }).eq("id", item.id).eq("status", "pending").select("id").maybeSingle();
       if (reviewError) throw reviewError;
+      if (!reviewed) throw new Error("This material was already reviewed by another administrator. The duplicate publication was rolled back.");
       setNotice("Material approved and published to the learner's Study Materials library.");
       await refresh();
     } catch (reason) {
@@ -147,13 +148,14 @@ export default function LearningMaterialReviewQueue() {
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Your administrator session has expired.");
-      const { error: updateError } = await supabase.from("learning_material_review_queue").update({
+      const { data: reviewed, error: updateError } = await supabase.from("learning_material_review_queue").update({
         status: "rejected",
         reviewed_by: auth.user.id,
         reviewed_at: new Date().toISOString(),
         review_notes: reason.trim().slice(0, 1200),
-      }).eq("id", item.id).eq("status", "pending");
+      }).eq("id", item.id).eq("status", "pending").select("id").maybeSingle();
       if (updateError) throw updateError;
+      if (!reviewed) throw new Error("This material was already reviewed by another administrator.");
       setNotice("Material rejected. It will not appear in the learner's library.");
       await refresh();
     } catch (reason) {

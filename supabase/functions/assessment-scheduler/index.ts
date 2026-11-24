@@ -93,16 +93,29 @@ async function generateQuestions(url:string,publishable:string,token:string,subj
 }
 async function existingMaterials(admin:any,learnerId:string,subject:string) {
   const [{data:personal,error:personalError},{data:assignments,error:assignmentError},{data:packs,error:packError}]=await Promise.all([
-    admin.from("learner_personal_resources").select("id,mime_type").eq("learner_id",learnerId).ilike("subject_name",subject).limit(5),
+    admin.from("learner_personal_resources").select("id,mime_type").eq("learner_id",learnerId).ilike("subject_name",subject).limit(10),
     admin.from("resource_assignments").select("resource_id").eq("learner_id",learnerId),
-    admin.from("learner_study_packs").select("id").eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating"]).limit(1),
+    admin.from("learner_study_packs").select("personal_resource_id,learning_resource_id,status")
+      .eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating","needs_ocr","failed"]),
   ]);
   if(personalError||assignmentError||packError)throw new Error("The learner's existing resources could not be checked.");
   const ids=(assignments||[]).map((row:any)=>row.resource_id).filter(Boolean);
-  const {data:resources,error}=ids.length?await admin.from("learning_resources").select("id,mime_type").in("id",ids).ilike("subject_name",subject).limit(5):{data:[]};
+  const {data:teacherResources,error}=ids.length?await admin.from("learning_resources").select("id,mime_type")
+    .in("id",ids).ilike("subject_name",subject).limit(10):{data:[]};
   if(error)throw new Error("The learner's assigned resources could not be checked.");
-  const readablePersonal=(personal||[]).some((row:any)=>/^text\/(plain|markdown)/i.test(String(row.mime_type||"")));
-  return Boolean(readablePersonal||resources?.length||packs?.length);
+  const packByResource=new Map<string,string>();
+  for(const pack of packs||[]){
+    const resourceId=String(pack.personal_resource_id||pack.learning_resource_id||"");
+    if(resourceId&&!packByResource.has(resourceId))packByResource.set(resourceId,String(pack.status));
+  }
+  const canProvideNotes=(resource:any)=>{
+    const status=packByResource.get(String(resource.id));
+    if(status==="ready"||status==="generating")return true;
+    if(status==="needs_ocr"||status==="failed")return false;
+    const mime=String(resource.mime_type||"");
+    return /^text\/(plain|markdown)/i.test(mime)||/pdf|word|presentation|spreadsheet|officedocument/i.test(mime);
+  };
+  return Boolean((personal||[]).some(canProvideNotes)||(teacherResources||[]).some(canProvideNotes));
 }
 async function approvedNotes(admin:any,learnerId:string,subject:string) {
   const [{data:assignments},{data:personal},{data:packs}]=await Promise.all([

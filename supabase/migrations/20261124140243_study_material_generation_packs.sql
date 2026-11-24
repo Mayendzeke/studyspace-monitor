@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.learner_study_packs (
   source_hash text NOT NULL,
   source_text text NOT NULL DEFAULT '',
   content jsonb NOT NULL DEFAULT '{}'::jsonb,
-  status text NOT NULL DEFAULT 'generating' CHECK (status IN ('queued','generating','ready','failed','needs_ocr')),
+  status text NOT NULL DEFAULT 'generating' CHECK (status IN ('queued','generating','ready','failed','needs_ocr','superseded')),
   error_message text,
   version integer NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at timestamptz NOT NULL DEFAULT now(),

@@ -69,3 +69,6 @@ verify_jwt = true
 
 [functions.redeem-access-pin]
 verify_jwt = true
+
+[functions.study-material-engine]
+verify_jwt = true

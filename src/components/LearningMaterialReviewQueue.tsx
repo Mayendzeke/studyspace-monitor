@@ -116,6 +116,7 @@ export default function LearningMaterialReviewQueue() {
     let storagePath = "";
     let resourceId = "";
     let assignmentCreated = false;
+    const recipientIds = [...new Set(selectedRecipients[item.id] || [item.learner_id])];
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Your administrator session has expired. Sign in again.");
@@ -153,11 +154,9 @@ export default function LearningMaterialReviewQueue() {
       if (resourceError || !resource) throw resourceError || new Error("The learning resource record was not created.");
       resourceId = resource.id;
 
-      const { error: assignmentError } = await supabase.from("resource_assignments").insert({
-        resource_id: resourceId,
-        learner_id: item.learner_id,
-        assigned_by: auth.user.id,
-      });
+      const { error: assignmentError } = await supabase.from("resource_assignments").insert(
+        recipientIds.map(learner_id => ({ resource_id: resourceId, learner_id, assigned_by: auth.user.id }))
+      );
       if (assignmentError) throw assignmentError;
       assignmentCreated = true;
 
@@ -169,7 +168,7 @@ export default function LearningMaterialReviewQueue() {
       }).eq("id", item.id).eq("status", "pending").select("id").maybeSingle();
       if (reviewError) throw reviewError;
       if (!reviewed) throw new Error("This material was already reviewed by another administrator. The duplicate publication was rolled back.");
-      setNotice("Material approved and published to the learner's Study Materials library.");
+      setNotice("Material approved and published to " + recipientIds.length + " compatible learner account(s).");
       await refresh();
     } catch (reason) {
       if (assignmentCreated && resourceId) await supabase.from("resource_assignments").delete().eq("resource_id", resourceId);
@@ -249,6 +248,18 @@ export default function LearningMaterialReviewQueue() {
             {Object.keys(profile).length > 0 && <details><summary>Full academic profile used for research</summary><pre>{JSON.stringify(profile,null,2)}</pre></details>}
             <details className="material-review-preview"><summary><FileText size={15}/> Preview learning material</summary><pre>{markdownFor(item)}</pre></details>
             <div className="material-review-sources"><strong>Research sources</strong>{sources.length ? sources.map((source,index)=>source.url ? <a key={source.url || index} href={source.url} target="_blank" rel="noreferrer">{source.title || source.publisher || source.url} <ExternalLink size={12}/></a> : <span key={index}>{source.title || source.publisher || "Suggested source"} · URL not verified</span>) : <span>No source references supplied. Verify the material's accuracy before approving.</span>}</div>
+            {item.status === "pending" && <div className="material-review-recipients">
+              <strong>Share with compatible learners</strong>
+              <p>Matches require the same country, registered subject and grade/curriculum or institution. The original learner remains selected.</p>
+              {compatibleCandidates(item).map(candidate => {
+                const selected = selectedRecipients[item.id] || [item.learner_id];
+                return <label key={candidate.id}>
+                  <input type="checkbox" checked={selected.includes(candidate.id)} onChange={event => toggleRecipient(item,candidate.id,event.target.checked)}/>
+                  <span><b>{candidate.preferred_name || candidate.full_name || "Learner"}</b><small>{[candidate.institution,candidate.education_level,candidate.grade,candidate.course,candidate.curriculum].filter(Boolean).join(" · ")}</small></span>
+                </label>;
+              })}
+              {!compatibleCandidates(item).length && <span>No other compatible learners match this material.</span>}
+            </div>}
             <div className="material-review-footer"><span>Prepared {when(item.created_at)} · Learner {item.learner_id.slice(0,8)}…</span>
               {item.status === "pending" && <div className="material-review-actions">
                 <button type="button" className="secondary-button" disabled={busyId === item.id || !!busyId} onClick={() => void reject(item)}><XCircle size={15}/> Reject</button>

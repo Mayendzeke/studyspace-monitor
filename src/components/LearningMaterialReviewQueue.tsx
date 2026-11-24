@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import "./learning-material-review.css";
 
 type SourceReference = { title?: string; url?: string; publisher?: string; accessed_at?: string };
+type Candidate = { id: string; full_name: string; preferred_name: string; country: string; institution: string; education_level: string; grade: string; curriculum: string; course: string; subjects: string[] };
 type ReviewItem = {
   id: string;
   learner_id: string;
@@ -56,6 +57,8 @@ export default function LearningMaterialReviewQueue() {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<Record<string,string[]>>({});
 
   const refresh = useCallback(async () => {
     if (!supabase) { setError("StudySpace database is not connected."); setLoading(false); return; }
@@ -69,6 +72,36 @@ export default function LearningMaterialReviewQueue() {
   }, [filter]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadCandidates() {
+      if (!supabase) return;
+      const [p,s] = await Promise.all([
+        supabase.from("profiles").select("id,full_name,preferred_name,country,institution,education_level,grade,curriculum,course").eq("role","learner").eq("account_status","active"),
+        supabase.from("student_subjects").select("learner_id,name"),
+      ]);
+      if (!alive || p.error || s.error) return;
+      const byLearner = new Map<string,string[]>();
+      for (const row of s.data || []) byLearner.set(row.learner_id,[...(byLearner.get(row.learner_id)||[]),String(row.name||"")]);
+      setCandidates((p.data||[]).map(row=>({id:row.id,full_name:row.full_name||"",preferred_name:row.preferred_name||"",country:row.country||"",institution:row.institution||"",education_level:row.education_level||"",grade:row.grade||"",curriculum:row.curriculum||"",course:row.course||"",subjects:byLearner.get(row.id)||[]})));
+    }
+    void loadCandidates();
+    return () => { alive = false; };
+  }, []);
+  function compatibleCandidates(item: ReviewItem) {
+    const same=(a:string,b:string)=>Boolean(a&&b&&a.trim().toLowerCase()===b.trim().toLowerCase());
+    return candidates.filter(candidate=>{
+      if(candidate.id===item.learner_id)return true;
+      if(!same(candidate.country,item.country)||!candidate.subjects.some(name=>same(name,item.subject_name)))return false;
+      if(item.education_level&&!same(candidate.education_level,item.education_level))return false;
+      if(/tertiary|university|college/i.test(item.education_level))return same(candidate.institution,item.institution)&&same(candidate.course,item.course);
+      return same(candidate.grade,item.grade)&&(same(candidate.curriculum,item.curriculum)||same(candidate.institution,item.institution));
+    });
+  }
+  function toggleRecipient(item: ReviewItem, learnerId: string, checked: boolean) {
+    setSelectedRecipients(current=>{const selected=current[item.id]||[item.learner_id];const next=checked?[...new Set([...selected,learnerId])]:selected.filter(id=>id!==learnerId);return {...current,[item.id]:next.includes(item.learner_id)?next:[item.learner_id,...next]};});
+  }
 
   const visible = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();

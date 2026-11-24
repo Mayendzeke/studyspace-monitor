@@ -122,6 +122,7 @@ Deno.serve(async request=>{
   const sourceType=body.sourceType==="teacher_resource"?"teacher_resource":"uploaded_resource";
   const extractedText=cleanText(body.extractedText,180000);
   const force=body.force===true;
+  const unsupported=body.unsupported===true;
   if(!/^[0-9a-f-]{36}$/i.test(resourceId))return json(400,{error:"A valid school resource is required."});
   let resource:any=null;
   if(sourceType==="teacher_resource"){
@@ -155,15 +156,19 @@ Deno.serve(async request=>{
   if(existing?.status==="ready"&&!force)return json(200,{success:true,status:"ready",packId:existing.id,sourceHash,content:existing.content});
   if(existing?.status==="generating"&&!force&&Date.now()-Date.parse(String(existing.updated_at||""))<10*60*1000)return json(200,{success:true,status:"generating",packId:existing.id,sourceHash});
   if(extractedText.trim().length<120) {
+    const lowTextStatus=unsupported?"unsupported":"needs_ocr";
+    const lowTextMessage=unsupported
+      ?"This file format is not currently supported for text extraction."
+      :"The file did not contain enough extractable text. It may be a scanned image or photo.";
     const payload={
       learner_id:learnerId,source_type:sourceType,personal_resource_id:sourceType==="uploaded_resource"?resourceId:null,
       learning_resource_id:sourceType==="teacher_resource"?resourceId:null,subject_id:subject.id,subject_name:subjectName,
       topic,file_name:resource.title,mime_type:resource.mime_type,source_hash:sourceHash,source_text:extractedText,
-      status:"needs_ocr",error_message:"The file did not contain enough extractable text. It may be a scanned image or photo.",updated_at:new Date().toISOString(),
+      status:lowTextStatus,error_message:lowTextMessage,updated_at:new Date().toISOString(),
     };
     if(existing?.id)await admin.from("learner_study_packs").update(payload).eq("id",existing.id);
     else await admin.from("learner_study_packs").insert(payload);
-    return json(200,{success:true,status:"needs_ocr",packId:existing?.id||null,sourceHash,message:"This file appears to be scanned or image-based. A readable text version is needed before a study pack can be prepared."});
+    return json(200,{success:true,status:lowTextStatus,packId:existing?.id||null,sourceHash,message:lowTextMessage});
   }
   let versionsQuery=admin.from("learner_study_packs").select("version").eq("learner_id",learnerId);
   versionsQuery=sourceType==="teacher_resource"?versionsQuery.eq("learning_resource_id",resourceId):versionsQuery.eq("personal_resource_id",resourceId);

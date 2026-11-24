@@ -72,3 +72,6 @@ verify_jwt = true
 
 [functions.study-material-engine]
 verify_jwt = true
+
+[functions.curriculum-material-engine]
+verify_jwt = true

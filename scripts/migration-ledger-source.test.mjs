@@ -41,6 +41,7 @@ const required = [
   "20261124140241_cohort_question_versioning_and_exposure.sql",
   "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
   "20261124140243_study_material_generation_packs.sql",
+  "20261124140244_practice_assessment_requests.sql",
 ];
 
 const superseded = [

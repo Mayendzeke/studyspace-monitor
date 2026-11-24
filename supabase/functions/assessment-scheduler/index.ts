@@ -307,6 +307,25 @@ Deno.serve(async request=>{
   const prefs=preferences||{available_windows:[],daily_minutes_limit:120,preferred_assessment_days:[1,2,3,4,5],timezone:"Africa/Mbabane",question_count:10};
   let timezone=String(prefs.timezone||body.timezone||"Africa/Mbabane");
   try{new Intl.DateTimeFormat("en-GB",{timeZone:timezone});}catch{timezone="Africa/Mbabane";}
+  if(body.action==="request_practice"){
+    const requestedId=String(body.subjectId||"");
+    const requestedName=clean(body.subjectName,120).toLowerCase();
+    const subject=subjects.find((row:any)=>String(row.id)===requestedId||(requestedName&&String(row.name||"").trim().toLowerCase()===requestedName));
+    if(!subject)return json(404,{error:"Choose one of your registered subjects before preparing a practice test."});
+    const questionCount=Math.max(5,Math.min(20,Number(body.questionCount)||10));
+    const topic=clean(body.topic,180);
+    const {data:created,error:createError}=await admin.from("learner_practice_requests").insert({
+      learner_id:auth.user.id,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty:"adaptive",status:"queued",
+    }).select("id,status").single();
+    if(createError||!created)return json(503,{error:"Your practice test request could not be saved. Please try again."});
+    await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
+    const {data:updated}=await admin.from("learner_practice_requests").select("id,status,exercise_assignment_id,error_message,subject_name,topic,created_at")
+      .eq("id",created.id).maybeSingle();
+    const status=String(updated?.status||"queued");
+    return json(200,{success:true,requestId:created.id,status,assignmentId:updated?.exercise_assignment_id||null,error:updated?.error_message||null,
+      message:status==="ready"?"Your practice test is ready.":status==="waiting_for_material"?"StudySpace is preparing a curriculum guide for Monitor approval. Your practice test will appear when it is approved.":status==="waiting_for_study_pack"?"Your study material is being prepared. Your practice test will appear automatically when it is ready.":"Your practice test request has been saved."});
+  }
+  await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
   const monday=mondayOf(localDate(new Date(),timezone));
   const fridayDate=dateForDay(monday,"Friday");
   const preferredDays=Array.isArray(prefs.preferred_assessment_days)?prefs.preferred_assessment_days.map(Number):[1,2,3,4,5];

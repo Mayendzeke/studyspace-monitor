@@ -7,6 +7,7 @@ export type ProviderResult = {
   model: string;
   fallbackUsed: boolean;
   providerNotice: string | null;
+  groundingSources?: { title: string; uri: string }[];
 };
 
 export type ProviderStatus = {
@@ -16,7 +17,7 @@ export type ProviderStatus = {
   gemma: { configured: boolean; model: string };
 };
 
-type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[] };
+type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[]; googleSearch?: boolean };
 
 class ProviderSafetyError extends Error {
   constructor(message: string) {
@@ -95,7 +96,7 @@ function parseGeminiText(payload: any): string {
   return text;
 }
 
-async function callGemini(prompt: string, options: Required<GenerationOptions>): Promise<string> {
+async function callGemini(prompt: string, options: Required<GenerationOptions>): Promise<{ text: string; groundingSources: { title: string; uri: string }[] }> {
   const key = geminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is not configured.");
   let response: Response;
@@ -107,6 +108,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
       body: JSON.stringify({
         ...(options.systemPrompt ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } } : {}),
         contents: [{ role: "user", parts: [{ text: prompt }] }],
+        ...(options.googleSearch ? { tools: [{ googleSearch: {} }] } : {}),
         generationConfig: {
           maxOutputTokens: options.maxTokens,
           thinkingConfig: { thinkingLevel: "low" },
@@ -127,7 +129,18 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     const providerMessage = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new Error("Gemini API returned HTTP " + response.status + (providerMessage ? ": " + providerMessage : "."));
   }
-  return validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys);
+  const candidate = Array.isArray(payload?.candidates) ? payload.candidates[0] : undefined;
+  const groundingChunks = Array.isArray(candidate?.groundingMetadata?.groundingChunks) ? candidate.groundingMetadata.groundingChunks : [];
+  const groundingSources = groundingChunks.flatMap((chunk: any) => {
+    const web = chunk?.web;
+    if (!web || typeof web.uri !== "string" || !/^https:\/\//i.test(web.uri)) return [];
+    return [{ title: String(web.title || web.uri).slice(0, 240), uri: web.uri.slice(0, 2000) }];
+  }).filter((source: { title: string; uri: string }, index: number, all: { title: string; uri: string }[]) =>
+    all.findIndex(item => item.uri === source.uri) === index).slice(0, 12);
+  return {
+    text: validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys),
+    groundingSources,
+  };
 }
 
 async function callGemma(prompt: string, options: Required<GenerationOptions>): Promise<string> {
@@ -181,13 +194,14 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
     jsonMode: options.jsonMode === true,
     systemPrompt: String(options.systemPrompt ?? "").trim().slice(0, 12000),
     requiredJsonKeys: Array.isArray(options.requiredJsonKeys) ? options.requiredJsonKeys.filter(key => typeof key === "string").slice(0, 20) : [],
+    googleSearch: options.googleSearch === true,
   };
   const status = getProviderStatus();
   let primaryFailure = "";
   if (status.gemini.configured) {
     try {
-      const text = await callGemini(prompt, config);
-      return { text, provider: "Google Gemini API", model: GEMINI_MODEL, fallbackUsed: false, providerNotice: null };
+      const generated = await callGemini(prompt, config);
+      return { text: generated.text, provider: "Google Gemini API", model: GEMINI_MODEL, fallbackUsed: false, providerNotice: null, groundingSources: generated.groundingSources };
     } catch (error) {
       if (error instanceof ProviderSafetyError) throw error;
       primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";

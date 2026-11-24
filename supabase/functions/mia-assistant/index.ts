@@ -114,7 +114,7 @@ Deno.serve(async request => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(mime) || !/^[A-Za-z0-9+/=]+$/.test(data) || data.length > 5_600_000) return json(400, { error: "Only JPG, PNG or WebP image attachments are supported." });
   }
 
-  if (action === "usage_status") return json(200, { success: true, provider: "Cloudflare Workers AI", quotaManagedByProvider: true });
+  if (action === "usage_status") return json(200, { success: true, quotaManagedByProvider: true });
 
   const [subjectsResult, goalResult, memoryResult, assignedResourcesResult] = await Promise.all([
     admin.from("student_subjects").select("name,target_mark").eq("learner_id", learnerId).order("name").limit(30),
@@ -301,5 +301,5 @@ Deno.serve(async request => {
     provider: generated.provider === "Google Gemini API" ? "google-gemini" : "cloudflare-workers-ai",
   }).eq("id", usage.data.id).eq("actor_id", learnerId);
   if (usageUpdateError) console.error("[MIΛ] Could not update AI usage metrics:", usageUpdateError.message);
-  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated, provider: generated.provider, model: generated.model, fallbackUsed: generated.fallbackUsed, providerNotice: generated.providerNotice });
+  return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated });
 });

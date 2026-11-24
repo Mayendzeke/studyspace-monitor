@@ -85,8 +85,16 @@ Deno.serve(async (request: Request) => {
         .eq("country", String(profile.country).trim()).ilike("subject_name", subjectName).eq("learning_language", requestedLanguage).limit(100);
       if (literatureError) return json(503, { error: "The literature set-text register could not be checked. No material was generated." });
       const matchedLiteratureTexts = (literatureRows ?? []).filter((row: Record<string, unknown>) => {
-        const gradeMatches = !String(row.grade || "").trim() || !String(profile.grade || "").trim() || String(row.grade).toLowerCase().includes(String(profile.grade).toLowerCase()) || String(profile.grade).toLowerCase().includes(String(row.grade).toLowerCase());
-        const qualificationMatches = !String(row.qualification || "").trim() || !String(profile.qualification_level || "").trim() || String(row.qualification).toLowerCase().includes(String(profile.qualification_level).toLowerCase()) || String(profile.qualification_level).toLowerCase().includes(String(row.qualification).toLowerCase());
+        const learnerGrade = String(profile.grade || "").toLowerCase().replace(/[–—]/g,"-");
+        const textGrade = String(row.grade || "").toLowerCase().replace(/[–—]/g,"-");
+        const gradeMatches = !textGrade.trim() || !learnerGrade.trim() || textGrade.includes(learnerGrade) || learnerGrade.includes(textGrade)
+          || (/form\s*1\s*[-–]\s*3/.test(textGrade) && /form\s*[123]/.test(learnerGrade))
+          || (/form\s*4\s*[-–]\s*5/.test(textGrade) && /form\s*[45]/.test(learnerGrade));
+        const learnerQualification = String(profile.qualification_level || "").toLowerCase();
+        const textQualification = String(row.qualification || "").toLowerCase();
+        const qualificationMatches = !textQualification.trim() || !learnerQualification.trim() || textQualification.includes(learnerQualification) || learnerQualification.includes(textQualification)
+          || (textQualification.includes("junior certificate") && /\bjc\b/.test(learnerQualification))
+          || (textQualification.includes("egcse") && /egcse|sgcse/.test(learnerQualification));
         return gradeMatches && qualificationMatches;
       }).slice(0, 60);
       const { data: subjects, error: subjectsError } = await admin.from("student_subjects").select("name,category,description").eq("learner_id", learnerId);

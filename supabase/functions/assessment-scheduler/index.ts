@@ -324,6 +324,11 @@ Deno.serve(async request=>{
   if(itemsError)return json(503,{error:"The saved assessment programme could not be loaded."});
   const dueCutoffIso=new Date(Date.now()+7*24*60*60*1000).toISOString();
   const dueCandidates=(items||[]).filter((item:any)=>!item.exercise_assignment_id&&item.status==="scheduled"&&Date.parse(String(item.scheduled_at))<=Date.parse(dueCutoffIso));
+  const {data:readyPacks,error:readyPackError}=await admin.from("learner_study_packs").select("subject_id,subject_name")
+    .eq("learner_id",auth.user.id).eq("status","ready");
+  if(readyPackError)throw new Error("Ready study pack status could not be checked.");
+  const readyPackSubjectIds=new Set((readyPacks||[]).map((row:any)=>String(row.subject_id||"")).filter(Boolean));
+  const readyPackSubjectNames=new Set((readyPacks||[]).map((row:any)=>String(row.subject_name||"").trim().toLowerCase()).filter(Boolean));
   const waitingReviewIds=[...new Set(dueCandidates.filter((item:any)=>item.metadata?.waiting_for_material_approval&&item.metadata?.material_review_id).map((item:any)=>String(item.metadata.material_review_id)))];
   const reviewStatusById=new Map<string,string>();
   if(waitingReviewIds.length){
@@ -335,6 +340,8 @@ Deno.serve(async request=>{
     await admin.from("assessment_schedule_items").update({status:"conflict",metadata:{...(item.metadata||{}),material_request_error:"The Monitor review team did not approve the requested learning material."}}).eq("id",item.id);
   }
   const pending=dueCandidates.filter((item:any)=>{
+    if(item.metadata?.waiting_for_study_pack&&!readyPackSubjectIds.has(String(item.subject_id||""))&&!readyPackSubjectNames.has(String(item.subject_name||"").trim().toLowerCase()))return false;
+    if(item.metadata?.waiting_for_study_pack&&!readyPackSubjectIds.has(String(item.subject_id||""))&&!readyPackSubjectNames.has(String(item.subject_name||"").trim().toLowerCase()))return false;
     if(!item.metadata?.waiting_for_material_approval)return true;
     return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
   }).slice(0,2);
@@ -399,6 +406,12 @@ Deno.serve(async request=>{
         }));
       }else{
         const notesText=await approvedNotes(admin,auth.user.id,item.subject_name);
+        if(!notesText.trim()){
+          await admin.from("assessment_schedule_items").update({
+            status:"scheduled",metadata:{...(item.metadata||{}),waiting_for_study_pack:true},
+          }).eq("id",item.id);
+          continue;
+        }
         questions=await generateQuestions(url,publishable,token,item.subject_name,String(item.difficulty_score||"adaptive"),notesText,itemQuestionCount,assessmentTopic);
         const bankRows=await Promise.all(questions.map(async(question:any)=>({
           country:String(profile.country||""),curriculum:String(profile.curriculum||""),education_level:String(profile.education_level||""),

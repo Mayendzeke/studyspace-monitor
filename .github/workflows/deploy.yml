@@ -30,6 +30,14 @@ jobs:
         run: npm install
       - name: Run complete automated regression suite
         run: npm test
+      - name: Set up Deno for Edge Function type checking
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check central assessment Edge Functions
+        run: |
+          deno check supabase/functions/assessment-scheduler/index.ts
+          deno check supabase/functions/submit-exercise-attempt/index.ts
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true
@@ -123,7 +131,27 @@ jobs:
             throw new Error('Assessment function must reject invalid JWTs with HTTP 401, received HTTP ' + invalidToken.status + ': ' + detail)
           }
 
-          console.log('Assessment endpoint is deployed; missing and invalid learner credentials are rejected with HTTP 401.')
+          const schedulerEndpoint = url + '/functions/v1/assessment-scheduler'
+          const schedulerMissing = await fetch(schedulerEndpoint, {
+            method: 'POST',
+            headers: commonHeaders,
+            body: JSON.stringify({}),
+          })
+          if (schedulerMissing.status !== 401) {
+            const detail = (await schedulerMissing.text()).slice(0, 180)
+            throw new Error('Assessment scheduler must reject missing credentials with HTTP 401, received HTTP ' + schedulerMissing.status + ': ' + detail)
+          }
+          const schedulerInvalid = await fetch(schedulerEndpoint, {
+            method: 'POST',
+            headers: { ...commonHeaders, Authorization: 'Bearer invalid.invalid.invalid' },
+            body: JSON.stringify({}),
+          })
+          if (schedulerInvalid.status !== 401) {
+            const detail = (await schedulerInvalid.text()).slice(0, 180)
+            throw new Error('Assessment scheduler must reject invalid credentials with HTTP 401, received HTTP ' + schedulerInvalid.status + ': ' + detail)
+          }
+
+          console.log('Assessment submission and scheduler endpoints reject missing and invalid learner credentials with HTTP 401.')
           NODE
       - name: Verify learner account management requires authentication
         env:

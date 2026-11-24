@@ -1,0 +1,20 @@
+/* Study Space brand navigation: the brand always returns to the workspace home. */
+.brand-home-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.brand-home-link:hover .brand-copy strong { color: var(--purple); }
+.brand-home-link:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 4px;
+}

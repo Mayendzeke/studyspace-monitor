@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.submit-exercise-attempt]
 verify_jwt = true
 
+[functions.assessment-scheduler]
+verify_jwt = true
+
 [functions.mark-class-homework]
 verify_jwt = true
 

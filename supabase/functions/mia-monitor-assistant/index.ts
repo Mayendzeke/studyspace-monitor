@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertNoPersonalIdentifiers, generateWithFallback, getProviderStatus } from "./provider.ts";
+import { assertNoPersonalIdentifiers, generateWithFallback, getProviderStatus } from "../_shared/monitor-ai-provider.ts";
 
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") ?? "";
 const allowedOrigins = new Set(["https://mayendzeke.github.io", ...APP_ORIGIN.split(",").map(value => { try { return new URL(value.trim()).origin; } catch { return ""; } }).filter(Boolean)]);

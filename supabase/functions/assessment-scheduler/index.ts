@@ -96,7 +96,7 @@ async function existingMaterials(admin:any,learnerId:string,subject:string) {
     admin.from("learner_personal_resources").select("id,mime_type").eq("learner_id",learnerId).ilike("subject_name",subject).limit(10),
     admin.from("resource_assignments").select("resource_id").eq("learner_id",learnerId),
     admin.from("learner_study_packs").select("personal_resource_id,learning_resource_id,status")
-      .eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating","needs_ocr","failed"]),
+      .eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating","needs_ocr","unsupported","failed"]),
   ]);
   if(personalError||assignmentError||packError)throw new Error("The learner's existing resources could not be checked.");
   const ids=(assignments||[]).map((row:any)=>row.resource_id).filter(Boolean);
@@ -111,7 +111,7 @@ async function existingMaterials(admin:any,learnerId:string,subject:string) {
   const canProvideNotes=(resource:any)=>{
     const status=packByResource.get(String(resource.id));
     if(status==="ready"||status==="generating")return true;
-    if(status==="needs_ocr"||status==="failed")return false;
+    if(status==="needs_ocr"||status==="unsupported"||status==="failed")return false;
     const mime=String(resource.mime_type||"");
     return /^text\/(plain|markdown)/i.test(mime)||/pdf|word|presentation|spreadsheet|officedocument/i.test(mime);
   };

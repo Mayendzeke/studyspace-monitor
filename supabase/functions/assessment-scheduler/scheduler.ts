@@ -20,30 +20,58 @@ export function workload(subject:Record<string,unknown>) {
   };
 }
 
+export function expandPeriodWindows(startDate:string,endDate:string,windows:Record<string,unknown>[],preferredDays:number[]=[1,2,3,4,5]) {
+  const output:Record<string,unknown>[]=[];
+  const start=new Date(startDate+"T12:00:00Z");
+  const end=new Date(endDate+"T12:00:00Z");
+  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<start)return output;
+  for(let cursor=new Date(start);cursor<=end;cursor.setUTCDate(cursor.getUTCDate()+1)) {
+    const date=cursor.toISOString().slice(0,10);
+    const day=cursor.getUTCDay()||7;
+    if(day>5||!preferredDays.includes(day))continue;
+    for(const window of windows.filter(row=>number(row.day,-1)===day)) {
+      const startTime=String(window.start||"").slice(0,5);
+      const endTime=String(window.end||"").slice(0,5);
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)||toMin(endTime)<=toMin(startTime))continue;
+      output.push({day,date,start:startTime,end:endTime,id:String(window.id||"window")+"-"+date,preferencePenalty:number(window.preferencePenalty,0)});
+    }
+  }
+  return output;
+}
+
 export function subtractBusyWindows(windows:Record<string,unknown>[], busy:Record<string,unknown>[]) {
   const output:Record<string,unknown>[]=[];
   for(const window of windows) {
     const day=number(window.day,-1);
+    const date=String(window.date||"");
     const start=String(window.start||"").slice(0,5);
     const end=String(window.end||"").slice(0,5);
     if(day<1||day>5||!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)||toMin(end)<=toMin(start))continue;
-    const blocks=busy.filter(row=>number(row.day,-2)===day)
-      .map(row=>({start:toMin(String(row.start||"").slice(0,5)),end:toMin(String(row.end||"").slice(0,5))}))
+    const blocks=busy.filter(row=>{
+      const busyDate=String(row.date||"");
+      return busyDate?busyDate===date:number(row.day,-2)===day;
+    }).map(row=>({start:toMin(String(row.start||"").slice(0,5)),end:toMin(String(row.end||"").slice(0,5))}))
       .filter(row=>row.end>row.start).sort((a,b)=>a.start-b.start);
     let cursor=toMin(start);
     for(const block of blocks) {
       if(block.end<=cursor||block.start>=toMin(end))continue;
-      if(block.start>cursor)output.push({day:DAYS[day-1],start:fromMin(cursor),end:fromMin(Math.min(block.start,toMin(end))),id:String(window.id||"")+"-"+cursor});
+      if(block.start>cursor)output.push({day:DAYS[day-1],date:date||undefined,start:fromMin(cursor),end:fromMin(Math.min(block.start,toMin(end))),id:String(window.id||"")+"-"+cursor});
       cursor=Math.max(cursor,block.end);
       if(cursor>=toMin(end))break;
     }
-    if(cursor<toMin(end))output.push({day:DAYS[day-1],start:fromMin(cursor),end,id:String(window.id||"")+"-"+cursor});
+    if(cursor<toMin(end))output.push({day:DAYS[day-1],date:date||undefined,start:fromMin(cursor),end,id:String(window.id||"")+"-"+cursor});
   }
   return output;
 }
 
 export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:Record<string,unknown>[], dailyLimit:number, questionCount=10) {
-  const days=DAYS.map(day=>({day,workload:0,minutes:0,hard:0,count:0}));
+  const dayMap=new Map<string,{day:string;date?:string;workload:number;minutes:number;hard:number;count:number}>();
+  for(const slot of slots) {
+    const day=String(slot.day||"");
+    const date=String(slot.date||"");
+    const key=date||day;
+    if(key&&!dayMap.has(key))dayMap.set(key,{day,date:date||undefined,workload:0,minutes:0,hard:0,count:0});
+  }
   const remaining=slots.map((slot,index)=>({
     ...slot,id:String(slot.id||"slot-"+index),
     next:toMin(String(slot.start)),end:toMin(String(slot.end)),
@@ -56,11 +84,12 @@ export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:R
   const conflicts:Record<string,unknown>[]=[];
   for(const {subject,profile} of ordered) {
     const options=remaining.filter(slot=>slot.end-slot.next>=profile.minutes).map(slot=>{
-      const day=days.find(item=>item.day===slot.day)!;
+      const key=String(slot.date||slot.day||"");
+      const day=dayMap.get(key)!;
       const hard=profile.difficulty>=4.5;
       const score=(hard&&day.hard>0?1000:0)+Math.max(0,day.minutes+profile.minutes-dailyLimit)*3+day.workload*12+day.count*4+number(slot.preferencePenalty,0);
       return {slot,day,score};
-    }).sort((a,b)=>a.score-b.score||DAYS.indexOf(String(a.slot.day))-DAYS.indexOf(String(b.slot.day))||a.slot.next-b.slot.next);
+    }).sort((a,b)=>a.score-b.score||String(a.slot.date||"").localeCompare(String(b.slot.date||""))||DAYS.indexOf(String(a.slot.day))-DAYS.indexOf(String(b.slot.day))||a.slot.next-b.slot.next);
     if(!options.length) {
       conflicts.push({subjectId:subject.id,subjectName:subject.name,reason:"insufficient_available_capacity",requiredMinutes:profile.minutes});
       continue;
@@ -72,14 +101,14 @@ export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:R
     day.workload+=profile.workload;day.minutes+=profile.minutes;day.count++;
     if(profile.difficulty>=4.5)day.hard++;
     assignments.push({
-      subjectId:subject.id,subjectName:String(subject.name),day:slot.day,slotId:slot.id,start,end,
+      subjectId:subject.id,subjectName:String(subject.name),day:slot.day,date:slot.date,slotId:slot.id,start,end,
       durationMinutes:profile.minutes,questionCount:clamp(Math.round(number(questionCount,10)),1,100),difficultyScore:Math.round(profile.difficulty*100)/100,
       workloadScore:Math.round(profile.workload*100)/100,subjectType:String(subject.subject_type||"mixed"),
       creditHours:number(subject.credit_hours,1),weeklyMinutesTarget:number(subject.weekly_minutes_target,60),
     });
   }
-  for(const day of days) {
-    if(day.minutes>dailyLimit)conflicts.push({reason:"daily_workload_limit_exceeded",day:day.day,requiredMinutes:day.minutes,limitMinutes:dailyLimit});
+  for(const day of dayMap.values()) {
+    if(day.minutes>dailyLimit)conflicts.push({reason:"daily_workload_limit_exceeded",day:day.date||day.day,requiredMinutes:day.minutes,limitMinutes:dailyLimit});
   }
-  return {assignments,conflicts,dayLoads:days};
+  return {assignments,conflicts,dayLoads:[...dayMap.values()]};
 }

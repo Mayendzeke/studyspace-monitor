@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, CheckCircle2, ExternalLink, FileText, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import "./learning-material-review.css";
 
 type SourceReference = { title?: string; url?: string; publisher?: string; accessed_at?: string };
 type ReviewItem = {

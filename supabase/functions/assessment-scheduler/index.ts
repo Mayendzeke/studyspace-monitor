@@ -168,6 +168,98 @@ async function approvedNotes(admin:any,learnerId:string,subject:string) {
   }
   return notes.join("\n\n").slice(0,30000);
 }
+async function processPracticeRequests(admin:any,url:string,publishable:string,service:string,learnerId:string,profile:any,subjects:any[],limit=2) {
+  const {data:requests,error}=await admin.from("learner_practice_requests").select("*")
+    .eq("learner_id",learnerId).in("status",["queued","waiting_for_material","waiting_for_study_pack"])
+    .order("created_at",{ascending:true}).limit(limit);
+  if(error)return;
+  for(const request of requests||[]){
+    try{
+      const subject=subjects.find((row:any)=>String(row.id)===String(request.subject_id));
+      if(!subject){
+        await admin.from("learner_practice_requests").update({status:"failed",error_message:"The subject is no longer registered.",updated_at:new Date().toISOString()}).eq("id",request.id);
+        continue;
+      }
+      const hasMaterial=await existingMaterials(admin,learnerId,String(subject.name));
+      if(!hasMaterial){
+        if(request.material_review_id){
+          const {data:review}=await admin.from("learning_material_review_queue").select("status").eq("id",request.material_review_id).maybeSingle();
+          if(review?.status==="rejected"){
+            await admin.from("learner_practice_requests").update({status:"failed",error_message:"The Monitor rejected the curriculum material request. Ask your Monitor for an alternative.",updated_at:new Date().toISOString()}).eq("id",request.id);
+          }else if(review?.status==="approved"){
+            await admin.from("learner_practice_requests").update({status:"queued",material_review_id:null,updated_at:new Date().toISOString()}).eq("id",request.id);
+          }
+          continue;
+        }
+        const review=await requestMaterialReview(url,publishable,service,learnerId,String(subject.name));
+        await admin.from("learner_practice_requests").update({
+          status:"waiting_for_material",material_review_id:String(review.reviewId||"")||null,
+          error_message:null,updated_at:new Date().toISOString(),
+        }).eq("id",request.id);
+        continue;
+      }
+      const notesText=await approvedNotes(admin,learnerId,String(subject.name));
+      if(!notesText.trim()){
+        await admin.from("learner_practice_requests").update({status:"waiting_for_study_pack",updated_at:new Date().toISOString()}).eq("id",request.id);
+        continue;
+      }
+      const count=Math.max(5,Math.min(20,Number(request.question_count)||10));
+      const topic=String(request.topic||"").trim();
+      const questions=await generateQuestions(String(subject.name),String(request.difficulty||"adaptive"),notesText,count,topic,{
+        country:String(profile.country||""),education_level:String(profile.education_level||""),grade:String(profile.grade||""),
+        curriculum:String(profile.curriculum||""),academic_year:String(profile.academic_year||""),course:String(profile.course||""),
+      });
+      const title=(String(subject.name)+" Practice"+(topic?" · "+topic:"")).slice(0,150);
+      const {data:set,error:setError}=await admin.from("exercise_sets").insert({
+        created_by:learnerId,title,instructions:"Complete each question independently. Review the explanations after submitting your answers.",
+        subject_name:String(subject.name),education_level:profile.education_level||null,grade:profile.grade||null,
+        curriculum:profile.curriculum||null,question_count:count,is_published:false,review_status:"draft",
+        duration_minutes:Math.max(10,Math.ceil(count*1.5)),due_date:null,
+      }).select("id").single();
+      if(setError||!set)throw new Error("The practice test could not be saved.");
+      const questionRows=questions.map((question:any,index:number)=>({
+        exercise_set_id:set.id,position:index+1,question_type:question.question_type,prompt:question.prompt,
+        content:{options:question.options,pairs:question.pairs,clue:question.clue,scramble:question.scramble,topic:question.topic,difficulty:question.difficulty},
+        explanation:question.explanation,points:1,topic:question.topic,difficulty:question.difficulty,
+      }));
+      const {data:savedQuestions,error:questionError}=await admin.from("exercise_set_questions").insert(questionRows).select("id,position");
+      if(questionError||!savedQuestions||savedQuestions.length!==count){
+        await admin.from("exercise_sets").delete().eq("id",set.id);
+        throw new Error("The practice test questions could not be saved.");
+      }
+      const answerRows=savedQuestions.map((saved:any)=>({
+        question_id:saved.id,answer_key:{answer:String(questions[saved.position-1]?.answer||""),acceptedAnswers:[String(questions[saved.position-1]?.answer||"")],pairs:questions[saved.position-1]?.pairs||[]},
+        explanation:String(questions[saved.position-1]?.explanation||""),
+      }));
+      const {error:answerError}=await admin.from("exercise_answer_keys").insert(answerRows);
+      if(answerError){
+        await admin.from("exercise_sets").delete().eq("id",set.id);
+        throw new Error("The practice test answer key could not be saved.");
+      }
+      const {error:publishError}=await admin.from("exercise_sets").update({is_published:true,review_status:"approved"}).eq("id",set.id);
+      if(publishError){
+        await admin.from("exercise_sets").delete().eq("id",set.id);
+        throw new Error("The practice test could not be published.");
+      }
+      const {data:assignment,error:assignmentError}=await admin.from("exercise_assignments").insert({
+        exercise_set_id:set.id,learner_id:learnerId,assigned_by:learnerId,assignment_type:"practice",
+        available_at:new Date().toISOString(),due_at:null,
+      }).select("id").single();
+      if(assignmentError||!assignment){
+        await admin.from("exercise_sets").delete().eq("id",set.id);
+        throw new Error("The practice test could not be assigned to your account.");
+      }
+      await admin.from("learner_practice_requests").update({
+        status:"ready",exercise_assignment_id:assignment.id,error_message:null,updated_at:new Date().toISOString(),
+      }).eq("id",request.id);
+    }catch(error){
+      await admin.from("learner_practice_requests").update({
+        status:"failed",error_message:error instanceof Error?error.message:"Practice test preparation failed.",updated_at:new Date().toISOString(),
+      }).eq("id",request.id);
+    }
+  }
+}
+
 async function requestMaterialReview(url:string,publishable:string,service:string,learnerId:string,subject:string) {
   const response=await fetch(url+"/functions/v1/curriculum-material-engine",{
     method:"POST",

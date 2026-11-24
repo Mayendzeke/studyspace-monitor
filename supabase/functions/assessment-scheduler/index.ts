@@ -92,33 +92,41 @@ async function generateQuestions(url:string,publishable:string,token:string,subj
   return payload.questions as Record<string,unknown>[];
 }
 async function existingMaterials(admin:any,learnerId:string,subject:string) {
-  const [{data:personal,error:personalError},{data:assignments,error:assignmentError}]=await Promise.all([
+  const [{data:personal,error:personalError},{data:assignments,error:assignmentError},{data:packs,error:packError}]=await Promise.all([
     admin.from("learner_personal_resources").select("id").eq("learner_id",learnerId).ilike("subject_name",subject).limit(1),
     admin.from("resource_assignments").select("resource_id").eq("learner_id",learnerId),
+    admin.from("learner_study_packs").select("id").eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating"]).limit(1),
   ]);
-  if(personalError||assignmentError)throw new Error("The learner's existing resources could not be checked.");
+  if(personalError||assignmentError||packError)throw new Error("The learner's existing resources could not be checked.");
   const ids=(assignments||[]).map((row:any)=>row.resource_id).filter(Boolean);
-  if(!ids.length)return Boolean(personal?.length);
+  if(!ids.length)return Boolean(personal?.length||packs?.length);
   const {data:resources,error}=await admin.from("learning_resources").select("id").in("id",ids).ilike("subject_name",subject).limit(1);
   if(error)throw new Error("The learner's assigned resources could not be checked.");
-  return Boolean(personal?.length||resources?.length);
+  return Boolean(personal?.length||resources?.length||packs?.length);
 }
 async function approvedNotes(admin:any,learnerId:string,subject:string) {
-  const [{data:assignments},{data:personal}]=await Promise.all([
+  const [{data:assignments},{data:personal},{data:packs}]=await Promise.all([
     admin.from("resource_assignments").select("resource_id").eq("learner_id",learnerId),
     admin.from("learner_personal_resources").select("title,topic,storage_path,mime_type").eq("learner_id",learnerId).ilike("subject_name",subject).limit(5),
+    admin.from("learner_study_packs").select("file_name,topic,source_text,content").eq("learner_id",learnerId).ilike("subject_name",subject).eq("status","ready").order("updated_at",{ascending:false}).limit(5),
   ]);
   const ids=(assignments||[]).map((row:any)=>row.resource_id).filter(Boolean);
   const {data:resources}=ids.length?await admin.from("learning_resources").select("title,topic,storage_path,mime_type").in("id",ids).ilike("subject_name",subject).limit(5):{data:[]};
   const notes:string[]=[];
+  for(const pack of packs||[]) {
+    const content=pack.content||{};
+    const concepts=Array.isArray(content.concept_sections)?content.concept_sections.map((item:any)=>String(item.heading||"")+": "+String(item.explanation||"")).join("\\n"):"";
+    const terms=Array.isArray(content.key_terms)?content.key_terms.map((item:any)=>String(item.term||"")+": "+String(item.definition||"")).join("\\n"):"";
+    notes.push("# "+String(pack.file_name||subject)+"\\nTopic: "+String(pack.topic||"")+"\\n"+String(pack.source_text||"").slice(0,5000)+"\\nStudy summary: "+String(content.summary||"")+"\\nKey terms:\\n"+terms+"\\nConcepts:\\n"+concepts);
+  }
   for(const resource of [...(resources||[]),...(personal||[])]) {
-    if(!resource.storage_path||!/^text\/(plain|markdown)/i.test(String(resource.mime_type||"")))continue;
+    if(!resource.storage_path||!/^text\\/(plain|markdown)/i.test(String(resource.mime_type||"")))continue;
     const {data,error}=await admin.storage.from("studyspace-resources").download(resource.storage_path);
     if(error||!data)continue;
     const text=await data.text();
-    if(text.trim())notes.push("# "+String(resource.title||subject)+"\\nTopic: "+String(resource.topic||"")+"\\n"+text.slice(0,7000));
+    if(text.trim())notes.push("# "+String(resource.title||subject)+"\\nTopic: "+String(resource.topic||"")+"\\n"+text.slice(0,5000));
   }
-  return notes.join("\\n\\n").slice(0,23000);
+  return notes.join("\\n\\n").slice(0,30000);
 }
 async function requestMaterialReview(url:string,publishable:string,service:string,learnerId:string,subject:string) {
   const response=await fetch(url+"/functions/v1/mia-monitor-assistant",{

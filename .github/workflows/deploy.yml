@@ -287,7 +287,7 @@ jobs:
           const capacityMigration = readFileSync('supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql', 'utf8')
           const fortyEightHourTrialMigration = readFileSync('supabase/migrations/20261124135400_studyspace_48_hour_trial_and_terms_v9.sql', 'utf8')
           if (!capacityMigration.includes("interval '48 hours'") || !fortyEightHourTrialMigration.includes("interval ''48 hours''") || !fortyEightHourTrialMigration.includes("trial_expires_at - interval ''24 hours''")) throw new Error('The current 48-hour trial policy and 24-hour-before-expiry reminder must be applied.')
-          if (!enrolment.includes('complete_public_studyspace_enrolment')) throw new Error('Public learner enrolment must start its seven-day trial through the database transaction.')
+          if (!enrolment.includes('complete_public_studyspace_enrolment')) throw new Error('Public learner enrolment must start its 48-hour trial through the database transaction.')
           if (!enrolment.includes('complete_public_studyspace_enrolment') || !enrolment.includes('createStudentId') || !enrolment.includes('trialHours: 48')) throw new Error('Public learner registration must create an automatic Student ID and start the 48-hour trial.')
           if (!enrolment.includes('studyspace_enrolment_capacity_available')) throw new Error('Self-service registration must retain the server-side enrolment capacity control.')
           const accountManagement = readFileSync('supabase/functions/manage-learner-account/index.ts', 'utf8')

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, Bot, Brain, BookOpen, CalendarDays, GraduationCap, Lightbulb, MessageCircle, Send, Sparkles, Trash2, ClipboardCheck, FileText, X, Library } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import MissingMaterialsGenerator from './MissingMaterialsGenerator'
+import './missing-materials-generator.css'
 
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 type AcademicProfile = { id: string; education_level: string | null; grade: string | null; curriculum: string | null; course: string | null }
@@ -368,6 +370,8 @@ export default function MiaStudio() {
         {providerHealth.providerNotice && <p>{providerHealth.providerNotice}</p>}
       </div>}
       {providerHealthError && <p className="mia-error" role="alert">{providerHealthError}</p>}
+      <MissingMaterialsGenerator />
+
       <div className="mia-capabilities">
         <article><BookOpen size={18}/><strong>Lesson preparation</strong><span>Objectives, timed teaching steps, learner activities, differentiation and checks for understanding.</span></article>
         <article><Brain size={18}/><strong>Assessments</strong><span>Quizzes, class tests, exam practice, answer keys and marking guidance.</span></article>

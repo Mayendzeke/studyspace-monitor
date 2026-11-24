@@ -106,3 +106,16 @@ test("curriculum material generation is research-grounded, profile-aware and que
   assert.match(provider, /google_search/);
   assert.match(engine, /assertNoPersonalIdentifiers/);
 });
+
+test("scheduled and on-demand assessments are independent of MIΛ chat", () => {
+  const scheduler = read("supabase/functions/assessment-scheduler/index.ts");
+  const materialEngine = read("supabase/functions/study-material-engine/index.ts");
+  assert.match(scheduler, /generateWithFallback/);
+  assert.doesNotMatch(scheduler, /functions\/v1\/mia-assistant/);
+  assert.match(scheduler, /request_practice/);
+  assert.match(scheduler, /process_practice_requests/);
+  assert.match(scheduler, /learner_practice_requests/);
+  assert.match(scheduler, /assignment_type:"scheduled_assessment"/);
+  assert.match(scheduler, /assignment_type:"practice"/);
+  assert.match(materialEngine, /resumePracticeRequests/);
+});

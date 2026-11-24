@@ -104,26 +104,35 @@ Deno.serve(async (request: Request) => {
         "Do not include learner names, Student IDs, email addresses, phone numbers or other personal identifiers.",
       ].join(" ");
       const generated = await generateWithFallback("Prepare learning material using this exact learner academic profile. Existing resources were checked and no matching material was found. Return JSON only.\n" + JSON.stringify(profileContext), {
-        maxTokens: 6500, jsonMode: true, systemPrompt: materialSystem,
+        maxTokens: 6500, jsonMode: true, googleSearch: true, systemPrompt: materialSystem,
         requiredJsonKeys: ["title","summary","topic","material_type","markdown","learning_objectives","syllabus_alignment","practice_questions","source_references"],
       });
       let material: Record<string, unknown>;
       try { material = JSON.parse(generated.text); } catch { return json(502, { error: "The AI providers returned invalid material structure. Nothing was added to the learner profile." }); }
       const markdown = typeof material.markdown === "string" ? material.markdown.trim() : "";
       if (markdown.length < 500 || markdown.length > 60000) return json(502, { error: "The generated material did not pass the minimum content-quality check." });
-      const sourceReferences = Array.isArray(material.source_references) ? material.source_references.slice(0, 12).map((source: unknown) => {
-        if (!source || typeof source !== "object") return null;
-        const row = source as Record<string, unknown>;
-        let safeUrl = "";
-        try { const parsedUrl = new URL(String(row.url || "")); if (parsedUrl.protocol === "https:") safeUrl = parsedUrl.toString(); } catch { /* Unverified URLs are omitted. */ }
-        return { title: String(row.title || "").slice(0,240), publisher: String(row.publisher || "").slice(0,160), url: safeUrl, relevance: String(row.relevance || "").slice(0,500), verification_status: "administrator_review_required" };
-      }).filter(Boolean) : [];
+      const groundedSources = Array.isArray(generated.groundingSources) ? generated.groundingSources : [];
+      const sourceReferences = groundedSources.length
+        ? groundedSources.map((source: { title: string; uri: string }) => ({
+            title: String(source.title || source.uri).slice(0, 240),
+            publisher: "Google Search",
+            url: source.uri,
+            relevance: "Search-grounded source supplied by Gemini; administrator must verify curriculum relevance.",
+            verification_status: "administrator_review_required",
+          }))
+        : Array.isArray(material.source_references) ? material.source_references.slice(0, 12).map((source: unknown) => {
+            if (!source || typeof source !== "object") return null;
+            const row = source as Record<string, unknown>;
+            let safeUrl = "";
+            try { const parsedUrl = new URL(String(row.url || "")); if (parsedUrl.protocol === "https:") safeUrl = parsedUrl.toString(); } catch { /* Unverified URLs are omitted. */ }
+            return { title: String(row.title || "").slice(0,240), publisher: String(row.publisher || "").slice(0,160), url: safeUrl, relevance: String(row.relevance || "").slice(0,500), verification_status: "administrator_review_required" };
+          }).filter(Boolean) : [];
       const content = {
         markdown,
         learning_objectives: Array.isArray(material.learning_objectives) ? material.learning_objectives.slice(0,20) : [],
         syllabus_alignment: material.syllabus_alignment ?? "",
         practice_questions: Array.isArray(material.practice_questions) ? material.practice_questions.slice(0,30) : [],
-        source_verification: "Pending administrator verification",
+        source_verification: groundedSources.length ? "Google Search grounded; pending administrator curriculum verification" : "No grounding sources returned; pending administrator source verification",
       };
       const { data: queued, error: queueError } = await admin.from("learning_material_review_queue").insert({
         learner_id: learnerId, requested_by: auth.userId,

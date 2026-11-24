@@ -93,16 +93,16 @@ async function generateQuestions(url:string,publishable:string,token:string,subj
 }
 async function existingMaterials(admin:any,learnerId:string,subject:string) {
   const [{data:personal,error:personalError},{data:assignments,error:assignmentError},{data:packs,error:packError}]=await Promise.all([
-    admin.from("learner_personal_resources").select("id").eq("learner_id",learnerId).ilike("subject_name",subject).limit(1),
+    admin.from("learner_personal_resources").select("id,mime_type").eq("learner_id",learnerId).ilike("subject_name",subject).limit(5),
     admin.from("resource_assignments").select("resource_id").eq("learner_id",learnerId),
     admin.from("learner_study_packs").select("id").eq("learner_id",learnerId).ilike("subject_name",subject).in("status",["ready","generating"]).limit(1),
   ]);
   if(personalError||assignmentError||packError)throw new Error("The learner's existing resources could not be checked.");
   const ids=(assignments||[]).map((row:any)=>row.resource_id).filter(Boolean);
-  if(!ids.length)return Boolean(personal?.length||packs?.length);
-  const {data:resources,error}=await admin.from("learning_resources").select("id").in("id",ids).ilike("subject_name",subject).limit(1);
+  const {data:resources,error}=ids.length?await admin.from("learning_resources").select("id,mime_type").in("id",ids).ilike("subject_name",subject).limit(5):{data:[]};
   if(error)throw new Error("The learner's assigned resources could not be checked.");
-  return Boolean(personal?.length||resources?.length||packs?.length);
+  const readablePersonal=(personal||[]).some((row:any)=>/^text\/(plain|markdown)/i.test(String(row.mime_type||"")));
+  return Boolean(readablePersonal||resources?.length||packs?.length);
 }
 async function approvedNotes(admin:any,learnerId:string,subject:string) {
   const [{data:assignments},{data:personal},{data:packs}]=await Promise.all([

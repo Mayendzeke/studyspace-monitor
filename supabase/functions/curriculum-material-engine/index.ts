@@ -27,7 +27,9 @@ function objects(value:unknown,fields:string[],max=12):Record<string,unknown>[] 
     const result:Record<string,unknown>={};
     for(const field of fields){
       const raw=(item as Record<string,unknown>)[field];
-      result[field]=field==="steps"||field==="labels"||field==="options"?strings(raw,10):clean(raw,field==="explanation"||field==="definition"?3000:1500);
+      if(field==="steps"||field==="labels"||field==="options"||field==="prerequisites")result[field]=strings(raw,10);
+      else if(field==="estimated_minutes")result[field]=Math.max(0,Math.min(600,Math.round(Number(raw)||0)));
+      else result[field]=clean(raw,field==="explanation"||field==="definition"?3000:1500);
     }
     return result;
   });

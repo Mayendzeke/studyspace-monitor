@@ -296,13 +296,11 @@ Deno.serve(async request=>{
 
   let body:Record<string,unknown>={};
   try{body=await request.json();}catch{return json(400,{error:"Invalid request body."});}
-  const [{data:preferences,error:preferencesError},{data:subjects,error:subjectsError},{data:studentEntries,error:studentEntriesError},{data:members,error:membersError}]=await Promise.all([
+  const [{data:preferences,error:preferencesError},{data:subjects,error:subjectsError}]=await Promise.all([
     admin.from("assessment_schedule_preferences").select("available_windows,daily_minutes_limit,preferred_assessment_days,timezone,question_count").eq("learner_id",auth.user.id).maybeSingle(),
     admin.from("student_subjects").select("id,name,category,description,difficulty_level,subject_type,credit_hours,weekly_minutes_target").eq("learner_id",auth.user.id).order("name"),
-    admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",auth.user.id),
-    admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",auth.user.id),
   ]);
-  if(preferencesError||subjectsError||studentEntriesError||membersError)return json(503,{error:"Your subjects, timetable or assessment availability could not be loaded."});
+  if(preferencesError||subjectsError)return json(503,{error:"Your subjects or assessment preferences could not be loaded."});
   if(!subjects?.length)return json(200,{success:true,status:"no_subjects",message:"Add your subjects before creating a weekly assessment programme."});
   const prefs=preferences||{available_windows:[],daily_minutes_limit:120,preferred_assessment_days:[1,2,3,4,5],timezone:"Africa/Mbabane",question_count:10};
   let timezone=String(prefs.timezone||body.timezone||"Africa/Mbabane");
@@ -325,6 +323,11 @@ Deno.serve(async request=>{
       message:status==="ready"?"Your practice test is ready.":status==="waiting_for_material"?"StudySpace is preparing a curriculum guide for Monitor approval. Your practice test will appear when it is approved.":status==="waiting_for_study_pack"?"Your study material is being prepared. Your practice test will appear automatically when it is ready.":"Your practice test request has been saved."});
   }
   await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
+  const [{data:studentEntries,error:studentEntriesError},{data:members,error:membersError}]=await Promise.all([
+    admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",auth.user.id),
+    admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",auth.user.id),
+  ]);
+  if(studentEntriesError||membersError)return json(503,{error:"Your timetable and assessment availability could not be loaded."});
   const monday=mondayOf(localDate(new Date(),timezone));
   const fridayDate=dateForDay(monday,"Friday");
   const preferredDays=Array.isArray(prefs.preferred_assessment_days)?prefs.preferred_assessment_days.map(Number):[1,2,3,4,5];

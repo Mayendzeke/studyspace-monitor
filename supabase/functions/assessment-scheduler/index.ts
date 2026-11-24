@@ -339,6 +339,14 @@ Deno.serve(async request=>{
       const {data:claim}=await admin.from("assessment_schedule_items").update({status:"generated"})
         .eq("id",item.id).eq("status","scheduled").is("exercise_assignment_id",null).select("id").maybeSingle();
       if(!claim)continue;
+      const assessmentType=String(item.assessment_type||"weekly_subject");
+      const scheduledDate=String(item.metadata?.date||localDate(new Date(String(item.scheduled_at)),timezone));
+      const assessmentPeriodStart=String(item.metadata?.period_start||monday);
+      const assessmentTopic=assessmentType==="monthly_subject"
+        ?"Monthly comprehensive assessment covering the subject topics studied this month"
+        :assessmentType==="quarterly_exam"
+          ?"Quarterly comprehensive examination covering the subject topics studied this quarter"
+          :"Weekly subject practice covering current learning objectives";
       const hasMaterial=await existingMaterials(admin,auth.user.id,item.subject_name);
       if(!hasMaterial) {
         try {
@@ -366,7 +374,7 @@ Deno.serve(async request=>{
       if(poolError)throw new Error("The shared question bank could not be checked.");
       const poolIds=(pool||[]).map((row:any)=>row.id);
       const {data:exposures}=poolIds.length?await admin.from("assessment_question_exposures").select("question_id")
-        .eq("cohort_key",cohortKey).eq("assessment_week",monday).in("question_id",poolIds):{data:[]};
+        .eq("cohort_key",cohortKey).eq("assessment_week",assessmentPeriodStart).in("question_id",poolIds):{data:[]};
       const exposed=new Set((exposures||[]).map((row:any)=>row.question_id));
       const freshPool=(pool||[]).filter((row:any)=>!exposed.has(row.id));
       const seed=String(item.version_seed||crypto.randomUUID());
@@ -383,7 +391,7 @@ Deno.serve(async request=>{
         }));
       }else{
         const notesText=await approvedNotes(admin,auth.user.id,item.subject_name);
-        questions=await generateQuestions(url,publishable,token,item.subject_name,String(item.difficulty_score||"adaptive"),notesText,itemQuestionCount);
+        questions=await generateQuestions(url,publishable,token,item.subject_name,String(item.difficulty_score||"adaptive"),notesText,itemQuestionCount,assessmentTopic);
         const bankRows=await Promise.all(questions.map(async(question:any)=>({
           country:String(profile.country||""),curriculum:String(profile.curriculum||""),education_level:String(profile.education_level||""),
           grade:String(profile.grade||""),course:String(profile.course||""),subject_name:item.subject_name,language:"English",
@@ -407,12 +415,13 @@ Deno.serve(async request=>{
         options:Array.isArray(question.options)?shuffle(question.options,seed+"-options-"+index):[],
         pairs:Array.isArray(question.pairs)?shuffle(question.pairs,seed+"-pairs-"+index):[],
       }));
-      const title="Weekly Test · "+item.subject_name+" · "+monday;
+      const periodLabel=assessmentType==="monthly_subject"?assessmentPeriodStart.slice(0,7):assessmentType==="quarterly_exam"?(assessmentPeriodStart.slice(0,4)+" Q"+(Math.floor((Number(assessmentPeriodStart.slice(5,7))-1)/3)+1)):scheduledDate;
+      const title=(assessmentType==="monthly_subject"?"Monthly Comprehensive Test · ":assessmentType==="quarterly_exam"?"Quarterly Exam · ":"Weekly Test · ")+item.subject_name+" · "+periodLabel;
       const {data:set,error:setError}=await admin.from("exercise_sets").insert({
         created_by:auth.user.id,title,instructions:"Complete all "+itemQuestionCount+" questions. This test was prepared for your registered subject and academic profile.",
         subject_name:item.subject_name,education_level:String(profile.education_level||""),grade:String(profile.grade||""),
         curriculum:String(profile.curriculum||""),question_count:itemQuestionCount,is_published:false,review_status:"draft",
-        duration_minutes:item.duration_minutes,due_date:dateForDay(monday,String(item.metadata?.day||"Monday")),
+        duration_minutes:item.duration_minutes,due_date:scheduledDate,
       }).select("id").single();
       if(setError||!set)throw new Error("Assessment storage could not be created.");
       setId=set.id;
@@ -431,7 +440,7 @@ Deno.serve(async request=>{
       if(keyError)throw new Error("The answer keys could not be stored.");
       const {error:publishError}=await admin.from("exercise_sets").update({is_published:true,review_status:"approved"}).eq("id",set.id);
       if(publishError)throw new Error("The assessment could not be published.");
-      const dueAt=zonedTimeToIso(dateForDay(monday,String(item.metadata?.day||"Monday")),"23:59",timezone);
+      const dueAt=zonedTimeToIso(scheduledDate,"23:59",timezone);
       const {data:assignment,error:assignmentError}=await admin.from("exercise_assignments").insert({
         exercise_set_id:set.id,learner_id:auth.user.id,assigned_by:auth.user.id,
         available_at:item.scheduled_at,due_at:dueAt,
@@ -443,7 +452,7 @@ Deno.serve(async request=>{
       const exposureIds=selectedBank.length?selectedBank.map((row:any)=>row.id):bankQuestionIds;
       if(exposureIds.length){
         const {error:exposureError}=await admin.from("assessment_question_exposures").upsert(
-          exposureIds.map(questionId=>({question_id:questionId,learner_id:auth.user.id,assessment_item_id:item.id,cohort_key:cohortKey,assessment_week:monday})),
+          exposureIds.map(questionId=>({question_id:questionId,learner_id:auth.user.id,assessment_item_id:item.id,cohort_key:cohortKey,assessment_week:assessmentPeriodStart})),
           {onConflict:"question_id,cohort_key,assessment_week",ignoreDuplicates:true},
         );
         if(exposureError)throw new Error("Question exposure history could not be saved.");

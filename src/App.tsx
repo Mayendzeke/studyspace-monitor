@@ -27,7 +27,7 @@ import './brand-home-link.css'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool, FlaskConical,
-  CheckCircle2, ChevronDown, CircleHelp, GraduationCap, LayoutDashboard,
+  CheckCircle2, ChevronDown, CircleHelp, GraduationBookOpen, Cap, LayoutDashboard,
   LockKeyhole, Menu, Plus, Settings, ShieldCheck,
   SlidersHorizontal, Users, X, KeyRound, Sparkles, Brain, Moon, Sun,
   Clock3, FileText, RefreshCw, TrendingUp, CreditCard, Download, CalendarDays, ShieldAlert, MessageCircle,

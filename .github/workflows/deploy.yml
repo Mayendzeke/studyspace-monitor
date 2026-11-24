@@ -173,7 +173,27 @@ jobs:
             throw new Error('Study material engine must reject invalid credentials with HTTP 401, received HTTP ' + studyMaterialInvalid.status + ': ' + detail)
           }
 
-          console.log('Assessment submission, scheduler and study material endpoints reject missing and invalid learner credentials with HTTP 401.')
+          const curriculumEndpoint = url + '/functions/v1/curriculum-material-engine'
+          const curriculumMissing = await fetch(curriculumEndpoint, {
+            method: 'POST',
+            headers: commonHeaders,
+            body: JSON.stringify({}),
+          })
+          if (curriculumMissing.status !== 401) {
+            const detail = (await curriculumMissing.text()).slice(0, 180)
+            throw new Error('Curriculum material engine must reject missing credentials with HTTP 401, received HTTP ' + curriculumMissing.status + ': ' + detail)
+          }
+          const curriculumInvalid = await fetch(curriculumEndpoint, {
+            method: 'POST',
+            headers: { ...commonHeaders, Authorization: 'Bearer invalid.invalid.invalid' },
+            body: JSON.stringify({}),
+          })
+          if (curriculumInvalid.status !== 401) {
+            const detail = (await curriculumInvalid.text()).slice(0, 180)
+            throw new Error('Curriculum material engine must reject invalid credentials with HTTP 401, received HTTP ' + curriculumInvalid.status + ': ' + detail)
+          }
+
+          console.log('Assessment submission, scheduler, study material and curriculum material endpoints reject missing and invalid credentials with HTTP 401.')
           NODE
       - name: Verify learner account management requires authentication
         env:

@@ -119,48 +119,71 @@ Deno.serve(async request=>{
   let body:any;
   try { body=await request.json(); } catch { return json(400,{error:"Invalid request."}); }
   const resourceId=String(body.resourceId||"");
+  const sourceType=body.sourceType==="teacher_resource"?"teacher_resource":"uploaded_resource";
   const extractedText=cleanText(body.extractedText,180000);
   const force=body.force===true;
-  if(!/^[0-9a-f-]{36}$/i.test(resourceId))return json(400,{error:"A valid uploaded resource is required."});
-  const {data:resource,error:resourceError}=await admin.from("learner_personal_resources")
-    .select("id,learner_id,title,subject_name,topic,mime_type,file_size")
-    .eq("id",resourceId).eq("learner_id",learnerId).maybeSingle();
-  if(resourceError||!resource)return json(404,{error:"That uploaded file could not be found in your private StudySpace library."});
+  if(!/^[0-9a-f-]{36}$/i.test(resourceId))return json(400,{error:"A valid school resource is required."});
+  let resource:any=null;
+  if(sourceType==="teacher_resource"){
+    const {data:assignment,error:assignmentError}=await admin.from("resource_assignments").select("id")
+      .eq("learner_id",learnerId).eq("resource_id",resourceId).maybeSingle();
+    if(assignmentError||!assignment)return json(403,{error:"This teacher resource has not been assigned to your learner account."});
+    const {data:teacherResource,error:teacherError}=await admin.from("learning_resources")
+      .select("id,title,subject_name,topic,mime_type,file_size").eq("id",resourceId).maybeSingle();
+    if(teacherError||!teacherResource)return json(404,{error:"That assigned school resource could not be found."});
+    resource=teacherResource;
+  }else{
+    const {data:personalResource,error:resourceError}=await admin.from("learner_personal_resources")
+      .select("id,learner_id,title,subject_name,topic,mime_type,file_size")
+      .eq("id",resourceId).eq("learner_id",learnerId).maybeSingle();
+    if(resourceError||!personalResource)return json(404,{error:"That uploaded file could not be found in your private StudySpace library."});
+    resource=personalResource;
+  }
   const subjectName=String(resource.subject_name||body.subjectName||"").trim().slice(0,120);
   const topic=String(resource.topic||body.topic||"").trim().slice(0,180);
-  if(!subjectName)return json(400,{error:"Choose one of your registered subjects for this file before generating a study pack."});
+  if(!subjectName)return json(400,{error:"Choose a registered subject for this file before generating a study pack."});
   const {data:subjects,error:subjectsError}=await admin.from("student_subjects").select("id,name").eq("learner_id",learnerId).limit(50);
   if(subjectsError)return json(503,{error:"Your registered subjects could not be checked."});
   const subject=(subjects||[]).find((row:any)=>String(row.name||"").trim().toLowerCase()===subjectName.toLowerCase());
   if(!subject)return json(400,{error:"This file must be linked to a subject registered on your StudySpace account."});
   const sourceHash=await sha256(JSON.stringify({text:extractedText,subjectName,topic,grade:profile.grade,curriculum:profile.curriculum,academic_year:profile.academic_year}));
-  const {data:existing,error:existingError}=await admin.from("learner_study_packs")
-    .select("id,status,content,version,source_hash,updated_at")
-    .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).eq("source_hash",sourceHash).maybeSingle();
+  let existingQuery=admin.from("learner_study_packs").select("id,status,content,version,source_hash,updated_at")
+    .eq("learner_id",learnerId).eq("source_hash",sourceHash);
+  existingQuery=sourceType==="teacher_resource"?existingQuery.eq("learning_resource_id",resourceId):existingQuery.eq("personal_resource_id",resourceId);
+  const {data:existing,error:existingError}=await existingQuery.maybeSingle();
   if(existingError)return json(503,{error:"Your existing study pack could not be checked."});
   if(existing?.status==="ready"&&!force)return json(200,{success:true,status:"ready",packId:existing.id,sourceHash,content:existing.content});
   if(existing?.status==="generating"&&!force&&Date.now()-Date.parse(String(existing.updated_at||""))<10*60*1000)return json(200,{success:true,status:"generating",packId:existing.id,sourceHash});
   if(extractedText.trim().length<120) {
-    const payload={learner_id:learnerId,source_type:"uploaded_resource",personal_resource_id:resourceId,subject_id:subject.id,subject_name:subjectName,topic,file_name:resource.title,mime_type:resource.mime_type,source_hash:sourceHash,source_text:extractedText,status:"needs_ocr",error_message:"The file did not contain enough extractable text. It may be a scanned image or photo.",updated_at:new Date().toISOString()};
+    const payload={
+      learner_id:learnerId,source_type:sourceType,personal_resource_id:sourceType==="uploaded_resource"?resourceId:null,
+      learning_resource_id:sourceType==="teacher_resource"?resourceId:null,subject_id:subject.id,subject_name:subjectName,
+      topic,file_name:resource.title,mime_type:resource.mime_type,source_hash:sourceHash,source_text:extractedText,
+      status:"needs_ocr",error_message:"The file did not contain enough extractable text. It may be a scanned image or photo.",updated_at:new Date().toISOString(),
+    };
     if(existing?.id)await admin.from("learner_study_packs").update(payload).eq("id",existing.id);
     else await admin.from("learner_study_packs").insert(payload);
     return json(200,{success:true,status:"needs_ocr",packId:existing?.id||null,sourceHash,message:"This file appears to be scanned or image-based. A readable text version is needed before a study pack can be prepared."});
   }
-  const {data:latestVersions}=await admin.from("learner_study_packs").select("version")
-    .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).order("version",{ascending:false}).limit(1);
+  let versionsQuery=admin.from("learner_study_packs").select("version").eq("learner_id",learnerId);
+  versionsQuery=sourceType==="teacher_resource"?versionsQuery.eq("learning_resource_id",resourceId):versionsQuery.eq("personal_resource_id",resourceId);
+  const {data:latestVersions}=await versionsQuery.order("version",{ascending:false}).limit(1);
   const version=existing?.version?Number(existing.version)+1:Number(latestVersions?.[0]?.version||0)+1;
   const rowPayload={
-    learner_id:learnerId,source_type:"uploaded_resource",personal_resource_id:resourceId,learning_resource_id:null,
-    subject_id:subject.id,subject_name:subjectName,topic,file_name:resource.title,mime_type:resource.mime_type,
-    source_hash:sourceHash,source_text:extractedText,status:"generating",content:{},error_message:null,version,updated_at:new Date().toISOString(),
+    learner_id:learnerId,source_type:sourceType,personal_resource_id:sourceType==="uploaded_resource"?resourceId:null,
+    learning_resource_id:sourceType==="teacher_resource"?resourceId:null,subject_id:subject.id,subject_name:subjectName,
+    topic,file_name:resource.title,mime_type:resource.mime_type,source_hash:sourceHash,source_text:extractedText,
+    status:"generating",content:{},error_message:null,version,updated_at:new Date().toISOString(),
   };
   let packId=String(existing?.id||"");
   if(existing?.id) {
     const {error:updateError}=await admin.from("learner_study_packs").update(rowPayload).eq("id",existing.id);
     if(updateError)return json(503,{error:"Your study pack could not be prepared."});
   } else {
-    await admin.from("learner_study_packs").update({status:"superseded",updated_at:new Date().toISOString()})
-      .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).eq("status","ready");
+    let supersedeQuery=admin.from("learner_study_packs").update({status:"superseded",updated_at:new Date().toISOString()})
+      .eq("learner_id",learnerId).eq("status","ready");
+    supersedeQuery=sourceType==="teacher_resource"?supersedeQuery.eq("learning_resource_id",resourceId):supersedeQuery.eq("personal_resource_id",resourceId);
+    await supersedeQuery;
     const {data:created,error:createError}=await admin.from("learner_study_packs").insert(rowPayload).select("id").single();
     if(createError||!created)return json(503,{error:"Your study pack could not be queued. Please try again."});
     packId=String(created.id);

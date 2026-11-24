@@ -133,7 +133,7 @@ Deno.serve(async request=>{
   if(subjectsError)return json(503,{error:"Your registered subjects could not be checked."});
   const subject=(subjects||[]).find((row:any)=>String(row.name||"").trim().toLowerCase()===subjectName.toLowerCase());
   if(!subject)return json(400,{error:"This file must be linked to a subject registered on your StudySpace account."});
-  const sourceHash=await sha256(extractedText);
+  const sourceHash=await sha256(JSON.stringify({text:extractedText,subjectName,topic,grade:profile.grade,curriculum:profile.curriculum,academic_year:profile.academic_year}));
   const {data:existing,error:existingError}=await admin.from("learner_study_packs")
     .select("id,status,content,version,source_hash,updated_at")
     .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).eq("source_hash",sourceHash).maybeSingle();

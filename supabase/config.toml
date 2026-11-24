@@ -66,3 +66,6 @@ verify_jwt = true
 
 [functions.redeem-access-pin]
 verify_jwt = true
+
+[functions.assessment-scheduler]
+verify_jwt = true

@@ -318,7 +318,6 @@ Deno.serve(async request=>{
       learner_id:auth.user.id,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty:"adaptive",status:"queued",
     }).select("id,status").single();
     if(createError||!created)return json(503,{error:"Your practice test request could not be saved. Please try again."});
-    await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
     const {data:updated}=await admin.from("learner_practice_requests").select("id,status,exercise_assignment_id,error_message,subject_name,topic,created_at")
       .eq("id",created.id).maybeSingle();
     const status=String(updated?.status||"queued");
@@ -657,14 +656,17 @@ Deno.serve(async request=>{
   const finalStatus=allConflicts.length?"capacity_conflict":allPublished?"published":"planned";
   const finalDuePending=savedItems.filter((item:any)=>{
     if(item.exercise_assignment_id||item.status!=="scheduled"||Date.parse(String(item.scheduled_at))>Date.now()+7*24*60*60*1000)return false;
+    if(item.metadata?.waiting_for_study_pack&&!readyPackSubjectIds.has(String(item.subject_id||""))&&!readyPackSubjectNames.has(String(item.subject_name||"").trim().toLowerCase()))return false;
     if(!item.metadata?.waiting_for_material_approval)return true;
     return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
   });
-  const hasMore=finalDuePending.length>0;
+  const {count:queuedPracticeCount,error:practiceCountError}=await admin.from("learner_practice_requests").select("id",{count:"exact",head:true}).eq("learner_id",auth.user.id).eq("status","queued");
+  if(practiceCountError)return json(503,{error:"Pending practice requests could not be checked."});
+  const hasMore=finalDuePending.length>0||Number(queuedPracticeCount||0)>0;
   return json(200,{
     success:true,status:finalStatus,scheduleRunId:periodRuns.weekly,monthlyRunId:periodRuns.monthly,quarterlyRunId:periodRuns.quarterly,
     weekStart:monday,monthStart:month.start,quarterStart:quarter.start,subjectCount:subjects.length,
-    scheduledCount:savedItems.length,generatedCount,pendingCount:finalDuePending.length,hasMore,
+    scheduledCount:savedItems.length,generatedCount,pendingCount:finalDuePending.length+Number(queuedPracticeCount||0),practicePendingCount:Number(queuedPracticeCount||0),hasMore,
     conflicts:allConflicts,items:savedItems,
     message:generatedCount
       ?"Your ready assessments have been prepared and saved. Monthly and quarterly tests are scheduled for their assessment periods."

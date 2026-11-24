@@ -71,7 +71,7 @@ Deno.serve(async request => {
   const hasPaidAccess = Boolean(profile.subscription_tier && Number.isFinite(paidExpiry) && paidExpiry > now);
   const hasTrialAccess = Boolean(!profile.subscription_tier && Number.isFinite(trialStart)
     && Number.isFinite(trialExpiry) && trialStart <= now && trialExpiry > now);
-  const hasAcceptedTerms = Boolean(profile.terms_accepted_at && profile.terms_version === "2026-11-09-v8");
+  const hasAcceptedTerms = Boolean(profile.terms_accepted_at && profile.terms_version === "2026-11-24-v9");
   if (!hasAcceptedTerms) return json(403, { error: "Please accept the current StudySpace Terms and Conditions before submitting assessments." });
   if (!hasPaidAccess && !hasTrialAccess) return json(403, { error: "Your StudySpace access is paused. Choose a paid plan to continue." });
 

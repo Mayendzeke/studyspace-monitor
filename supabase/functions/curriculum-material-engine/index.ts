@@ -147,6 +147,7 @@ Deno.serve(async request=>{
       country:learnerContext.country,institution:learnerContext.institution_type,education_level:learnerContext.education_level,
       grade:learnerContext.grade,course:learnerContext.course,curriculum:learnerContext.curriculum,academic_year:learnerContext.academic_year,
       language:"English",source_references:parsed.sourceReferences,profile_snapshot:profileSnapshot,generator:generated.provider==="Google Gemini API"?"hybrid_ai_research":"hybrid_ai_fallback",
+      review_notes:generated.provider==="Google Gemini API"&&parsed.sourceReferences.length?"":"AI fallback was used or no source links were returned. Verify curriculum coverage and references before approval.",
       status:"pending",
     }).select("id").single();
     if(createError||!created)throw new Error("The material review request could not be saved.");

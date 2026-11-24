@@ -313,8 +313,23 @@ Deno.serve(async request=>{
   ];
 
   const {data:items,error:itemsError}=await admin.from("assessment_schedule_items").select("*").in("schedule_run_id",runIds).order("scheduled_at");
-  if(itemsError)return json(503,{error:"The saved weekly assessment plan could not be loaded."});
-  const pending=(items||[]).filter((item:any)=>!item.exercise_assignment_id&&item.status==="scheduled").slice(0,2);
+  if(itemsError)return json(503,{error:"The saved assessment programme could not be loaded."});
+  const dueCutoffIso=new Date(Date.now()+7*24*60*60*1000).toISOString();
+  const dueCandidates=(items||[]).filter((item:any)=>!item.exercise_assignment_id&&item.status==="scheduled"&&Date.parse(String(item.scheduled_at))<=Date.parse(dueCutoffIso));
+  const waitingReviewIds=[...new Set(dueCandidates.filter((item:any)=>item.metadata?.waiting_for_material_approval&&item.metadata?.material_review_id).map((item:any)=>String(item.metadata.material_review_id)))];
+  const reviewStatusById=new Map<string,string>();
+  if(waitingReviewIds.length){
+    const {data:reviews,error:reviewError}=await admin.from("learning_material_review_queue").select("id,status").in("id",waitingReviewIds);
+    if(reviewError)throw new Error("Material approval status could not be checked.");
+    for(const review of reviews||[])reviewStatusById.set(String(review.id),String(review.status));
+  }
+  for(const item of dueCandidates.filter((row:any)=>row.metadata?.waiting_for_material_approval&&reviewStatusById.get(String(row.metadata?.material_review_id||""))==="rejected")){
+    await admin.from("assessment_schedule_items").update({status:"conflict",metadata:{...(item.metadata||{}),material_request_error:"The Monitor review team did not approve the requested learning material."}}).eq("id",item.id);
+  }
+  const pending=dueCandidates.filter((item:any)=>{
+    if(!item.metadata?.waiting_for_material_approval)return true;
+    return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
+  }).slice(0,2);
   const appOrigin=APP_ORIGIN;
   let generatedCount=0;
   for(const item of pending){

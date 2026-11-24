@@ -71,3 +71,12 @@ test("central scheduler creates monthly and quarterly assessment periods", () =>
   assert.match(helper, /expandPeriodWindows/);
   assert.match(helper, /slot\.date\|\|slot\.day/);
 });
+
+test("MIΛ keeps model and provider identities server-side and enforces current terms", () => {
+  const mia = read("supabase/functions/mia-assistant/index.ts");
+  assert.match(mia, /CURRENT_TERMS_VERSION = "2026-11-24-v9"/);
+  assert.doesNotMatch(mia, /providerNotice:\s*generated\.providerNotice/);
+  assert.doesNotMatch(mia, /model:\s*generated\.model/);
+  assert.doesNotMatch(mia, /provider:\s*generated\.provider/);
+  assert.doesNotMatch(mia, /usage_status"\) return json\(200, \{ success: true, provider:/);
+});

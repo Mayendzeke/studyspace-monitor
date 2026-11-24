@@ -74,3 +74,8 @@ Use only the public publishable key in the browser. Follow [SUPABASE_SETUP.md](S
 - Verify cloud sync and deletion behaviour across separate learner devices.
 
 Do not treat a successful frontend deployment as proof that all backend operations or security controls have been exercised.
+
+
+## Development standard
+
+All changes must follow the [Study Space Development Standard](STUDYSPACE_DEVELOPMENT_STANDARD.md). The pull-request template includes the required visual, accessibility, and verification checklist.

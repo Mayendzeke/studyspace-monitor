@@ -35,6 +35,11 @@ const required = [
   "20261116200743_allow_incomplete_learner_education_profile.sql",
   "20261117073500_studyspace_fix_learner_profile_rpc_persistence.sql",
   "20261117073929_studyspace_fix_learner_profile_rpc_persistence_reapply.sql",
+  "20261124135558_central_assessment_engine_and_material_approval.sql",
+  "20261124135836_assessment_late_completion_tracking.sql",
+  "20261124140036_subject_workload_profiles_for_balanced_scheduler.sql",
+  "20261124140241_cohort_question_versioning_and_exposure.sql",
+  "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
 ];
 
 const superseded = [

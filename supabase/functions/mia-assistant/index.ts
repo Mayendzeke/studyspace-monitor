@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { generateWithFallback, type ProviderMessage } from "./provider.ts";
+import { generateWithFallback, type ProviderMessage } from "../_shared/ai-provider.ts";
 
 const allowedOrigin = Deno.env.get("APP_ORIGIN") ?? "https://mayendzeke.github.io";
 const CURRENT_TERMS_VERSION = "2026-11-24-v9";

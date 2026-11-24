@@ -207,7 +207,7 @@ export default function LearningMaterialReviewQueue() {
             </div>
             {Object.keys(profile).length > 0 && <details><summary>Full academic profile used for research</summary><pre>{JSON.stringify(profile,null,2)}</pre></details>}
             <details className="material-review-preview"><summary><FileText size={15}/> Preview learning material</summary><pre>{markdownFor(item)}</pre></details>
-            <div className="material-review-sources"><strong>Research sources</strong>{sources.length ? sources.map((source,index)=><a key={source.url || index} href={source.url} target="_blank" rel="noreferrer">{source.title || source.publisher || source.url || "Source"} <ExternalLink size={12}/></a>) : <span>No source references supplied. Verify the material's accuracy before approving.</span>}</div>
+            <div className="material-review-sources"><strong>Research sources</strong>{sources.length ? sources.map((source,index)=>source.url ? <a key={source.url || index} href={source.url} target="_blank" rel="noreferrer">{source.title || source.publisher || source.url} <ExternalLink size={12}/></a> : <span key={index}>{source.title || source.publisher || "Suggested source"} · URL not verified</span>) : <span>No source references supplied. Verify the material's accuracy before approving.</span>}</div>
             <div className="material-review-footer"><span>Prepared {when(item.created_at)} · Learner {item.learner_id.slice(0,8)}…</span>
               {item.status === "pending" && <div className="material-review-actions">
                 <button type="button" className="secondary-button" disabled={busyId === item.id || !!busyId} onClick={() => void reject(item)}><XCircle size={15}/> Reject</button>

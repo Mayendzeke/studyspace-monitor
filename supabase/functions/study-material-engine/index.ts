@@ -135,16 +135,16 @@ Deno.serve(async request=>{
   if(!subject)return json(400,{error:"This file must be linked to a subject registered on your StudySpace account."});
   const sourceHash=await sha256(extractedText);
   const {data:existing,error:existingError}=await admin.from("learner_study_packs")
-    .select("id,status,content,version,source_hash")
+    .select("id,status,content,version,source_hash,updated_at")
     .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).eq("source_hash",sourceHash).maybeSingle();
   if(existingError)return json(503,{error:"Your existing study pack could not be checked."});
-  if(existing?.status==="ready"&&!force)return json(200,{success:true,status:"ready",packId:existing.id,content:existing.content});
-  if(existing?.status==="generating"&&!force)return json(200,{success:true,status:"generating",packId:existing.id});
+  if(existing?.status==="ready"&&!force)return json(200,{success:true,status:"ready",packId:existing.id,sourceHash,content:existing.content});
+  if(existing?.status==="generating"&&!force&&Date.now()-Date.parse(String(existing.updated_at||""))<10*60*1000)return json(200,{success:true,status:"generating",packId:existing.id,sourceHash});
   if(extractedText.trim().length<120) {
     const payload={learner_id:learnerId,source_type:"uploaded_resource",personal_resource_id:resourceId,subject_id:subject.id,subject_name:subjectName,topic,file_name:resource.title,mime_type:resource.mime_type,source_hash:sourceHash,source_text:extractedText,status:"needs_ocr",error_message:"The file did not contain enough extractable text. It may be a scanned image or photo.",updated_at:new Date().toISOString()};
     if(existing?.id)await admin.from("learner_study_packs").update(payload).eq("id",existing.id);
     else await admin.from("learner_study_packs").insert(payload);
-    return json(200,{success:true,status:"needs_ocr",message:"This file appears to be scanned or image-based. A readable text version is needed before a study pack can be prepared."});
+    return json(200,{success:true,status:"needs_ocr",packId:existing?.id||null,sourceHash,message:"This file appears to be scanned or image-based. A readable text version is needed before a study pack can be prepared."});
   }
   const {data:latestVersions}=await admin.from("learner_study_packs").select("version")
     .eq("learner_id",learnerId).eq("personal_resource_id",resourceId).order("version",{ascending:false}).limit(1);
@@ -195,7 +195,7 @@ Deno.serve(async request=>{
     if(saveError)throw new Error("The study pack was generated but could not be saved.");
     await admin.from("ai_generation_usage").update({output_characters:generated.text.length,provider:"cloudflare-workers-ai"})
       .eq("id",usage.id).eq("actor_id",learnerId);
-    return json(200,{success:true,status:"ready",packId,content:pack});
+    return json(200,{success:true,status:"ready",packId,sourceHash,content:pack});
   } catch(error) {
     const message=error instanceof Error?error.message:"Study material generation failed.";
     await admin.from("learner_study_packs").update({

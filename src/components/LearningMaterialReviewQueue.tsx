@@ -28,6 +28,7 @@ type ReviewItem = {
   status: "pending" | "approved" | "rejected";
   review_notes: string;
   created_at: string;
+  research_status?: string; source_count?: number; source_domains?: string[]; quality_checks?: Record<string,unknown>;
 };
 
 function markdownFor(item: ReviewItem): string {
@@ -64,7 +65,7 @@ export default function LearningMaterialReviewQueue() {
     if (!supabase) { setError("StudySpace database is not connected."); setLoading(false); return; }
     setLoading(true); setError("");
     const { data, error: queryError } = await supabase.from("learning_material_review_queue")
-      .select("id,learner_id,title,summary,subject_name,topic,material_type,content,country,institution,education_level,grade,course,curriculum,academic_year,language,source_references,profile_snapshot,generator,status,review_notes,created_at")
+      .select("id,learner_id,title,summary,subject_name,topic,material_type,content,country,institution,education_level,grade,course,curriculum,academic_year,language,source_references,profile_snapshot,generator,status,review_notes,created_at,research_status,source_count,source_domains,quality_checks")
       .eq("status", filter).order("created_at", { ascending: false }).limit(200);
     if (queryError) setError("Learning-material review queue could not be loaded: " + queryError.message);
     else setItems((data || []) as ReviewItem[]);
@@ -243,6 +244,7 @@ export default function LearningMaterialReviewQueue() {
               <span><b>Institution</b>{item.institution || "Not supplied"}</span>
               <span><b>Language</b>{item.language || "English"}</span>
               <span><b>Academic year</b>{item.academic_year || "Not supplied"}</span>
+              <span><b>Cross-reference</b>{item.research_status === "cross_referenced" ? (item.source_count || 0) + " source domains checked" : "Verification pending"}</span>
               <span><b>Generator</b>{item.generator}</span>
             </div>
             {Object.keys(profile).length > 0 && <details><summary>Full academic profile used for research</summary><pre>{JSON.stringify(profile,null,2)}</pre></details>}

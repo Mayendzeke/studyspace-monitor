@@ -8,7 +8,7 @@ const standard = readFileSync(new URL("../STUDYSPACE_DEVELOPMENT_STANDARD.md", i
 const pullRequest = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
 
 test("Monitor Study Space brand control returns to the home page", () => {
-  assert.ok(app.includes('className="brand-home-link" onClick={() => navigate(\\'Overview\\')}'));
+  assert.ok(app.includes("className=\"brand-home-link\" onClick={() => navigate('Overview')}"));
   assert.ok(brandStyles.includes(".brand-home-link:focus-visible"));
 });
 

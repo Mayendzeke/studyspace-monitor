@@ -248,7 +248,71 @@ Deno.serve(async request=>{
     }
   }
 
-  const {data:items,error:itemsError}=await admin.from("assessment_schedule_items").select("*").eq("schedule_run_id",runId).order("scheduled_at");
+  const periodRuns:Record<string,string>={weekly:runId,monthly:"",quarterly:""};
+  const weeklyBusy=schedule.assignments.map((item:any)=>({
+    date:dateForDay(monday,String(item.day)),start:String(item.start),end:String(item.end),
+  }));
+  async function persistPeriod(periodType:"monthly"|"quarterly",periodStart:string,periodEnd:string,targetStart:string,targetEnd:string,assessmentType:"monthly_subject"|"quarterly_exam",periodSchedule:any,periodFreeSlots:Record<string,unknown>[]) {
+    const periodSnapshot={...snapshot,periodType,periodStart,periodEnd,targetStart,targetEnd,freeSlots:periodFreeSlots};
+    const periodHash=await sha(JSON.stringify(periodSnapshot));
+    const {data:existing,error:existingError}=await admin.from("assessment_schedule_runs").select("id,schedule_hash,status")
+      .eq("learner_id",auth.user.id).eq("period_type",periodType).eq("period_start",periodStart).maybeSingle();
+    if(existingError)throw new Error("The "+periodType+" assessment plan could not be checked.");
+    let periodRunId=existing?.id;
+    if(!existing||existing.schedule_hash!==periodHash){
+      const {data:run,error:runError}=await admin.from("assessment_schedule_runs").upsert({
+        learner_id:auth.user.id,period_type:periodType,period_start:periodStart,period_end:periodEnd,
+        policy:"balanced",status:periodSchedule.conflicts.length?"capacity_conflict":"planned",
+        schedule_hash:periodHash,input_snapshot:periodSnapshot,conflicts:periodSchedule.conflicts,
+      },{onConflict:"learner_id,period_type,period_start"}).select("id").single();
+      if(runError||!run)throw new Error("The "+periodType+" assessment plan could not be saved.");
+      periodRunId=run.id;
+      if(existing?.id)await admin.from("assessment_schedule_items").delete().eq("schedule_run_id",periodRunId).is("exercise_assignment_id",null);
+      const {data:alreadyAssigned}=existing?.id?await admin.from("assessment_schedule_items").select("subject_id").eq("schedule_run_id",periodRunId).not("exercise_assignment_id","is",null):{data:[]};
+      const assignedSubjects=new Set((alreadyAssigned||[]).map((row:any)=>row.subject_id));
+      const newRows=periodSchedule.assignments.filter((item:any)=>!assignedSubjects.has(item.subjectId)).map((item:any)=>({
+        schedule_run_id:periodRunId,learner_id:auth.user.id,subject_id:item.subjectId,subject_name:item.subjectName,
+        assessment_type:assessmentType,scheduled_at:zonedTimeToIso(String(item.date||targetStart),String(item.start),timezone),
+        duration_minutes:item.durationMinutes,question_count:item.questionCount||questionCount,difficulty_score:item.difficultyScore,
+        workload_score:item.workloadScore,status:"scheduled",
+        schedule_key:periodType+":"+auth.user.id+":"+periodStart+":"+item.subjectId,
+        version_seed:crypto.randomUUID(),
+        metadata:{day:item.day,date:item.date,start:item.start,end:item.end,period_start:periodStart,period_end:periodEnd,period_type:periodType,subject_type:item.subjectType,credit_hours:item.creditHours,weekly_minutes_target:item.weeklyMinutesTarget},
+      }));
+      if(newRows.length){
+        const {error:insertError}=await admin.from("assessment_schedule_items").insert(newRows);
+        if(insertError)throw new Error("The "+periodType+" assessment items could not be stored.");
+      }
+    }
+    if(!periodRunId)throw new Error("The "+periodType+" assessment run was not created.");
+    return periodRunId;
+  }
+
+  const today=localDate(new Date(),timezone);
+  const month=monthBounds(today);
+  const quarter=quarterBounds(today);
+  const quarterEndMonth=month.end===quarter.end;
+  const monthlyTargetStart=laterDate(today,addDays(month.end,quarterEndMonth?-14:-6));
+  const monthlyTargetEnd=quarterEndMonth?addDays(month.end,-8):month.end;
+  const monthlyWindows=expandPeriodWindows(monthlyTargetStart,monthlyTargetEnd,windows,preferredDays);
+  const monthlyFree=subtractBusyWindows(monthlyWindows,weeklyBusy.length?[...busy,...weeklyBusy]:busy);
+  const monthlySchedule=buildBalancedSchedule(schedulerSubjects,monthlyFree,dailyLimit,questionCount);
+  periodRuns.monthly=await persistPeriod("monthly",month.start,month.end,monthlyTargetStart,monthlyTargetEnd,"monthly_subject",monthlySchedule,monthlyFree);
+  const monthlyBusy=monthlySchedule.assignments.map((item:any)=>({date:String(item.date),start:String(item.start),end:String(item.end)}));
+  const quarterlyTargetStart=laterDate(today,addDays(quarter.end,-6));
+  const quarterlyWindows=expandPeriodWindows(quarterlyTargetStart,quarter.end,windows,preferredDays);
+  const quarterlyBusy=[...busy,...weeklyBusy,...monthlyBusy];
+  const quarterlyFree=subtractBusyWindows(quarterlyWindows,quarterlyBusy);
+  const quarterlySchedule=buildBalancedSchedule(schedulerSubjects,quarterlyFree,dailyLimit,questionCount);
+  periodRuns.quarterly=await persistPeriod("quarterly",quarter.start,quarter.end,quarterlyTargetStart,quarter.end,"quarterly_exam",quarterlySchedule,quarterlyFree);
+  const runIds=Object.values(periodRuns).filter(Boolean);
+  const allConflicts=[
+    ...schedule.conflicts.map((item:any)=>({...item,periodType:"weekly"})),
+    ...monthlySchedule.conflicts.map((item:any)=>({...item,periodType:"monthly"})),
+    ...quarterlySchedule.conflicts.map((item:any)=>({...item,periodType:"quarterly"})),
+  ];
+
+  const {data:items,error:itemsError}=await admin.from("assessment_schedule_items").select("*").in("schedule_run_id",runIds).order("scheduled_at");
   if(itemsError)return json(503,{error:"The saved weekly assessment plan could not be loaded."});
   const pending=(items||[]).filter((item:any)=>!item.exercise_assignment_id&&item.status==="scheduled").slice(0,2);
   const appOrigin=APP_ORIGIN;

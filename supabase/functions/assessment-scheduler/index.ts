@@ -170,7 +170,7 @@ async function approvedNotes(admin:any,learnerId:string,subject:string) {
 }
 async function processPracticeRequests(admin:any,url:string,publishable:string,service:string,learnerId:string,profile:any,subjects:any[],limit=2) {
   const {data:requests,error}=await admin.from("learner_practice_requests").select("*")
-    .eq("learner_id",learnerId).in("status",["queued","waiting_for_material","waiting_for_study_pack"])
+    .eq("learner_id",learnerId).eq("status","queued")
     .order("created_at",{ascending:true}).limit(limit);
   if(error)return;
   for(const request of requests||[]){
@@ -322,7 +322,13 @@ Deno.serve(async request=>{
     return json(200,{success:true,requestId:created.id,status,assignmentId:updated?.exercise_assignment_id||null,error:updated?.error_message||null,
       message:status==="ready"?"Your practice test is ready.":status==="waiting_for_material"?"StudySpace is preparing a curriculum guide for Monitor approval. Your practice test will appear when it is approved.":status==="waiting_for_study_pack"?"Your study material is being prepared. Your practice test will appear automatically when it is ready.":"Your practice test request has been saved."});
   }
-  await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
+  if(body.action==="process_practice_requests"){
+    await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
+    const {count,error:countError}=await admin.from("learner_practice_requests").select("id",{count:"exact",head:true})
+      .eq("learner_id",auth.user.id).eq("status","queued");
+    if(countError)return json(503,{error:"Queued practice requests could not be checked."});
+    return json(200,{success:true,status:"practice_requests_processed",processedCount:1,pendingCount:Number(count||0),hasMore:Number(count||0)>0});
+  }
   const [{data:studentEntries,error:studentEntriesError},{data:members,error:membersError}]=await Promise.all([
     admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",auth.user.id),
     admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",auth.user.id),
@@ -662,13 +668,11 @@ Deno.serve(async request=>{
     if(!item.metadata?.waiting_for_material_approval)return true;
     return reviewStatusById.get(String(item.metadata?.material_review_id||""))==="approved";
   });
-  const {count:queuedPracticeCount,error:practiceCountError}=await admin.from("learner_practice_requests").select("id",{count:"exact",head:true}).eq("learner_id",auth.user.id).eq("status","queued");
-  if(practiceCountError)return json(503,{error:"Pending practice requests could not be checked."});
-  const hasMore=finalDuePending.length>0||Number(queuedPracticeCount||0)>0;
+  const hasMore=finalDuePending.length>0;
   return json(200,{
     success:true,status:finalStatus,scheduleRunId:periodRuns.weekly,monthlyRunId:periodRuns.monthly,quarterlyRunId:periodRuns.quarterly,
     weekStart:monday,monthStart:month.start,quarterStart:quarter.start,subjectCount:subjects.length,
-    scheduledCount:savedItems.length,generatedCount,pendingCount:finalDuePending.length+Number(queuedPracticeCount||0),practicePendingCount:Number(queuedPracticeCount||0),hasMore,
+    scheduledCount:savedItems.length,generatedCount,pendingCount:finalDuePending.length,hasMore,
     conflicts:allConflicts,items:savedItems,
     message:generatedCount
       ?"Your ready assessments have been prepared and saved. Monthly and quarterly tests are scheduled for their assessment periods."

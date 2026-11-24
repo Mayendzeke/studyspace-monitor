@@ -60,3 +60,14 @@ test("submitting an assessment updates its central programme item", () => {
   assert.match(submit, /assessment_schedule_items/);
   assert.match(submit, /update\(\{ status: "completed" \}\)/);
 });
+
+test("central scheduler creates monthly and quarterly assessment periods", () => {
+  const scheduler = read("supabase/functions/assessment-scheduler/index.ts");
+  const helper = read("supabase/functions/assessment-scheduler/scheduler.ts");
+  assert.match(scheduler, /persistPeriod\("monthly"/);
+  assert.match(scheduler, /persistPeriod\("quarterly"/);
+  assert.match(scheduler, /assessment_type:assessmentType/);
+  assert.match(scheduler, /hasMore/);
+  assert.match(helper, /expandPeriodWindows/);
+  assert.match(helper, /slot\.date\|\|slot\.day/);
+});

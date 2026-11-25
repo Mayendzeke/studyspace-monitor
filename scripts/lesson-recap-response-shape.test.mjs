@@ -10,11 +10,11 @@ test("lesson recap provider adapter handles raw responses and content variants",
   assert.ok(provider.includes("JSON.parse(responseText)"), "Parse the provider response body explicitly.");
   assert.ok(source.includes("systemPrompt"), "Lesson recap policy must be passed separately from lesson notes.");
   assert.ok(provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }'), "Gemini must receive a trusted system instruction.");
-  assert.ok(provider.includes('role: "system", content: options.systemPrompt'), "Gemma must receive a trusted system message.");
-  assert.ok(provider.includes("Array.isArray(raw)"), "Support structured content-part arrays.");
-  assert.ok(provider.includes('.join("\\n")'), "Join provider text parts with one escaped newline.");
-  assert.ok(provider.includes('typeof choice?.text === "string"'), "Support the legacy completion text field.");
-  assert.ok(provider.includes('response_format: { type: "json_object" }'), "Request JSON mode for structured Gemma responses.");
+  assert.ok(provider.includes("candidate?.content?.parts"), "Support Gemini candidate content-part arrays.");
+  assert.ok(provider.includes('typeof part?.text === "string"'), "Extract text from Gemini content parts.");
+  assert.ok(provider.includes('.join("\\n")'), "Join Gemini text parts with one escaped newline.");
+  assert.ok(provider.includes('responseMimeType: "application/json"'), "Request JSON mode for structured Gemini responses.");
+  assert.ok(!provider.includes("CLOUDFLARE") && !provider.includes("callGemma"), "Lesson recap must not call a paid secondary provider.");
   assert.ok(source.includes("jsonMode: true"), "The recap endpoint must request JSON mode through the adapter.");
 });
 

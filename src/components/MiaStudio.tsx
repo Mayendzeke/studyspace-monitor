@@ -357,8 +357,8 @@ export default function MiaStudio() {
       </div>
 
       <div className="mia-provider-banner" role="note">
-        <strong>Gemini free-tier API · Gemma 4 automatic backup</strong>
-        <span>Available to authorised adult administrators in Monitor only. Gemini is used first; when its free API quota is reached or the service is unavailable, Gemma 4 takes over automatically. Google may use free-tier prompts and responses to improve its services and may have them reviewed by people. Submit anonymised, non-confidential teaching material only; never submit learner names, Student IDs, contact details or sensitive records.</span>
+        <strong>Google Gemini API · Cloudflare Workers AI Gemma 4 automatic backup</strong>
+        <span>Available only to authorised adult administrators in Monitor after multi-factor authentication. Google Gemini API is the primary provider; Cloudflare Workers AI (Gemma 4) is the automatic backup when Gemini is unavailable. Use anonymised, non-confidential teaching material only. Never submit learner or guardian names, Student IDs, dates of birth, contact details, private learner records or other sensitive information.</span>
       </div>
 
       {providerHealth && <div className="mia-provider-health-panel" role="status">

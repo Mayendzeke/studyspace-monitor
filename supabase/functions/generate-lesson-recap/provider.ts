@@ -1,22 +1,22 @@
-export const GEMINI_MODEL = "gemini-3.8-flash";
-export const GEMMA_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+export const GEMINI_MODEL = "gemini-2.5-flash";
 
 export type ProviderResult = {
   text: string;
-  provider: "Google Gemini API" | "Cloudflare Workers AI";
+  provider: "Google Gemini API";
   model: string;
   fallbackUsed: boolean;
   providerNotice: string | null;
+  groundingSources?: { title: string; uri: string }[];
 };
 
 export type ProviderStatus = {
-  primary: "Google Gemini API";
-  backup: "Cloudflare Workers AI";
+  primary: "Google Gemini API (Free tier)";
+  backup: "Disabled";
   gemini: { configured: boolean; model: string };
   gemma: { configured: boolean; model: string };
 };
 
-type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[] };
+type GenerationOptions = { maxTokens?: number; jsonMode?: boolean; systemPrompt?: string; requiredJsonKeys?: string[]; googleSearch?: boolean };
 
 class ProviderSafetyError extends Error {
   constructor(message: string) {
@@ -29,20 +29,12 @@ function geminiKey(): string {
   return Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
 }
 
-function cloudflareCredentials(): { accountId: string; apiToken: string } {
-  return {
-    accountId: Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim() ?? "",
-    apiToken: Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim() ?? "",
-  };
-}
-
 export function getProviderStatus(): ProviderStatus {
-  const cloudflare = cloudflareCredentials();
   return {
-    primary: "Google Gemini API",
-    backup: "Cloudflare Workers AI",
+    primary: "Google Gemini API (Free tier)",
+    backup: "Disabled",
     gemini: { configured: Boolean(geminiKey()), model: GEMINI_MODEL },
-    gemma: { configured: Boolean(cloudflare.accountId && cloudflare.apiToken), model: GEMMA_MODEL },
+    gemma: { configured: false, model: "Disabled — no paid fallback" },
   };
 }
 
@@ -56,11 +48,11 @@ export function assertNoPersonalIdentifiers(value: string): void {
   ];
   for (const [pattern, label] of checks) {
     if (pattern.test(value)) {
-      throw new Error("Remove " + label + " before using administrator MIΛ. Submit anonymised lesson material only; never send identifiable learner or guardian information to an AI provider.");
+      throw new Error("Remove " + label + " before using administrator MIA. Submit anonymised lesson material only; never send identifiable learner or guardian information to an AI provider.");
     }
   }
   if (/\b(?:password|passcode|one[- ]time pin|otp)\s*[:=]/i.test(value)) {
-    throw new Error("Remove credentials and security codes before using administrator MIΛ.");
+    throw new Error("Remove credentials and security codes before using administrator MIA.");
   }
 }
 
@@ -95,7 +87,7 @@ function parseGeminiText(payload: any): string {
   return text;
 }
 
-async function callGemini(prompt: string, options: Required<GenerationOptions>): Promise<string> {
+async function callGemini(prompt: string, options: Required<GenerationOptions>): Promise<{ text: string; groundingSources: { title: string; uri: string }[] }> {
   const key = geminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is not configured.");
   let response: Response;
@@ -107,6 +99,7 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
       body: JSON.stringify({
         ...(options.systemPrompt ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } } : {}),
         contents: [{ role: "user", parts: [{ text: prompt }] }],
+        ...(options.googleSearch ? { tools: [{ googleSearch: {} }] } : {}),
         generationConfig: {
           maxOutputTokens: options.maxTokens,
           thinkingConfig: { thinkingLevel: "low" },
@@ -127,52 +120,18 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     const providerMessage = String(payload?.error?.message ?? "").replace(/\s+/g, " ").slice(0, 220);
     throw new Error("Gemini API returned HTTP " + response.status + (providerMessage ? ": " + providerMessage : "."));
   }
-  return validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys);
-}
-
-async function callGemma(prompt: string, options: Required<GenerationOptions>): Promise<string> {
-  const { accountId, apiToken } = cloudflareCredentials();
-  if (!accountId || !apiToken) throw new Error("Cloudflare Workers AI credentials are not configured.");
-  let response: Response;
-  try {
-    response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(45000),
-      body: JSON.stringify({
-        model: GEMMA_MODEL,
-        messages: [
-          ...(options.systemPrompt ? [{ role: "system", content: options.systemPrompt }] : []),
-          { role: "user", content: prompt },
-        ],
-        max_completion_tokens: options.maxTokens,
-        stream: false,
-        store: false,
-        chat_template_kwargs: { enable_thinking: false, clear_thinking: true },
-        ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-      }),
-    });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new Error("Gemma backup timed out after 45 seconds.");
-    }
-    throw new Error("Gemma backup could not be reached.");
-  }
-  const responseText = await response.text();
-  let payload: any = {};
-  try { payload = JSON.parse(responseText); } catch { /* Keep the failure description generic. */ }
-  if (!response.ok) {
-    const details = Array.isArray(payload?.errors)
-      ? payload.errors.map((item: any) => String(item?.message ?? "")).filter(Boolean).join("; ").slice(0, 220)
-      : "";
-    throw new Error("Gemma backup returned HTTP " + response.status + (details ? ": " + details : "."));
-  }
-  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
-  const raw = choice?.message?.content;
-  const text = typeof raw === "string" ? raw.trim()
-    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
-    : typeof choice?.text === "string" ? choice.text.trim() : "";
-  return validateStructuredOutput(text, options.jsonMode, "Gemma backup", options.requiredJsonKeys);
+  const candidate = Array.isArray(payload?.candidates) ? payload.candidates[0] : undefined;
+  const groundingChunks = Array.isArray(candidate?.groundingMetadata?.groundingChunks) ? candidate.groundingMetadata.groundingChunks : [];
+  const groundingSources = groundingChunks.flatMap((chunk: any) => {
+    const web = chunk?.web;
+    if (!web || typeof web.uri !== "string" || !/^https:\/\//i.test(web.uri)) return [];
+    return [{ title: String(web.title || web.uri).slice(0, 240), uri: web.uri.slice(0, 2000) }];
+  }).filter((source: { title: string; uri: string }, index: number, all: { title: string; uri: string }[]) =>
+    all.findIndex(item => item.uri === source.uri) === index).slice(0, 12);
+  return {
+    text: validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys),
+    groundingSources,
+  };
 }
 
 export async function generateWithFallback(prompt: string, options: GenerationOptions = {}): Promise<ProviderResult> {
@@ -181,36 +140,24 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
     jsonMode: options.jsonMode === true,
     systemPrompt: String(options.systemPrompt ?? "").trim().slice(0, 12000),
     requiredJsonKeys: Array.isArray(options.requiredJsonKeys) ? options.requiredJsonKeys.filter(key => typeof key === "string").slice(0, 20) : [],
+    googleSearch: options.googleSearch === true,
   };
-  const status = getProviderStatus();
-  let primaryFailure = "";
-  if (status.gemini.configured) {
-    try {
-      const text = await callGemini(prompt, config);
-      return { text, provider: "Google Gemini API", model: GEMINI_MODEL, fallbackUsed: false, providerNotice: null };
-    } catch (error) {
-      if (error instanceof ProviderSafetyError) throw error;
-      primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";
-      console.warn("[StudySpace AI provider fallback] Gemini request unavailable; switching to Gemma backup:", primaryFailure.slice(0, 260));
-    }
-  } else {
-    primaryFailure = "GEMINI_API_KEY is not configured.";
-  }
-
-  if (!status.gemma.configured) {
-    throw new Error(primaryFailure + " Gemma backup is also not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to Supabase Edge Function secrets.");
+  if (!geminiKey()) {
+    throw new Error("GEMINI_API_KEY is not configured. Add the existing Google AI Studio Free tier key to Supabase Edge Function secrets.");
   }
   try {
-    const text = await callGemma(prompt, config);
+    const generated = await callGemini(prompt, config);
     return {
-      text,
-      provider: "Cloudflare Workers AI",
-      model: GEMMA_MODEL,
-      fallbackUsed: true,
-      providerNotice: "Gemini was unavailable (" + primaryFailure + "). Gemma 4 handled this request as the automatic backup.",
+      text: generated.text,
+      provider: "Google Gemini API",
+      model: GEMINI_MODEL,
+      fallbackUsed: false,
+      providerNotice: null,
+      groundingSources: generated.groundingSources,
     };
   } catch (error) {
-    const backupFailure = error instanceof Error ? error.message : "Gemma backup failed.";
-    throw new Error("Both AI providers are currently unavailable. Gemini: " + primaryFailure + " Gemma: " + backupFailure);
+    if (error instanceof ProviderSafetyError) throw error;
+    const reason = error instanceof Error ? error.message : "Gemini was unavailable.";
+    throw new Error("Gemini Free tier is temporarily unavailable: " + reason.slice(0, 400) + ". No paid AI fallback is enabled; retry when the free quota resets.");
   }
 }

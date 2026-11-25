@@ -11,8 +11,8 @@ export type ProviderResult = {
 };
 
 export type ProviderStatus = {
-  primary: "Google Gemini API";
-  backup: "Cloudflare Workers AI";
+  primary: "Google Gemini API (Free tier)";
+  backup: "Disabled";
   gemini: { configured: boolean; model: string };
   gemma: { configured: boolean; model: string };
 };
@@ -38,12 +38,11 @@ function cloudflareCredentials(): { accountId: string; apiToken: string } {
 }
 
 export function getProviderStatus(): ProviderStatus {
-  const cloudflare = cloudflareCredentials();
   return {
-    primary: "Google Gemini API",
-    backup: "Cloudflare Workers AI",
+    primary: "Google Gemini API (Free tier)",
+    backup: "Disabled",
     gemini: { configured: Boolean(geminiKey()), model: GEMINI_MODEL },
-    gemma: { configured: Boolean(cloudflare.accountId && cloudflare.apiToken), model: GEMMA_MODEL },
+    gemma: { configured: false, model: "Disabled — no paid fallback" },
   };
 }
 
@@ -196,35 +195,22 @@ export async function generateWithFallback(prompt: string, options: GenerationOp
     requiredJsonKeys: Array.isArray(options.requiredJsonKeys) ? options.requiredJsonKeys.filter(key => typeof key === "string").slice(0, 20) : [],
     googleSearch: options.googleSearch === true,
   };
-  const status = getProviderStatus();
-  let primaryFailure = "";
-  if (status.gemini.configured) {
-    try {
-      const generated = await callGemini(prompt, config);
-      return { text: generated.text, provider: "Google Gemini API", model: GEMINI_MODEL, fallbackUsed: false, providerNotice: null, groundingSources: generated.groundingSources };
-    } catch (error) {
-      if (error instanceof ProviderSafetyError) throw error;
-      primaryFailure = error instanceof Error ? error.message : "Gemini was unavailable.";
-      console.warn("[StudySpace AI provider fallback] Gemini request unavailable; switching to Gemma backup:", primaryFailure.slice(0, 260));
-    }
-  } else {
-    primaryFailure = "GEMINI_API_KEY is not configured.";
-  }
-
-  if (!status.gemma.configured) {
-    throw new Error(primaryFailure + " Gemma backup is also not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to Supabase Edge Function secrets.");
+  if (!geminiKey()) {
+    throw new Error("GEMINI_API_KEY is not configured. Add the existing Google AI Studio Free tier key to Supabase Edge Function secrets.");
   }
   try {
-    const text = await callGemma(prompt, config);
+    const generated = await callGemini(prompt, config);
     return {
-      text,
-      provider: "Cloudflare Workers AI",
-      model: GEMMA_MODEL,
-      fallbackUsed: true,
-      providerNotice: "Gemini was unavailable (" + primaryFailure + "). Gemma 4 handled this request as the automatic backup.",
+      text: generated.text,
+      provider: "Google Gemini API",
+      model: GEMINI_MODEL,
+      fallbackUsed: false,
+      providerNotice: null,
+      groundingSources: generated.groundingSources,
     };
   } catch (error) {
-    const backupFailure = error instanceof Error ? error.message : "Gemma backup failed.";
-    throw new Error("Both AI providers are currently unavailable. Gemini: " + primaryFailure + " Gemma: " + backupFailure);
+    if (error instanceof ProviderSafetyError) throw error;
+    const reason = error instanceof Error ? error.message : "Gemini was unavailable.";
+    throw new Error("Gemini Free tier is temporarily unavailable: " + reason.slice(0, 400) + ". No paid AI fallback is enabled; retry when the free quota resets.");
   }
 }

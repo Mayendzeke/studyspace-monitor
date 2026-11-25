@@ -374,15 +374,15 @@ export default function MiaStudio() {
       </div>
 
       <div className="mia-provider-banner" role="note">
-        <strong>Google Gemini API · Cloudflare Workers AI Gemma 4 automatic backup</strong>
-        <span>Available only to authorised adult administrators in Monitor after multi-factor authentication. Google Gemini API is the primary provider; Cloudflare Workers AI (Gemma 4) is the automatic backup when Gemini is unavailable. Use anonymised, non-confidential teaching material only. Never submit learner or guardian names, Student IDs, dates of birth, contact details, private learner records or other sensitive information.</span>
+        <strong>Google Gemini API · Free tier only · No paid fallback</strong>
+        <span>Available only to authorised adult administrators in Monitor after multi-factor authentication. MIΛ uses the Google Gemini API Free tier only. If the free quota is exhausted or Gemini is unavailable, requests pause; no paid AI provider is called. Use anonymised, non-confidential teaching material only. Never submit learner or guardian names, Student IDs, dates of birth, contact details, private learner records or other sensitive information.</span>
       </div>
 
       {providerHealth && <div className="mia-provider-health-panel" role="status">
         <div className="mia-provider-health-top"><strong><Activity size={16}/> Live AI provider test passed</strong><span>{providerHealth.provider} · {providerHealth.model}</span></div>
         <div className="mia-provider-health-grid">
-          <span><strong>Gemini primary</strong><small>{providerHealth.providers?.gemini?.configured ? 'Configured and eligible for requests' : 'Not configured — add the Gemini API key in Supabase secrets'}</small></span>
-          <span><strong>Gemma 4 backup</strong><small>{providerHealth.providers?.gemma?.configured ? 'Cloudflare credentials configured' : 'Cloudflare credentials missing'}</small></span>
+          <span><strong>Gemini Free tier</strong><small>{providerHealth.providers?.gemini?.configured ? 'Configured for free-tier requests' : 'Not configured — add the existing Google AI Studio Free tier key in Supabase secrets'}</small></span>
+          <span><strong>Paid fallback</strong><small>Disabled. No secondary AI API is called.</small></span>
         </div>
         {providerHealth.providerNotice && <p>{providerHealth.providerNotice}</p>}
       </div>}

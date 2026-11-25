@@ -329,15 +329,20 @@ jobs:
             const directory = path.slice(0, path.lastIndexOf('/'))
             const provider = readFileSync(directory + '/provider.ts', 'utf8')
             if (!source.includes('./provider.ts') || !provider.includes('GEMINI_API_KEY') || !provider.includes('generativelanguage.googleapis.com') || !provider.includes('GEMINI_MODEL')) throw new Error(path + ' must use the server-side Gemini primary provider adapter.')
-            if (!provider.includes('CLOUDFLARE_API_TOKEN') || !provider.includes('GEMMA_MODEL') || !provider.includes('generateWithFallback')) throw new Error(path + ' must retain Gemma as the automatic backup.')
-            if (!source.includes('systemPrompt') || !provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }') || !provider.includes('role: "system", content: options.systemPrompt')) throw new Error(path + ' must separate trusted system instructions from user content for both providers.')
+            if (path === 'supabase/functions/mia-monitor-assistant/index.ts') {
+              if (!provider.includes('backup: "Disabled"') || !provider.includes('No paid AI fallback is enabled') || provider.includes('CLOUDFLARE_API_TOKEN') || provider.includes('GEMMA_MODEL')) throw new Error(path + ' must use Gemini Free tier only and must not call a paid secondary provider.')
+              if (!source.includes('systemPrompt') || !provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }')) throw new Error(path + ' must pass trusted system instructions to Gemini separately from user content.')
+            } else {
+              if (!provider.includes('CLOUDFLARE_API_TOKEN') || !provider.includes('GEMMA_MODEL') || !provider.includes('generateWithFallback')) throw new Error(path + ' must retain Gemma as the automatic backup.')
+              if (!source.includes('systemPrompt') || !provider.includes('systemInstruction: { parts: [{ text: options.systemPrompt }] }') || !provider.includes('role: "system", content: options.systemPrompt')) throw new Error(path + ' must separate trusted system instructions from user content for both providers.')
+            }
             if (!provider.includes('gemini: { configured: Boolean(geminiKey()), model: GEMINI_MODEL }') || provider.includes('GEMINI_API_PAID_SERVICE_CONFIRMED')) throw new Error(path + ' must attempt the Gemini Free Tier whenever its server-side API key is configured.')
             if (source.includes('daily MIΛ limit of 80 requests') || source.includes('>= 80')) throw new Error(path + ' must not impose an application-level daily AI request cap.')
             if (!provider.includes('ProviderSafetyError') || !provider.includes('assertNoPersonalIdentifiers')) throw new Error(path + ' must preserve safety refusals and reject common learner identifiers.')
             if (!source.includes('aal2') || !source.includes('profile?.role !== "admin"')) throw new Error(path + ' must enforce adult administrator role and MFA.')
             if (!source.includes('mia_admin_request')) throw new Error(path + ' must enforce and audit administrator AI usage.')
           }
-          console.log('Gemini primary / Gemma backup is restricted to adult administrator tools; Student MIΛ and homework fallback remain Gemma-only.')
+          console.log('Monitor MIΛ uses Gemini Free tier only with no paid fallback; other administrator AI workflows retain their configured Gemini/Gemma recovery policy.')
           console.log('Both provider credentials stay server-side; common learner identifiers are screened before administrator AI calls.')
           const migration = readFileSync('supabase/migrations/20261108140011_studyspace_terms_v6_homework_ai_disclosure.sql', 'utf8')
           if (!/security invoker/i.test(migration)) throw new Error('The learner access helper must run with invoker privileges.')

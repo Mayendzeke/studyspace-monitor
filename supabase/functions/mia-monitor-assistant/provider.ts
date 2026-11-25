@@ -1,4 +1,4 @@
-export const GEMINI_MODEL = "gemini-3.8-flash";
+export const GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMMA_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 export type ProviderResult = {

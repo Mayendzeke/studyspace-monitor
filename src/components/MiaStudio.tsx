@@ -72,6 +72,23 @@ function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: strin
   })
 }
 
+async function invokeMonitorMia(body: Record<string, unknown>) {
+  if (!supabase) throw new Error("The secure StudySpace connection is unavailable.");
+  const current = await supabase.auth.getSession();
+  if (current.error) throw current.error;
+  let session = current.data.session;
+  if (!session || (session.expires_at && session.expires_at * 1000 <= Date.now() + 60_000)) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error) throw refreshed.error;
+    session = refreshed.data.session;
+  }
+  if (!session?.access_token) throw new Error("Your administrator session has expired. Sign in again to use MIΛ.");
+  return supabase.functions.invoke("mia-monitor-assistant", {
+    body,
+    headers: { Authorization: "Bearer " + session.access_token },
+  });
+}
+
 async function edgeError(reason: unknown): Promise<string> {
   const context = reason && typeof reason === 'object' && 'context' in reason
     ? (reason as { context?: unknown }).context : undefined
@@ -182,7 +199,7 @@ export default function MiaStudio() {
     setCheckingProviders(true);
     setProviderHealthError('');
     try {
-      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', { body: { action: 'healthcheck' } }), 120000, 'The provider health check timed out after 120 seconds. Try again.');
+      const { data, error: invokeError } = await withTimeout(invokeMonitorMia({ action: 'healthcheck' }), 120000, 'The provider health check timed out after 120 seconds. Try again.');
       if (invokeError) throw new Error(await edgeError(invokeError));
       if (!data?.success || !data?.verified) throw new Error(typeof data?.error === 'string' ? data.error : 'The AI providers did not return a verified test response.');
       setProviderHealth(data as ProviderHealthSnapshot);
@@ -205,8 +222,8 @@ export default function MiaStudio() {
     const next = [...previousMessages, { id: crypto.randomUUID(), role: 'user' as const, content: clean }]
     saveMessages(next)
     try {
-      const { data, error: invokeError } = await withTimeout(supabase.functions.invoke('mia-monitor-assistant', {
-        body: { message: clean, history: history.map(item => ({ role: item.role, content: item.content })) },
+      const { data, error: invokeError } = await withTimeout(invokeMonitorMia({
+        message: clean, history: history.map(item => ({ role: item.role, content: item.content })),
       }), 120000, 'MIΛ did not respond within 120 seconds. Your message has been restored so you can retry.');
       if (invokeError) throw new Error(await edgeError(invokeError))
       if (!data?.success || typeof data.reply !== 'string' || !data.reply.trim()) {

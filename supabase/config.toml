@@ -43,10 +43,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.mia-assistant]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mia-monitor-assistant]
-verify_jwt = true
+verify_jwt = false
 
 
 [functions.guardian-consent]

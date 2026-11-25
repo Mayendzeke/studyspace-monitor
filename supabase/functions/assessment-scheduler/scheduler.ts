@@ -72,7 +72,7 @@ export function buildBalancedSchedule(subjects:Record<string,unknown>[], slots:R
     const key=date||day;
     if(key&&!dayMap.has(key))dayMap.set(key,{day,date:date||undefined,workload:0,minutes:0,hard:0,count:0});
   }
-  const remaining=slots.map((slot,index)=>({
+  const remaining: (Record<string,unknown> & {id:string;next:number;end:number})[]=slots.map((slot,index)=>({
     ...slot,id:String(slot.id||"slot-"+index),
     next:toMin(String(slot.start)),end:toMin(String(slot.end)),
   })).filter(slot=>Number.isFinite(slot.next)&&Number.isFinite(slot.end)&&slot.end>slot.next);

@@ -222,14 +222,13 @@ async function processPracticeRequests(admin:any,url:string,publishable:string,s
         content:{options:question.options,pairs:question.pairs,clue:question.clue,scramble:question.scramble,topic:question.topic,difficulty:question.difficulty},
         explanation:question.explanation,points:1,topic:question.topic,difficulty:question.difficulty,
       }));
-      const {data:savedQuestions,error:questionError}=await admin.from("exercise_set_questions").insert(questionRows).select("id,position");
+      const {data:savedQuestions,error:questionError}=await admin.from("exercise_questions").insert(questionRows).select("id,position");
       if(questionError||!savedQuestions||savedQuestions.length!==count){
         await admin.from("exercise_sets").delete().eq("id",set.id);
         throw new Error("The practice test questions could not be saved.");
       }
       const answerRows=savedQuestions.map((saved:any)=>({
-        question_id:saved.id,answer_key:{answer:String(questions[saved.position-1]?.answer||""),acceptedAnswers:[String(questions[saved.position-1]?.answer||"")],pairs:questions[saved.position-1]?.pairs||[]},
-        explanation:String(questions[saved.position-1]?.explanation||""),
+        question_id:saved.id,answer_key:{answer:String(questions[saved.position-1]?.answer||""),acceptedAnswers:[String(questions[saved.position-1]?.answer||"")],pairs:questions[saved.position-1]?.pairs||[],explanation:String(questions[saved.position-1]?.explanation||"")},
       }));
       const {error:answerError}=await admin.from("exercise_answer_keys").insert(answerRows);
       if(answerError){

@@ -311,8 +311,10 @@ Deno.serve(async request=>{
     if(!subject)return json(404,{error:"Choose one of your registered subjects before preparing a practice test."});
     const questionCount=Math.max(5,Math.min(20,Number(body.questionCount)||10));
     const topic=clean(body.topic,180);
+    const requestedDifficulty=clean(body.difficulty,24).toLowerCase();
+    const difficulty=["adaptive","foundation","standard","challenge"].includes(requestedDifficulty)?requestedDifficulty:"adaptive";
     const {data:created,error:createError}=await admin.from("learner_practice_requests").insert({
-      learner_id:auth.user.id,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty:"adaptive",status:"queued",
+      learner_id:auth.user.id,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty,status:"queued",
     }).select("id,status").single();
     if(createError||!created)return json(503,{error:"Your practice test request could not be saved. Please try again."});
     const {data:updated}=await admin.from("learner_practice_requests").select("id,status,exercise_assignment_id,error_message,subject_name,topic,created_at")

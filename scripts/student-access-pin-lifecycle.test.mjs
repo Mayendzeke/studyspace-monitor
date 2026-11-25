@@ -29,7 +29,7 @@ test("issuing a replacement revokes the learner's prior unused PIN", () => {
 });
 
 test("renewal PIN redemption requires an authenticated active learner and is rate limited", () => {
-  assert.match(redeemer, /auth\\.getUser\\(accessToken\\)/);
+  assert.ok(redeemer.includes("auth.getUser(accessToken)"), "the redeemer must validate the bearer token");
   assert.match(redeemer, /account_status/);
   assert.match(redeemer, /count \?\? 0\) >= 5/);
   assert.match(redeemer, /15 minutes/);

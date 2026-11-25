@@ -103,7 +103,7 @@ Deno.serve(async request => {
   const trialExpiry=profile.trial_expires_at?Date.parse(profile.trial_expires_at):NaN;
   const paid=Boolean(profile.subscription_tier&&Number.isFinite(paidExpiry)&&paidExpiry>now);
   const trial=Boolean(!profile.subscription_tier&&Number.isFinite(trialStart)&&Number.isFinite(trialExpiry)&&trialStart<=now&&trialExpiry>now);
-  if(!profile.terms_accepted_at||profile.terms_version!=="2026-11-09-v8")return json(403,{error:"Please accept the current StudySpace Terms and Conditions."});
+  if(!profile.terms_accepted_at||profile.terms_version!=="2026-11-24-v9")return json(403,{error:"Please accept the current StudySpace Terms and Conditions."});
   if(!paid&&!trial)return json(403,{error:"Your StudySpace access is paused. Choose a paid plan to continue."});
 
   let body:{homeworkId?:string;response?:string};

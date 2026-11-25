@@ -1008,7 +1008,7 @@ function PinPage() {
   return <div className="subpage">
     <div className="eyebrow">ACCESS MANAGEMENT</div>
     <h1>Student Access PINs</h1>
-    <p className="page-subtitle">New learners register directly in StudySpace Student. Issue a one-time PIN only for an existing learner after their 7-day free trial or current paid plan has expired.</p>
+    <p className="page-subtitle">New learners register directly in StudySpace Student. Issue a one-time PIN only for an existing learner after their 48-hour free trial or current paid plan has expired.</p>
 
     <div className="panel pin-create-panel">
       <div className="panel-heading"><div><h2>Issue a renewal PIN</h2><p>Requires an active administrator session with MFA verified. The PIN is tied to one Student ID.</p></div><KeyRound size={20}/></div>
@@ -1178,7 +1178,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="settings-divider"/>
       <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learners self-register without a pre-issued Student ID or PIN. The server generates each Student ID and starts a 7-day free trial for eligible adult learners. After a trial or paid plan expires, an authorised administrator can issue a one-time renewal PIN tied to that learner. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Open</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learners self-register without a pre-issued Student ID or PIN. The server generates each Student ID and starts a 48-hour free trial for eligible adult learners. After a trial or paid plan expires, an authorised administrator can issue a one-time renewal PIN tied to that learner. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Open</span></div>
     </div>
 
     <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Student IDs are generated automatically. Deliver renewal PINs and reset credentials directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>

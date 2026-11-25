@@ -69,3 +69,6 @@ verify_jwt = true
 
 [functions.assessment-scheduler]
 verify_jwt = true
+
+[functions.study-material-engine]
+verify_jwt = true

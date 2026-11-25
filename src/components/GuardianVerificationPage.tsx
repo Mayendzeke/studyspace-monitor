@@ -27,7 +27,7 @@ type PendingLearner = {
   guardianSubmission: GuardianSubmission | null;
 };
 
-const TERMS_VERSION = "2026-11-08-v6";
+const TERMS_VERSION = "2026-11-24-v9";
 const RELATIONSHIPS = [
   { value: "mother", label: "Mother" },
   { value: "father", label: "Father" },

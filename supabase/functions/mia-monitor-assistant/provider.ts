@@ -1,9 +1,8 @@
 export const GEMINI_MODEL = "gemini-2.5-flash";
-export const GEMMA_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 export type ProviderResult = {
   text: string;
-  provider: "Google Gemini API" | "Cloudflare Workers AI";
+  provider: "Google Gemini API";
   model: string;
   fallbackUsed: boolean;
   providerNotice: string | null;
@@ -28,13 +27,6 @@ class ProviderSafetyError extends Error {
 
 function geminiKey(): string {
   return Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
-}
-
-function cloudflareCredentials(): { accountId: string; apiToken: string } {
-  return {
-    accountId: Deno.env.get("CLOUDFLARE_ACCOUNT_ID")?.trim() ?? "",
-    apiToken: Deno.env.get("CLOUDFLARE_API_TOKEN")?.trim() ?? "",
-  };
 }
 
 export function getProviderStatus(): ProviderStatus {
@@ -140,51 +132,6 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
     text: validateStructuredOutput(parseGeminiText(payload), options.jsonMode, "Gemini", options.requiredJsonKeys),
     groundingSources,
   };
-}
-
-async function callGemma(prompt: string, options: Required<GenerationOptions>): Promise<string> {
-  const { accountId, apiToken } = cloudflareCredentials();
-  if (!accountId || !apiToken) throw new Error("Cloudflare Workers AI credentials are not configured.");
-  let response: Response;
-  try {
-    response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(accountId) + "/ai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + apiToken, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(45000),
-      body: JSON.stringify({
-        model: GEMMA_MODEL,
-        messages: [
-          ...(options.systemPrompt ? [{ role: "system", content: options.systemPrompt }] : []),
-          { role: "user", content: prompt },
-        ],
-        max_completion_tokens: options.maxTokens,
-        stream: false,
-        store: false,
-        chat_template_kwargs: { enable_thinking: false, clear_thinking: true },
-        ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-      }),
-    });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new Error("Gemma backup timed out after 45 seconds.");
-    }
-    throw new Error("Gemma backup could not be reached.");
-  }
-  const responseText = await response.text();
-  let payload: any = {};
-  try { payload = JSON.parse(responseText); } catch { /* Keep the failure description generic. */ }
-  if (!response.ok) {
-    const details = Array.isArray(payload?.errors)
-      ? payload.errors.map((item: any) => String(item?.message ?? "")).filter(Boolean).join("; ").slice(0, 220)
-      : "";
-    throw new Error("Gemma backup returned HTTP " + response.status + (details ? ": " + details : "."));
-  }
-  const choice = Array.isArray(payload?.choices) ? payload.choices[0] : undefined;
-  const raw = choice?.message?.content;
-  const text = typeof raw === "string" ? raw.trim()
-    : Array.isArray(raw) ? raw.map((part: any) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "").join("\n").trim()
-    : typeof choice?.text === "string" ? choice.text.trim() : "";
-  return validateStructuredOutput(text, options.jsonMode, "Gemma backup", options.requiredJsonKeys);
 }
 
 export async function generateWithFallback(prompt: string, options: GenerationOptions = {}): Promise<ProviderResult> {

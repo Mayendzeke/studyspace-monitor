@@ -72,26 +72,27 @@ test("central scheduler creates monthly and quarterly assessment periods", () =>
   assert.match(helper, /slot\.date\|\|slot\.day/);
 });
 
-test("MIΛ keeps model and provider identities server-side and enforces current terms", () => {
+test("MIΛ keeps model and provider identities out of learner-facing responses", () => {
   const mia = read("supabase/functions/mia-assistant/index.ts");
   assert.match(mia, /CURRENT_TERMS_VERSION = "2026-11-24-v9"/);
-  assert.doesNotMatch(mia, /providerNotice:\s*generated\.providerNotice/);
-  assert.doesNotMatch(mia, /model:\s*generated\.model/);
-  assert.doesNotMatch(mia, /provider:\s*generated\.provider/);
-  assert.doesNotMatch(mia, /usage_status"\) return json\(200, \{ success: true, provider:/);
+  assert.match(mia, /return json\(200, \{ success: true, conversationId, reply, timetableDraft, sources:[\s\S]*?memoryUpdated \}\)/);
+  const response = mia.slice(mia.lastIndexOf("return json(200, { success: true, conversationId"));
+  assert.doesNotMatch(response, /provider|model|fallbackUsed/i);
+  assert.match(mia, /usage_status"\) return json\(200, \{ success: true, quotaManagedByProvider: true \}\)/);
 });
 
-test("private study material engine uses the shared learner AI provider and current terms", () => {
+test("private study material engine uses the shared learner AI provider and hides it from students", () => {
   const engine = read("supabase/functions/study-material-engine/index.ts");
   const sharedProvider = read("supabase/functions/_shared/ai-provider.ts");
   assert.match(engine, /CURRENT_TERMS_VERSION = "2026-11-24-v9"/);
   assert.match(engine, /from "\.\.\/_shared\/ai-provider\.ts"/);
   assert.match(engine, /learner_study_packs/);
   assert.match(engine, /source_text:extractedText/);
-  assert.match(engine, /status:"ready"/);
   assert.match(sharedProvider, /GEMMA_MODEL/);
   assert.match(sharedProvider, /SECONDARY_MODEL/);
-  assert.doesNotMatch(engine, /providerNotice|model:\s*generated\.model|provider:\s*generated\.provider/);
+  const response = engine.slice(engine.lastIndexOf('return json(200,{success:true,status:"ready"'));
+  assert.match(response, /return json\(200,\{success:true,status:"ready",packId,sourceHash,content:pack\}\)/);
+  assert.doesNotMatch(response, /provider|model|fallbackUsed/i);
 });
 
 test("curriculum material generation uses Monitor research and literature review before publication", () => {

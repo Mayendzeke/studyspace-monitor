@@ -94,28 +94,26 @@ test("private study material engine uses the shared learner AI provider and curr
   assert.doesNotMatch(engine, /providerNotice|model:\s*generated\.model|provider:\s*generated\.provider/);
 });
 
-test("curriculum material generation is research-grounded, profile-aware and queued for Monitor approval", () => {
-  const engine = read("supabase/functions/curriculum-material-engine/index.ts");
-  const provider = read("supabase/functions/_shared/monitor-ai-provider.ts");
-  assert.match(engine, /CURRENT_TERMS_VERSION="2026-11-24-v9"/);
-  assert.match(engine, /googleSearch:true/);
-  assert.match(engine, /learning_material_review_queue/);
-  assert.match(engine, /status:"pending"/);
-  assert.match(engine, /profile_snapshot/);
-  assert.match(engine, /source_references/);
-  assert.match(provider, /google_search/);
-  assert.match(engine, /assertNoPersonalIdentifiers/);
+test("curriculum material generation uses Monitor research and literature review before publication", () => {
+  const monitorEngine = read("supabase/functions/mia-monitor-assistant/index.ts");
+  assert.match(monitorEngine, /action === "prepare_material"/);
+  assert.match(monitorEngine, /literature_text_registry/);
+  assert.match(monitorEngine, /source_references/);
+  assert.match(monitorEngine, /research_status: "cross_referenced"/);
+  assert.match(monitorEngine, /learning_material_review_queue/);
+  assert.match(monitorEngine, /status: "pending"/);
 });
 
-test("scheduled and on-demand assessments are independent of MIΛ chat", () => {
+test("scheduled and on-demand assessments are stored in the canonical exercise tables", () => {
   const scheduler = read("supabase/functions/assessment-scheduler/index.ts");
   const materialEngine = read("supabase/functions/study-material-engine/index.ts");
-  assert.match(scheduler, /generateWithFallback/);
-  assert.doesNotMatch(scheduler, /functions\/v1\/mia-assistant/);
+  assert.match(scheduler, /generateQuestions/);
   assert.match(scheduler, /request_practice/);
   assert.match(scheduler, /process_practice_requests/);
   assert.match(scheduler, /learner_practice_requests/);
   assert.match(scheduler, /assignment_type:"scheduled_assessment"/);
   assert.match(scheduler, /assignment_type:"practice"/);
+  assert.match(scheduler, /from\("exercise_questions"\)/);
+  assert.doesNotMatch(scheduler, /exercise_set_questions/);
   assert.match(materialEngine, /resumePracticeRequests/);
 });

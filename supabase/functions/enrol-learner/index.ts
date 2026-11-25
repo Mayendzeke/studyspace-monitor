@@ -20,7 +20,7 @@ function getSecretKey(): string {
   return getNamedKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 
-const TERMS_VERSION = "2026-11-09-v8";
+const TERMS_VERSION = "2026-11-24-v9";
 const allowedOrigin = Deno.env.get("APP_ORIGIN");
 const headers = {
   "Access-Control-Allow-Origin": allowedOrigin ?? "null",
@@ -249,7 +249,7 @@ Deno.serve(async request => {
     success: true,
     studentId,
     accountStatus: "active",
-    trialHours: 168,
-    message: "Your account is ready. Your 7-day free trial has started.",
+    trialHours: 48,
+    message: "Your account is ready. Your 48-hour free trial has started.",
   });
 });

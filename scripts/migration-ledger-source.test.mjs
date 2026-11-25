@@ -35,6 +35,16 @@ const required = [
   "20261116200743_allow_incomplete_learner_education_profile.sql",
   "20261117073500_studyspace_fix_learner_profile_rpc_persistence.sql",
   "20261117073929_studyspace_fix_learner_profile_rpc_persistence_reapply.sql",
+  "20261124135558_central_assessment_engine_and_material_approval.sql",
+  "20261124135836_assessment_late_completion_tracking.sql",
+  "20261124140036_subject_workload_profiles_for_balanced_scheduler.sql",
+  "20261124140241_cohort_question_versioning_and_exposure.sql",
+  "20261124143115_curriculum_cross_reference_quality_pipeline.sql",
+  "20261124150500_literature_text_registry.sql",
+  "20261124152000_seed_eswatini_literature_registry.sql",
+  "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
+  "20261124140243_study_material_generation_packs.sql",
+  "20261124140244_practice_assessment_requests.sql",
 ];
 
 const superseded = [
@@ -59,7 +69,8 @@ test("migration files use applied Supabase versions and retain every applied mig
   const versions = files.map((file) => file.slice(0, 14));
   assert.equal(new Set(versions).size, versions.length, "Migration version prefixes must be unique.");
   const ledger = JSON.parse(readFileSync("supabase/migrations/applied-versions.json", "utf8"));
-  const expected = [...ledger.versions, ...(ledger.pending ?? [])].sort();
+  const pendingVersions = (ledger.pending ?? []).map((file) => String(file).slice(0, 14));
+  const expected = [...ledger.versions, ...pendingVersions].sort();
   assert.deepEqual(versions.slice().sort(), expected, "Monitor migration source must exactly match the applied production ledger plus explicitly reviewed pending migrations.");
 });
 

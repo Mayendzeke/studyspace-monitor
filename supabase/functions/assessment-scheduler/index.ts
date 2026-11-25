@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { generateWithFallback, type ProviderMessage } from "../_shared/ai-provider.ts";
+import { generateWithFallback, type ProviderMessage } from "./ai-provider.ts";
 import { buildBalancedSchedule, subtractBusyWindows, expandPeriodWindows } from "./scheduler.ts";
 
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "https://mayendzeke.github.io";

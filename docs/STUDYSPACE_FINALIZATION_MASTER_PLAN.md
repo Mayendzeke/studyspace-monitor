@@ -79,7 +79,9 @@ The Monitor repository owns shared-backend migrations and Edge Function source. 
 - Contact form, WhatsApp links, navigation anchors, mobile navigation and accessibility checks work.
 - Do not advertise features that are not actually live.
 
-## Initial audit findings — 24 November 2026
+## Initial audit findings — 24 November 2026 (superseded baseline)
+
+The findings in this section describe the pre-implementation state. Use the 25 November production verification update below for the current status.
 
 ### Confirmed from source/database inspection
 
@@ -167,3 +169,62 @@ The initial audit above records the pre-implementation baseline. The following c
 - Near-term tests are prepared automatically in bounded batches. Future monthly and quarterly tests are stored in the programme and generated as their dates approach.
 - The Monitor repository owns the scheduler and submission Edge Functions; the Student repository owns only the learner-facing programme and preferences.
 - Submitting an assessment marks its programme item complete, including when the submission is late.
+
+
+## Production verification update — 25 November 2026
+
+This update supersedes the pre-implementation findings recorded in the 24 November initial audit above. It records the state observed on the current `main` branches and the live shared Supabase project on 25 November 2026. Passing CI is evidence of the checks listed below; it is not a substitute for real learner/guardian account testing.
+
+### Verified release and deployment state
+
+- **Student app:** `Mayendzeke/planner` main. GitHub Pages deployment run [45627663878](https://github.com/Mayendzeke/planner/actions/runs/45627663878) completed successfully, including the build and deploy jobs. The separate Student quality-gate run [45627663825](https://github.com/Mayendzeke/planner/actions/runs/45627663825) completed successfully.
+- **Monitor app:** `Mayendzeke/studyspace-monitor` main. Deployment run [45627092538](https://github.com/Mayendzeke/studyspace-monitor/actions/runs/45627092538) completed successfully. Its build job ran the full Node regression suite, Deno type checks for the assessment scheduler, study-material engine and assessment submission function, the production dependency audit, Supabase project/key validation, unauthenticated endpoint checks, and the production build before Pages deployment.
+- **Public website:** `Mayendzeke/studyspace-website` main. Website quality run [45420756193](https://github.com/Mayendzeke/studyspace-website/actions/runs/45420756193) and Pages deployment run [45420755276](https://github.com/Mayendzeke/studyspace-website/actions/runs/45420755276) both completed successfully on 24 November 2026. This is the latest website release evidence found in this audit.
+- Student production build explicitly enables public self-enrolment and disables invitation-only enrolment. The student registration UI and enrolment function are wired for server-generated Student IDs; no pre-issued Student ID is required for the public path.
+- The student MIΛ route is a full-screen learning workspace with grouped study entry points. Its regression suite checks the full-screen layout, responsive safe-area handling, Friends navigation and notifications.
+
+### Verified shared-backend state
+
+- Supabase project `studyspace-core` (`tibcoottzstnqkfpwabk`, `eu-west-1`) reported `ACTIVE_HEALTHY` during the audit.
+- The live migration ledger includes the 48-hour trial/Terms v9 alignment, central assessment scheduling, study-pack persistence, stored practice requests and student friendships/notifications migrations. The Monitor repository remains the single source of truth for shared migrations and Edge Function source.
+- The latest active versions observed include `enrol-learner` v37, `mia-assistant` v66, `mia-monitor-assistant` v55, `study-material-engine` v1 and `assessment-scheduler` v7.
+- New learner activation uses a 48-hour trial. The migration changes future activation logic while preserving existing learners' stored expiry timestamps. Guardian approval and in-person consent components use Terms version `2026-11-24-v9`; the reminder is based on the actual expiry time.
+- The 25 November database migrations include the 48-hour/Terms alignment, study-pack storage, practice-assessment requests, Eswatini literature and Siswati references, and student friends/notifications.
+- Student and public-site subscription information was checked for the current standard plans: E100 / 7 days, E180 / 14 days and E350 / 28 days. The student app and website show the Study Space WhatsApp contact `+268 7994 0955` and MTN MoMo payment number `+268 7824 0679`; manual verification and Student ID payment reference are stated. Website Terms and Privacy pages were updated 24 November 2026.
+
+### Feature wiring confirmed in source and CI
+
+- Learner MIΛ uses Gemma as its primary Cloudflare Workers AI model with Qwen as its secondary model; learner-facing responses do not disclose provider/model names.
+- Monitor MIΛ uses Gemini as its primary model and Gemma as its backup. It requires an active administrator account and verified MFA, and its provider health-check is available in MIΛ Studio.
+- Student uploaded/assigned resources can be converted into persisted learner study packs. The Monitor no-material path checks existing resources and curriculum references, requires cross-referenced source evidence and saves generated material to an administrator approval queue rather than publishing it automatically.
+- The assessment scheduler uses the Balanced policy, stores assessments separately from MIΛ chat, retains the 10-question default, creates weekly/monthly/quarterly programme records and reports capacity conflicts. Practice requests are stored separately from teacher assignments.
+- Student friendship discovery, requests, accepted friends, direct-message hand-off and notifications are covered by a dedicated Student regression test.
+- The Monitor material review queue, subscriptions, teacher timetable/classroom, MFA-gated administration and learner resource workflows are present in the current source and included in Monitor tests.
+
+### Runtime evidence observed in the last 24 hours
+
+Supabase function-edge logs showed:
+
+- `assessment-scheduler`: 10 HTTP 200 responses (mean observed execution about 0.95 seconds).
+- Student `mia-assistant`: 6 HTTP 200 responses, 2 HTTP 400 responses and 12 HTTP 401 responses. HTTP 200 confirms endpoint-level successful responses; it does not independently verify answer quality or model selection for each request.
+- `mia-monitor-assistant`: 8 HTTP 401 responses and no successful authenticated request in the observed window. The Monitor Gemini/Gemma health-check therefore remains unverified by this audit.
+- `enrol-learner`: 12 HTTP 400 validation-path responses. The deployment smoke test deliberately sends an invalid date of birth; these are not evidence of 12 completed student registrations.
+- No request to `study-material-engine` appeared in the filtered 24-hour log window. The engine is deployed and wired in source, but an actual upload-to-saved-study-pack run was not demonstrated by these logs.
+
+### Security and performance review
+
+- Six sensitive tables with RLS enabled and no policies (`guardian_verification_invites`, `guardian_verifications`, `learner_storage_reservations`, `pin_redemption_attempts`, `student_access_pins`, `student_auth_attempts`) had no table grants to `anon` or `authenticated`. They were accessible only to the database owner/service role. Do not add broad client policies to clear an informational advisor finding.
+- The Supabase advisor also reported 39 callable `SECURITY DEFINER` RPCs. A targeted sample of account/guardian, XP, storage quota, friend-discovery and PIN-redemption functions was inspected: the sampled functions use caller identity, active learner/admin or MFA checks and/or row scoping, and the definitions set a controlled search path. This is a sampled review, not a complete audit of all 39 functions; review each RPC before changing grants.
+- The advisor reported `pg_net` installed in the `public` schema and performance findings for multiple permissive RLS policies and unused indexes. These are follow-up items. No extension move, policy rewrite or index deletion was made without dependency and workload analysis.
+
+### Release gates still requiring live operator access
+
+1. Run a real public enrolment with a disposable adult test account and verify its generated Student ID, login and 48-hour activation. Repeat with an under-18 test account and verify that neither access nor the trial starts until guardian approval. Test both in-person and guardian-link approval routes.
+2. Issue and redeem a post-trial PIN using a disposable test account; verify the 24-hour expiry, single-use behaviour, attempt throttling and that paid-access renewal follows manual payment verification. Do not use a live payment for testing.
+3. Upload a representative text-based PDF/DOCX or teacher-assigned source as a test learner; verify extraction, persisted study-pack creation, reopen/refresh behaviour and subsequent stored assessment generation. Also verify the no-upload curriculum/topic fallback for a registered Eswatini subject.
+4. Sign in to Monitor with the authorised administrator account and complete MFA. Run the MIΛ provider health check, verify Gemini primary and Gemma fallback configuration without exposing secrets, then test one anonymised teaching prompt and one material-review request through approval and learner assignment.
+5. Test the Balanced scheduler against a test learner with multiple subjects, busy school timetable periods and constrained availability. Verify no subject is silently dropped, capacity conflicts are explicit, question counts are correct, answer keys stay private and completed/late attempts update the programme and results.
+6. Test end-to-end cross-device data sync, friend requests/direct messages, read states, notifications, offline resource access, dark/light themes and mobile PWA installation with actual learner and Monitor sessions.
+7. Obtain a qualified Eswatini legal/privacy review of the Terms, Privacy Notice, guardian-consent process, retention and cross-border AI processing. The data-related certificate is not, by itself, a substitute for a complete legal assessment.
+
+**Release assessment:** source implementation, automated CI, production builds/deployments and core unauthenticated endpoint checks are green. The platform is deployed and the principal feature paths are wired. Do not mark every workflow as end-to-end verified or claim full production sign-off until the live operator checks above are completed and recorded.

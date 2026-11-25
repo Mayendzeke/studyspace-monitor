@@ -9,11 +9,12 @@ const guardianAdmin = read("supabase/functions/manage-guardian-verification/inde
 const guardianUi = read("src/components/GuardianVerificationPage.tsx");
 const subscriptions = read("src/components/SubscriptionsPage.tsx");
 const migration = read("supabase/migrations/20261124140242_studyspace_48_hour_trial_and_terms_v9.sql");
+const sevenDayMigration = read("supabase/migrations/20261125173000_studyspace_seven_day_trial.sql");
 
-test("new Monitor enrolments receive a 48-hour trial and terms v9", () => {
+test("new Monitor enrolments receive a full seven-day trial and terms v9", () => {
   assert.match(enrolment, /TERMS_VERSION = "2026-11-24-v9"/);
-  assert.match(enrolment, /trialHours: 48/);
-  assert.match(enrolment, /48-hour free trial has started/);
+  assert.match(enrolment, /trialHours: 168/);
+  assert.match(enrolment, /7-day free trial has started/);
 });
 
 test("in-person and guardian-link consent use the same current terms version", () => {
@@ -23,7 +24,7 @@ test("in-person and guardian-link consent use the same current terms version", (
 });
 
 test("Monitor subscription register labels the current trial correctly", () => {
-  assert.match(subscriptions, /48-hour Free Trial/);
+  assert.match(subscriptions, /7-day Free Trial/);
 });
 
 test("database migration aligns activation, consent and guardian approval", () => {
@@ -31,6 +32,15 @@ test("database migration aligns activation, consent and guardian approval", () =
   assert.match(migration, /2026-11-07-v3/);
   assert.match(migration, /interval ''48 hours''/);
   assert.match(migration, /terms_version in \(''2026-11-09-v8'', ''2026-11-24-v9''\)/);
+});
+
+test("the seven-day migration upgrades future activation functions without resetting existing trials", () => {
+  assert.match(sevenDayMigration, /interval ''48 hours''/);
+  assert.match(sevenDayMigration, /interval ''168 hours''/);
+  for (const name of ["activate_studyspace_minor_learner", "approve_studyspace_guardian_link_consent", "complete_public_studyspace_enrolment", "complete_studyspace_enrolment", "redeem_studyspace_pin"]) {
+    assert.ok(sevenDayMigration.includes(name));
+  }
+  assert.doesNotMatch(sevenDayMigration, /UPDATE public\.profiles\s+SET trial_expires_at/i);
 });
 
 test("existing trial expiry timestamps are preserved and reminders follow actual expiry", () => {

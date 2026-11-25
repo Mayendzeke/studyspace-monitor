@@ -249,7 +249,7 @@ Deno.serve(async request => {
     success: true,
     studentId,
     accountStatus: "active",
-    trialHours: 48,
-    message: "Your account is ready. Your 48-hour free trial has started.",
+    trialHours: 168,
+    message: "Your account is ready. Your 7-day free trial has started.",
   });
 });

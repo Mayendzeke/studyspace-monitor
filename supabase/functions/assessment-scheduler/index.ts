@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generateWithFallback, type ProviderMessage } from "../_shared/ai-provider.ts";
 import { buildBalancedSchedule, subtractBusyWindows, expandPeriodWindows } from "./scheduler.ts";
 
 const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "https://mayendzeke.github.io";
@@ -11,6 +12,7 @@ const headers = {
   "Vary": "Origin",
 };
 const json = (status:number, body:Record<string,unknown>) => new Response(JSON.stringify(body), {status,headers});
+const clean = (value:unknown, max=180):string => typeof value === "string" ? value.trim().slice(0,max) : "";
 function secret(name:string) {
   const raw=Deno.env.get(name)||"";
   try { const parsed=JSON.parse(raw)?.default; return typeof parsed==="string"?parsed:""; } catch { return raw; }
@@ -286,18 +288,19 @@ Deno.serve(async request=>{
   const caller=createClient(url,publishable,{global:{headers:{Authorization:authorization}},auth:{persistSession:false}});
   const {data:auth,error:authError}=await caller.auth.getUser(token);
   if(authError||!auth.user)return json(401,{error:"Sign in again to load your assessment programme."});
+  const learnerId=auth.user.id;
   const admin=createClient(url,service,{auth:{persistSession:false}});
   const {data:profile,error:profileError}=await admin.from("profiles")
     .select("role,account_status,country,education_level,grade,curriculum,academic_year,course,subscription_tier,subscription_expires_at,trial_started_at,trial_expires_at,terms_accepted_at,terms_version")
-    .eq("id",auth.user.id).maybeSingle();
+    .eq("id",learnerId).maybeSingle();
   if(profileError||!profile||profile.role!=="learner"||profile.account_status!=="active")return json(403,{error:"An active learner account is required."});
   if(!accessActive(profile))return json(403,{error:"Your StudySpace access is paused or your current terms need acceptance."});
 
   let body:Record<string,unknown>={};
   try{body=await request.json();}catch{return json(400,{error:"Invalid request body."});}
   const [{data:preferences,error:preferencesError},{data:subjects,error:subjectsError}]=await Promise.all([
-    admin.from("assessment_schedule_preferences").select("available_windows,daily_minutes_limit,preferred_assessment_days,timezone,question_count").eq("learner_id",auth.user.id).maybeSingle(),
-    admin.from("student_subjects").select("id,name,category,description,difficulty_level,subject_type,credit_hours,weekly_minutes_target").eq("learner_id",auth.user.id).order("name"),
+    admin.from("assessment_schedule_preferences").select("available_windows,daily_minutes_limit,preferred_assessment_days,timezone,question_count").eq("learner_id",learnerId).maybeSingle(),
+    admin.from("student_subjects").select("id,name,category,description,difficulty_level,subject_type,credit_hours,weekly_minutes_target").eq("learner_id",learnerId).order("name"),
   ]);
   if(preferencesError||subjectsError)return json(503,{error:"Your subjects or assessment preferences could not be loaded."});
   if(!subjects?.length)return json(200,{success:true,status:"no_subjects",message:"Add your subjects before creating a weekly assessment programme."});
@@ -314,7 +317,7 @@ Deno.serve(async request=>{
     const requestedDifficulty=clean(body.difficulty,24).toLowerCase();
     const difficulty=["adaptive","foundation","standard","challenge"].includes(requestedDifficulty)?requestedDifficulty:"adaptive";
     const {data:created,error:createError}=await admin.from("learner_practice_requests").insert({
-      learner_id:auth.user.id,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty,status:"queued",
+      learner_id:learnerId,subject_id:subject.id,subject_name:subject.name,topic,question_count:questionCount,difficulty,status:"queued",
     }).select("id,status").single();
     if(createError||!created)return json(503,{error:"Your practice test request could not be saved. Please try again."});
     const {data:updated}=await admin.from("learner_practice_requests").select("id,status,exercise_assignment_id,error_message,subject_name,topic,created_at")
@@ -324,15 +327,15 @@ Deno.serve(async request=>{
       message:status==="ready"?"Your practice test is ready.":status==="waiting_for_material"?"StudySpace is preparing a curriculum guide for Monitor approval. Your practice test will appear when it is approved.":status==="waiting_for_study_pack"?"Your study material is being prepared. Your practice test will appear automatically when it is ready.":"Your practice test request has been saved."});
   }
   if(body.action==="process_practice_requests"){
-    await processPracticeRequests(admin,url,publishable,service,auth.user.id,profile,subjects,1);
+    await processPracticeRequests(admin,url,publishable,service,learnerId,profile,subjects,1);
     const {count,error:countError}=await admin.from("learner_practice_requests").select("id",{count:"exact",head:true})
-      .eq("learner_id",auth.user.id).eq("status","queued");
+      .eq("learner_id",learnerId).eq("status","queued");
     if(countError)return json(503,{error:"Queued practice requests could not be checked."});
     return json(200,{success:true,status:"practice_requests_processed",processedCount:1,pendingCount:Number(count||0),hasMore:Number(count||0)>0});
   }
   const [{data:studentEntries,error:studentEntriesError},{data:members,error:membersError}]=await Promise.all([
-    admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",auth.user.id),
-    admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",auth.user.id),
+    admin.from("student_timetable_entries").select("id,timetable_kind,day_of_week,starts_at,ends_at,notes").eq("learner_id",learnerId),
+    admin.from("teacher_timetable_members").select("entry_id").eq("learner_id",learnerId),
   ]);
   if(studentEntriesError||membersError)return json(503,{error:"Your timetable and assessment availability could not be loaded."});
   const monday=mondayOf(localDate(new Date(),timezone));
@@ -343,9 +346,9 @@ Deno.serve(async request=>{
     .map((row:any)=>({day:row.day_of_week,start:String(row.starts_at).slice(0,5),end:String(row.ends_at).slice(0,5),id:row.id}));
   windows=windows.filter(row=>preferredDays.includes(Number(row.day)));
   if(!windows.length){
-    const hash=await sha(JSON.stringify({learner:auth.user.id,week:monday,availability:[]}));
+    const hash=await sha(JSON.stringify({learner:learnerId,week:monday,availability:[]}));
     const {data:run,error:runError}=await admin.from("assessment_schedule_runs").upsert({
-      learner_id:auth.user.id,period_type:"weekly",period_start:monday,period_end:fridayDate,
+      learner_id:learnerId,period_type:"weekly",period_start:monday,period_end:fridayDate,
       policy:"balanced",status:"needs_availability",schedule_hash:hash,
       input_snapshot:{subject_count:subjects.length,timezone},conflicts:[{reason:"availability_not_configured"}],
     },{onConflict:"learner_id,period_type,period_start"}).select("id").single();
@@ -362,12 +365,12 @@ Deno.serve(async request=>{
     for(const row of teacherEntries||[])busy.push({day:row.day_of_week,start:String(row.starts_at).slice(0,5),end:String(row.ends_at).slice(0,5)});
   }
   const freeSlots=subtractBusyWindows(windows,busy);
-  const {data:assignmentRows}=await admin.from("exercise_assignments").select("id,exercise_set_id").eq("learner_id",auth.user.id);
+  const {data:assignmentRows}=await admin.from("exercise_assignments").select("id,exercise_set_id").eq("learner_id",learnerId);
   const assignmentIds=(assignmentRows||[]).map((row:any)=>row.id);
   const setIds=(assignmentRows||[]).map((row:any)=>row.exercise_set_id).filter(Boolean);
   const {data:sets}=setIds.length?await admin.from("exercise_sets").select("id,subject_name").in("id",setIds):{data:[]};
   const setSubject=new Map((sets||[]).map((row:any)=>[row.id,row.subject_name]));
-  const {data:attempts}=assignmentIds.length?await admin.from("exercise_attempts").select("assignment_id,score,total_points,submitted_at").eq("learner_id",auth.user.id).in("assignment_id",assignmentIds).order("submitted_at",{ascending:false}).limit(100):{data:[]};
+  const {data:attempts}=assignmentIds.length?await admin.from("exercise_attempts").select("assignment_id,score,total_points,submitted_at").eq("learner_id",learnerId).in("assignment_id",assignmentIds).order("submitted_at",{ascending:false}).limit(100):{data:[]};
   const scoreBySubject=new Map<string,number[]>();
   for(const attempt of attempts||[]){
     const assignment=(assignmentRows||[]).find((row:any)=>row.id===attempt.assignment_id);
@@ -388,11 +391,11 @@ Deno.serve(async request=>{
   const snapshot={profile:{country:profile.country,education_level:profile.education_level,grade:profile.grade,curriculum:profile.curriculum,course:profile.course,academic_year:profile.academic_year},subjects:schedulerSubjects,windows,freeSlots,dailyLimit,questionCount,timezone};
   const scheduleHash=await sha(JSON.stringify(snapshot));
   const {data:existing}=await admin.from("assessment_schedule_runs").select("id,schedule_hash,status")
-    .eq("learner_id",auth.user.id).eq("period_type","weekly").eq("period_start",monday).maybeSingle();
+    .eq("learner_id",learnerId).eq("period_type","weekly").eq("period_start",monday).maybeSingle();
   let runId=existing?.id;
   if(!existing||existing.schedule_hash!==scheduleHash){
     const {data:run,error:runError}=await admin.from("assessment_schedule_runs").upsert({
-      learner_id:auth.user.id,period_type:"weekly",period_start:monday,period_end:fridayDate,
+      learner_id:learnerId,period_type:"weekly",period_start:monday,period_end:fridayDate,
       policy:"balanced",status:schedule.conflicts.length?"capacity_conflict":"planned",
       schedule_hash:scheduleHash,input_snapshot:snapshot,conflicts:schedule.conflicts,
     },{onConflict:"learner_id,period_type,period_start"}).select("id").single();
@@ -402,11 +405,11 @@ Deno.serve(async request=>{
     const {data:alreadyAssigned}=existing?.id?await admin.from("assessment_schedule_items").select("subject_id").eq("schedule_run_id",runId).not("exercise_assignment_id","is",null):{data:[]};
     const assignedSubjects=new Set((alreadyAssigned||[]).map((row:any)=>row.subject_id));
     const newRows=schedule.assignments.filter((item:any)=>!assignedSubjects.has(item.subjectId)).map((item:any)=>({
-      schedule_run_id:runId,learner_id:auth.user.id,subject_id:item.subjectId,subject_name:item.subjectName,
+      schedule_run_id:runId,learner_id:learnerId,subject_id:item.subjectId,subject_name:item.subjectName,
       assessment_type:"weekly_subject",scheduled_at:zonedTimeToIso(dateForDay(monday,String(item.day)),String(item.start),timezone),
       duration_minutes:item.durationMinutes,question_count:item.questionCount||questionCount,difficulty_score:item.difficultyScore,
       workload_score:item.workloadScore,status:"scheduled",
-      schedule_key:"weekly:"+auth.user.id+":"+monday+":"+item.subjectId,
+      schedule_key:"weekly:"+learnerId+":"+monday+":"+item.subjectId,
       version_seed:crypto.randomUUID(),
       metadata:{day:item.day,start:item.start,end:item.end,subject_type:item.subjectType,credit_hours:item.creditHours,weekly_minutes_target:item.weeklyMinutesTarget},
     }));
@@ -424,12 +427,12 @@ Deno.serve(async request=>{
     const periodSnapshot={...snapshot,periodType,periodStart,periodEnd,targetStart,targetEnd,freeSlots:periodFreeSlots};
     const periodHash=await sha(JSON.stringify(periodSnapshot));
     const {data:existing,error:existingError}=await admin.from("assessment_schedule_runs").select("id,schedule_hash,status")
-      .eq("learner_id",auth.user.id).eq("period_type",periodType).eq("period_start",periodStart).maybeSingle();
+      .eq("learner_id",learnerId).eq("period_type",periodType).eq("period_start",periodStart).maybeSingle();
     if(existingError)throw new Error("The "+periodType+" assessment plan could not be checked.");
     let periodRunId=existing?.id;
     if(!existing||existing.schedule_hash!==periodHash){
       const {data:run,error:runError}=await admin.from("assessment_schedule_runs").upsert({
-        learner_id:auth.user.id,period_type:periodType,period_start:periodStart,period_end:periodEnd,
+        learner_id:learnerId,period_type:periodType,period_start:periodStart,period_end:periodEnd,
         policy:"balanced",status:periodSchedule.conflicts.length?"capacity_conflict":"planned",
         schedule_hash:periodHash,input_snapshot:periodSnapshot,conflicts:periodSchedule.conflicts,
       },{onConflict:"learner_id,period_type,period_start"}).select("id").single();
@@ -439,11 +442,11 @@ Deno.serve(async request=>{
       const {data:alreadyAssigned}=existing?.id?await admin.from("assessment_schedule_items").select("subject_id").eq("schedule_run_id",periodRunId).not("exercise_assignment_id","is",null):{data:[]};
       const assignedSubjects=new Set((alreadyAssigned||[]).map((row:any)=>row.subject_id));
       const newRows=periodSchedule.assignments.filter((item:any)=>!assignedSubjects.has(item.subjectId)).map((item:any)=>({
-        schedule_run_id:periodRunId,learner_id:auth.user.id,subject_id:item.subjectId,subject_name:item.subjectName,
+        schedule_run_id:periodRunId,learner_id:learnerId,subject_id:item.subjectId,subject_name:item.subjectName,
         assessment_type:assessmentType,scheduled_at:zonedTimeToIso(String(item.date||targetStart),String(item.start),timezone),
         duration_minutes:item.durationMinutes,question_count:item.questionCount||questionCount,difficulty_score:item.difficultyScore,
         workload_score:item.workloadScore,status:"scheduled",
-        schedule_key:periodType+":"+auth.user.id+":"+periodStart+":"+item.subjectId,
+        schedule_key:periodType+":"+learnerId+":"+periodStart+":"+item.subjectId,
         version_seed:crypto.randomUUID(),
         metadata:{day:item.day,date:item.date,start:item.start,end:item.end,period_start:periodStart,period_end:periodEnd,period_type:periodType,subject_type:item.subjectType,credit_hours:item.creditHours,weekly_minutes_target:item.weeklyMinutesTarget},
       }));
@@ -485,7 +488,7 @@ Deno.serve(async request=>{
   const dueCutoffIso=new Date(Date.now()+7*24*60*60*1000).toISOString();
   const dueCandidates=(items||[]).filter((item:any)=>!item.exercise_assignment_id&&item.status==="scheduled"&&Date.parse(String(item.scheduled_at))<=Date.parse(dueCutoffIso));
   const {data:readyPacks,error:readyPackError}=await admin.from("learner_study_packs").select("subject_id,subject_name")
-    .eq("learner_id",auth.user.id).eq("status","ready");
+    .eq("learner_id",learnerId).eq("status","ready");
   if(readyPackError)throw new Error("Ready study pack status could not be checked.");
   const readyPackSubjectIds=new Set((readyPacks||[]).map((row:any)=>String(row.subject_id||"")).filter(Boolean));
   const readyPackSubjectNames=new Set((readyPacks||[]).map((row:any)=>String(row.subject_name||"").trim().toLowerCase()).filter(Boolean));
@@ -521,10 +524,10 @@ Deno.serve(async request=>{
         :assessmentType==="quarterly_exam"
           ?"Quarterly comprehensive examination covering the subject topics studied this quarter"
           :"Weekly subject practice covering current learning objectives";
-      const hasMaterial=await existingMaterials(admin,auth.user.id,item.subject_name);
+      const hasMaterial=await existingMaterials(admin,learnerId,item.subject_name);
       if(!hasMaterial) {
         try {
-          const request=await requestMaterialReview(url,publishable,service,auth.user.id,item.subject_name);
+          const request=await requestMaterialReview(url,publishable,service,learnerId,item.subject_name);
           await admin.from("assessment_schedule_items").update({
             status:"scheduled",
             metadata:{...(item.metadata||{}),waiting_for_material_approval:true,material_review_id:String(request.reviewId||""),material_request_status:String(request.status||"pending_review")},
@@ -564,7 +567,7 @@ Deno.serve(async request=>{
           explanation:row.answer_key?.explanation||row.explanation||"",difficulty:row.difficulty,topic:row.topic,
         }));
       }else{
-        const notesText=await approvedNotes(admin,auth.user.id,item.subject_name);
+        const notesText=await approvedNotes(admin,learnerId,item.subject_name);
         if(!notesText.trim()){
           await admin.from("assessment_schedule_items").update({
             status:"scheduled",metadata:{...(item.metadata||{}),waiting_for_study_pack:true},
@@ -581,7 +584,7 @@ Deno.serve(async request=>{
           explanation:String(question.explanation||""),points:1,difficulty:String(question.difficulty||"adaptive"),
           source_type:"ai_generated",source_reference:"StudySpace assessment engine · source-grounded and schema-validated",
           fingerprint:await sha([cohortKey,String(question.question_type),String(question.prompt).trim().toLocaleLowerCase()].join("|")),
-          verification_status:"pending",created_by:auth.user.id,
+          verification_status:"pending",created_by:learnerId,
         })));
         const {error:bankError}=await admin.from("assessment_question_bank").upsert(bankRows,{onConflict:"fingerprint",ignoreDuplicates:true});
         if(bankError)throw new Error("The generated questions could not be added to the shared question bank.");
@@ -598,7 +601,7 @@ Deno.serve(async request=>{
       const periodLabel=assessmentType==="monthly_subject"?assessmentPeriodStart.slice(0,7):assessmentType==="quarterly_exam"?(assessmentPeriodStart.slice(0,4)+" Q"+(Math.floor((Number(assessmentPeriodStart.slice(5,7))-1)/3)+1)):scheduledDate;
       const title=(assessmentType==="monthly_subject"?"Monthly Comprehensive Test · ":assessmentType==="quarterly_exam"?"Quarterly Exam · ":"Weekly Test · ")+item.subject_name+" · "+periodLabel;
       const {data:set,error:setError}=await admin.from("exercise_sets").insert({
-        created_by:auth.user.id,title,instructions:"Complete all "+itemQuestionCount+" questions. This test was prepared for your registered subject and academic profile.",
+        created_by:learnerId,title,instructions:"Complete all "+itemQuestionCount+" questions. This test was prepared for your registered subject and academic profile.",
         subject_name:item.subject_name,education_level:String(profile.education_level||""),grade:String(profile.grade||""),
         curriculum:String(profile.curriculum||""),question_count:itemQuestionCount,is_published:false,review_status:"draft",
         duration_minutes:item.duration_minutes,due_date:scheduledDate,
@@ -622,7 +625,7 @@ Deno.serve(async request=>{
       if(publishError)throw new Error("The assessment could not be published.");
       const dueAt=zonedTimeToIso(scheduledDate,"23:59",timezone);
       const {data:assignment,error:assignmentError}=await admin.from("exercise_assignments").insert({
-        exercise_set_id:set.id,learner_id:auth.user.id,assigned_by:auth.user.id,assignment_type:"scheduled_assessment",
+        exercise_set_id:set.id,learner_id:learnerId,assigned_by:learnerId,assignment_type:"scheduled_assessment",
         available_at:item.scheduled_at,due_at:dueAt,
       }).select("id").single();
       if(assignmentError||!assignment)throw new Error("The assessment assignment could not be created.");
@@ -632,7 +635,7 @@ Deno.serve(async request=>{
       const exposureIds=selectedBank.length?selectedBank.map((row:any)=>row.id):bankQuestionIds;
       if(exposureIds.length){
         const {error:exposureError}=await admin.from("assessment_question_exposures").upsert(
-          exposureIds.map(questionId=>({question_id:questionId,learner_id:auth.user.id,assessment_item_id:item.id,cohort_key:cohortKey,assessment_week:assessmentPeriodStart})),
+          exposureIds.map(questionId=>({question_id:questionId,learner_id:learnerId,assessment_item_id:item.id,cohort_key:cohortKey,assessment_week:assessmentPeriodStart})),
           {onConflict:"question_id,cohort_key,assessment_week",ignoreDuplicates:true},
         );
         if(exposureError)throw new Error("Question exposure history could not be saved.");

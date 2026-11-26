@@ -34,12 +34,15 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Type-check central assessment and study material Edge Functions
+      - name: Type-check production Edge Functions
         run: |
           deno check supabase/functions/assessment-scheduler/index.ts
           deno check supabase/functions/assessment-scheduler/scheduler.ts
           deno check supabase/functions/study-material-engine/index.ts
           deno check supabase/functions/submit-exercise-attempt/index.ts
+          deno check supabase/functions/mark-class-homework/index.ts
+          deno check supabase/functions/mia-assistant/index.ts
+          deno check supabase/functions/mia-monitor-assistant/index.ts
           deno check supabase/functions/create-access-pin/index.ts
           deno check supabase/functions/redeem-access-pin/index.ts
       - name: Report dependency audit

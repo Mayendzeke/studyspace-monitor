@@ -228,7 +228,7 @@ Deno.serve(async request => {
   // Load official SiSwati syllabus references only when relevant to the learner's request.
   // The registry stores source metadata, not full syllabus text; MIΛ must not claim otherwise.
   const siswatiSearchText = [message, ...history.map(item => item.content), ...subjects.map(item => item.name)].join(" ");
-  const requestsSiswati = /\\b(?:siswati|si\\s*swati)\\b/i.test(siswatiSearchText);
+  const requestsSiswati = /\b(?:siswati|si\s*swati)\b/i.test(siswatiSearchText);
   const siswatiReferenceContext: string[] = [];
   if (requestsSiswati) {
     try {

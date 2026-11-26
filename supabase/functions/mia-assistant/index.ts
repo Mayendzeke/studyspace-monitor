@@ -138,7 +138,12 @@ Deno.serve(async request => {
   ]);
   if (subjectsResult.error || goalResult.error || memoryResult.error) return json(503, { error: "MIΛ could not load your learning profile. Try again later." });
   const subjects = (subjectsResult.data ?? []).map(x => ({ name: x.name, target: x.target_mark })).slice(0, 30);
-  const goal = goalResult.data ?? {};
+  const goal = (goalResult.data ?? {}) as {
+    goal_text?: string | null;
+    target_mark?: string | number | null;
+    weekly_hours?: string | number | null;
+    preferred_days?: string[] | null;
+  };
   const memory = memoryResult.data ?? { strengths: [], difficulties: [], goals: [], recent_topics: [], explanation_preference: "" };
 
   // Recent assessment outcomes help MIΛ adjust explanations and practice difficulty.
@@ -448,7 +453,7 @@ Deno.serve(async request => {
     : [];
   const { error: usageUpdateError } = await admin.from("ai_generation_usage").update({
     output_characters: generated.text.length,
-    provider: generated.provider === "Google Gemini API" ? "google-gemini" : "cloudflare-workers-ai",
+    provider: "cloudflare-workers-ai",
   }).eq("id", usage.data.id).eq("actor_id", learnerId);
   if (usageUpdateError) console.error("[MIΛ] Could not update AI usage metrics:", usageUpdateError.message);
   return json(200, { success: true, conversationId, reply, timetableDraft, sources: action === "chat" ? materialSources : [], memoryUpdated });

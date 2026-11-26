@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const functionsRoot = join(root, "supabase", "functions");
 const functionDirectories = readdirSync(functionsRoot, { withFileTypes: true })
-  .filter(entry => entry.isDirectory())
+  .filter(entry => entry.isDirectory() && existsSync(join(functionsRoot, entry.name, "index.ts")))
   .map(entry => entry.name);
 
 const sources = new Map(functionDirectories.map(name => [

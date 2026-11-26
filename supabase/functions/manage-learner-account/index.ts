@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 function getNamedKey(variable: string): string | undefined {
   const raw = Deno.env.get(variable);
   if (!raw) return undefined;
@@ -38,7 +38,9 @@ const TERTIARY_QUALIFICATIONS = ["Certificate", "Higher Certificate", "Diploma",
 const MAX_STORAGE_PAGE = 1000;
 const MAX_STORAGE_DEPTH = 8;
 
-async function listPersonalStorageFiles(admin: ReturnType<typeof createClient>, learnerId: string): Promise<string[]> {
+type AdminClient = SupabaseClient<any, "public", "public", any, any>;
+
+async function listPersonalStorageFiles(admin: AdminClient, learnerId: string): Promise<string[]> {
   const bucket = admin.storage.from("studyspace-resources");
   const prefix = learnerId + "/personal";
   const paths = new Set<string>();
@@ -91,7 +93,7 @@ async function listPersonalStorageFiles(admin: ReturnType<typeof createClient>, 
   return [...paths];
 }
 
-async function removePersonalStorageFiles(admin: ReturnType<typeof createClient>, paths: string[]): Promise<number> {
+async function removePersonalStorageFiles(admin: AdminClient, paths: string[]): Promise<number> {
   const bucket = admin.storage.from("studyspace-resources");
   let removed = 0;
   for (let offset = 0; offset < paths.length; offset += 100) {

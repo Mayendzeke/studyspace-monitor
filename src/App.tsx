@@ -361,20 +361,18 @@ function App() {
 
       <StudyspaceNotificationListener />
       <main className="main-area">
-        <header className="topbar">
+        <header className="topbar" aria-label="Monitor toolbar">
           <div className="topbar-left">
             <button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
-            <div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div>
           </div>
           <div className="topbar-actions">
-            <button type="button" className="monitor-install-button" onClick={() => void installMonitor()} title="Install Studyspace Monitor on this device"><Download size={15}/><span>{isStandalone ? 'Installed' : 'Install app'}</span></button>
-            <div className="system-status"><span className="status-dot" /> MFA verified</div>
+            <div className="system-status" aria-label="Multi-factor authentication verified"><span className="status-dot" /> MFA verified</div>
             <button className="theme-switch" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}<span>{theme === 'light' ? 'Light' : 'Dark'}</span><i className={theme === 'dark' ? 'switch-knob is-dark' : 'switch-knob'} />
             </button>
-            <button type="button" className="icon-button" aria-label="Open messages" title="Messages" onClick={() => setPage('Messages')}><MessageCircle size={17}/></button>
             <NotificationCenter />
-            <div className="top-avatar">{adminName.slice(0,1).toUpperCase()}</div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LockKeyhole size={16} /></button>
+            <div className="top-avatar" aria-label="Signed in administrator">{adminName.slice(0,1).toUpperCase()}</div>
+            <button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LockKeyhole size={16} /></button>
           </div>
         </header>
 

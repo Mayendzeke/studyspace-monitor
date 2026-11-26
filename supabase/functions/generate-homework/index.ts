@@ -134,7 +134,7 @@ Deno.serve(async request => {
     });
     const { error: auditError } = await admin.from("audit_events").insert({
       actor_id: auth.userId, event_type: "mia_admin_request", target_type: "ai_usage",
-      details: { provider: generated.provider, model: generated.model, fallback_used: generated.fallbackUsed, primary_provider: "Google Gemini API", backup_provider: "disabled — Gemini Free tier only", feature: "homework_generation", question_count: questions.length }
+      details: { provider: generated.provider, model: generated.model, fallback_used: generated.fallbackUsed, primary_provider: "Google Gemini API", backup_provider: "Cloudflare Workers AI · Gemma 4", feature: "homework_generation", question_count: questions.length }
     });
     if (auditError) throw new Error("The homework could not be audited. Nothing was returned for publishing.");
     return json(200, { success: true, provider: generated.provider, model: generated.model, fallbackUsed: generated.fallbackUsed, providerNotice: generated.providerNotice, questions });

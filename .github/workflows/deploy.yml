@@ -34,10 +34,9 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Type-check production Edge Functions
+      - name: Type-check every production Edge Function
         run: |
           deno check supabase/functions/assessment-scheduler/index.ts
-          deno check supabase/functions/assessment-scheduler/scheduler.ts
           deno check supabase/functions/study-material-engine/index.ts
           deno check supabase/functions/submit-exercise-attempt/index.ts
           deno check supabase/functions/mark-class-homework/index.ts
@@ -45,6 +44,21 @@ jobs:
           deno check supabase/functions/mia-monitor-assistant/index.ts
           deno check supabase/functions/create-access-pin/index.ts
           deno check supabase/functions/redeem-access-pin/index.ts
+          deno check supabase/functions/create-enrolment-pin/index.ts
+          deno check supabase/functions/redeem-enrolment-pin/index.ts
+          deno check supabase/functions/manage-enrolment-pin/index.ts
+          deno check supabase/functions/enrol-learner/index.ts
+          deno check supabase/functions/student-sign-in/index.ts
+          deno check supabase/functions/manage-learner-account/index.ts
+          deno check supabase/functions/change-student-password/index.ts
+          deno check supabase/functions/manage-guardian-verification/index.ts
+          deno check supabase/functions/guardian-consent/index.ts
+          deno check supabase/functions/jaas-token/index.ts
+          deno check supabase/functions/generate-homework/index.ts
+          deno check supabase/functions/generate-lesson-recap/index.ts
+          deno check supabase/functions/reply-homework-help/index.ts
+          deno check supabase/functions/lab-learning-engine/index.ts
+          deno check supabase/functions/process-homework-fallbacks/index.ts
       - name: Report dependency audit
         run: |
           npm audit --json > audit-all.json || true

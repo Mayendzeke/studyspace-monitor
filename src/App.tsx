@@ -24,6 +24,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { runLogoHandoff } from './lib/logoTransition'
 import './brand-home-link.css'
+import { STAGE_DESCRIPTIONS, normalizeEducationStage, normalizeInstitutionType } from './lib/educationPathways'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool, FlaskConical,
@@ -490,6 +491,11 @@ function AcademicProgressPage() {
     preferred_name: string;
     grade: string;
     curriculum: string;
+    education_level: string;
+    institution_type: string;
+    qualification_level: string;
+    course: string;
+    academic_year: string;
     account_status: string;
   };
   type StudyRow = { learner_id: string; duration_minutes: number; started_at: string };
@@ -533,7 +539,7 @@ function AcademicProgressPage() {
     setLoading(true);
     setError('');
     const [profileResult, studyResult, assignmentResult, attemptResult, homeworkAttemptResult, practiceResult, subjectResult] = await Promise.all([
-      supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,account_status').eq('role','learner').order('preferred_name'),
+      supabase.from('profiles').select('id,student_id,full_name,preferred_name,grade,curriculum,education_level,institution_type,qualification_level,course,academic_year,account_status').eq('role','learner').order('preferred_name'),
       supabase.from('study_sessions').select('learner_id,duration_minutes,started_at').order('started_at',{ascending:false}),
       supabase.from('exercise_assignments').select('id,learner_id'),
       supabase.from('exercise_attempts').select('learner_id,score,total_points,submitted_at,marked_at,teacher_review_required').eq('teacher_review_required',false).order('submitted_at',{ascending:false}),
@@ -551,8 +557,15 @@ function AcademicProgressPage() {
 
     const progress = new Map<string,LearnerProgress>();
     for (const learner of (profileResult.data || []) as Learner[]) {
+      const legacyLevel = String(learner.education_level || '');
+      const educationLevel = normalizeEducationStage(legacyLevel, learner.grade, learner.course, learner.institution_type);
+      const normalizedLearner = {
+        ...learner,
+        education_level: educationLevel,
+        institution_type: normalizeInstitutionType(educationLevel, learner.institution_type, legacyLevel),
+      };
       progress.set(learner.id,{
-        learner,
+        learner: normalizedLearner,
         subjects:new Set<string>(),
         studyMinutes:0,
         assignments:0,
@@ -689,7 +702,7 @@ function AcademicProgressPage() {
   },[selectedRecordId]);
 
   const visible=learners.filter(item=>{
-    const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.grade,item.learner.curriculum].join(' ').toLocaleLowerCase();
+    const value=[item.learner.student_id,item.learner.full_name,item.learner.preferred_name,item.learner.education_level,item.learner.grade,item.learner.course,item.learner.curriculum].join(' ').toLocaleLowerCase();
     return value.includes(search.trim().toLocaleLowerCase());
   });
   const active=learners.filter(item=>item.learner.account_status==='active').length;
@@ -718,7 +731,7 @@ function AcademicProgressPage() {
         const percent=item.possible>0?Math.round(item.score/item.possible*100):null;
         return <article className="learner-row" key={item.learner.id}>
           <div className="learner-avatar">{(item.learner.preferred_name||item.learner.full_name||'S').slice(0,1).toUpperCase()}</div>
-          <div className="learner-identity"><strong>{item.learner.preferred_name||item.learner.full_name||'Learner'}</strong><span>{item.learner.student_id||'No Student ID'} · {item.learner.grade||'Grade not set'} · {item.learner.curriculum||'Curriculum not set'}</span><small>{item.subjects.size} subjects · {item.assignments} assigned · {item.submissions} submitted</small></div>
+          <div className="learner-identity"><strong>{item.learner.preferred_name||item.learner.full_name||'Learner'}</strong><span>{item.learner.student_id||'No Student ID'} · {item.learner.education_level||'Stage not set'} · {item.learner.grade||'Grade not set'} · {item.learner.curriculum||'Curriculum not set'}</span>{item.learner.education_level==='Tertiary'&&<small>{[item.learner.institution_type,item.learner.qualification_level,item.learner.course].filter(Boolean).join(' · ')}</small>}<small>{item.subjects.size} subjects · {item.assignments} assigned · {item.submissions} submitted</small></div>
           <span className="pin-status">{percent===null?'No score yet':percent+'% average'}</span>
           <div className="learner-actions"><span className="subtle-note">{Math.floor(item.studyMinutes/60)}h {item.studyMinutes%60}m study</span><small>{item.lastActivity?new Date(item.lastActivity).toLocaleDateString():'No activity yet'}</small><button type="button" className="subtle-button" onClick={()=>void loadLearnerRecord(item.learner.id)}>View records</button></div>
         </article>;
@@ -735,7 +748,8 @@ function AcademicProgressPage() {
         const line=points.map(p=>p.x+","+p.y).join(" ");
         const arrayText=(value:unknown):string[]=>Array.isArray(value)?value.map(x=>typeof x==="string"?x:JSON.stringify(x)).filter(Boolean).slice(0,8):[];
         return <>
-          <div className="panel-heading"><div><h2>Student academic record</h2><p>{selected?.preferred_name||selected?.full_name||'Selected learner'} · {selected?.student_id||'No Student ID'} · {selected?.grade||'Grade not set'}</p></div><div><button type="button" className="subtle-button" onClick={()=>void loadLearnerRecord(selectedRecordId)} disabled={recordLoading}><RefreshCw size={14}/> Refresh</button><button type="button" className="icon-button" aria-label="Close student record" onClick={()=>setSelectedRecordId(null)}><X size={15}/></button></div></div>
+          <div className="panel-heading"><div><h2>Student academic record</h2><p>{selected?.preferred_name||selected?.full_name||'Selected learner'} · {selected?.student_id||'No Student ID'} · {selected?.education_level||'Stage not set'} · {selected?.grade||'Grade not set'}</p></div><div><button type="button" className="subtle-button" onClick={()=>void loadLearnerRecord(selectedRecordId)} disabled={recordLoading}><RefreshCw size={14}/> Refresh</button><button type="button" className="icon-button" aria-label="Close student record" onClick={()=>setSelectedRecordId(null)}><X size={15}/></button></div></div>
+          <div className="monitor-record-education"><strong>Academic pathway</strong><span>{selected?.education_level||'Stage not set'}{selected?.grade?' · '+selected.grade:''}{selected?.academic_year?' · '+selected.academic_year:''}</span><small>{selected?.education_level==='Tertiary'?[selected?.institution_type,selected?.qualification_level,selected?.course].filter(Boolean).join(' · '):selected?.curriculum||'Curriculum not set'}</small></div>
           {recordError&&<p className="inline-message error-message" role="alert">{recordError}</p>}
           {recordLoading?<div className="classroom-empty">Loading this learner’s records…</div>:<>
             <div className="monitor-record-stat-row">

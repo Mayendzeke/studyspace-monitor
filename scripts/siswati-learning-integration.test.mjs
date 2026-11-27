@@ -53,3 +53,7 @@ test("SiSwati Second Language 6871 exposes its verified 2027–2029 assessment s
   assert.ok(enrichment.includes("Speaking"));
   assert.ok(enrichment.includes("all_papers_compulsory"));
 });
+
+test("learner MIΛ includes the full verified syllabus note within its bounded context", () => {
+  assert.ok(learnerAssistant.includes('String(item.notes || "").slice(0, 1200)'));
+});

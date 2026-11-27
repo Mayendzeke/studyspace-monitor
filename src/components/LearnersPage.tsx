@@ -535,7 +535,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <button type="button" className="icon-button" aria-label="Close student details" onClick={() => setViewTarget(null)}><X size={18}/></button>
             </div>
             <div className="learner-view-profile-grid">
-              <div><span>{/university|college/i.test(viewTarget.education_level) ? "Year of study" : "Grade / form"}</span><strong>{viewTarget.grade || "Not set"}</strong></div>
+              <div><span>{isTertiaryStage(viewTarget.education_level) ? "Year of study" : "Grade / form"}</span><strong>{viewTarget.grade || "Not set"}</strong></div>
               {viewTarget.course && <div><span>Course / programme</span><strong>{viewTarget.course}</strong></div>}
               <div><span>Curriculum</span><strong>{viewTarget.curriculum || "Not set"}</strong></div>
               <div><span>Academic year</span><strong>{viewTarget.academic_year || "Not set"}</strong></div>
@@ -597,7 +597,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                   education_level: event.target.value,
                   institution_type: event.target.value === "Tertiary" ? (current.institution_type === SCHOOL_INSTITUTION_TYPE ? "" : current.institution_type) : SCHOOL_INSTITUTION_TYPE,
                   qualification_level: event.target.value === "Tertiary" ? current.qualification_level : ""
-                }))}><option value="">Choose education stage</option>{EDUCATION_STAGES.map(stage => <option key={stage} value={stage}>{stage}</option>)}</select></label>
+                }))}><option value="">Choose education stage</option>{EDUCATION_STAGES.map(stage => <option key={stage} value={stage}>{stage} · {STAGE_DESCRIPTIONS[stage]}</option>)}</select></label>
                 <label>{profileForm.education_level === "Primary" ? "Grade" : isTertiaryStage(profileForm.education_level) ? "Year / semester" : "Form / grade"}<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={profileForm.education_level === "Primary" ? "e.g. Grade 4" : profileForm.education_level === "Tertiary" ? "e.g. Year 1 or Semester 2" : profileForm.education_level === "Matric" ? "e.g. Form 6 or A-Level" : profileForm.education_level === "High School" ? "e.g. Form 4 or Form 5" : "e.g. Form 1, Form 2 or Form 3"}/></label>
                 {isTertiaryStage(profileForm.education_level) && <>
                   <label>Institution type<select required value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{TERTIARY_INSTITUTION_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></label>

@@ -2639,3 +2639,20 @@ a:focus-visible {
   .app-shell .sidebar .brand-mark .brand-logo-image,
   .auth-screen .auth-brand .brand-logo-image { view-transition-name:none; }
 }
+
+
+/* Preserve the Monitor's dimensional surface language while keeping its toolbar in view. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 5px 14px rgba(44,54,88,.035);
+}
+:root[data-theme='dark'] .topbar {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 5px 14px rgba(0,0,0,.12);
+}

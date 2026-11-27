@@ -78,3 +78,17 @@ test("Monitor and learner apps retain the seven-day future trial policy without 
   assert.ok(!/UPDATE public\.profiles\s+SET trial_expires_at/i.test(migration));
   assert.ok(readFileSync("src/components/SubscriptionsPage.tsx", "utf8").includes("7-day Free Trial"));
 });
+
+test("Monitor toolbar removes redundant breadcrumb and duplicate quick actions", () => {
+  const app = readFileSync("src/App.tsx", "utf8");
+  const start = app.indexOf('<header className="topbar"');
+  const end = app.indexOf("</header>", start);
+  assert.ok(start >= 0 && end > start);
+  const header = app.slice(start, end);
+  assert.ok(!header.includes("breadcrumb"));
+  assert.ok(!header.includes("monitor-install-button"));
+  assert.ok(!header.includes("Open messages"));
+  assert.ok(header.includes("MFA verified"));
+  assert.ok(header.includes("NotificationCenter"));
+  assert.ok(header.includes("aria-label=\"Sign out\""));
+});

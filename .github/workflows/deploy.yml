@@ -314,7 +314,7 @@ jobs:
           const guardianConsent = readFileSync('supabase/functions/guardian-consent/index.ts', 'utf8')
           if (!guardianVerification.includes(termsVersion) || !guardianConsent.includes(termsVersion)) throw new Error('Guardian consent and activation must enforce the current StudySpace terms version.')
           const capacityMigration = readFileSync('supabase/migrations/20261108070909_studyspace_enrolment_capacity.sql', 'utf8')
-          const fortyEightHourTrialMigration = readFileSync('supabase/migrations/20261124140242_studyspace_48_hour_trial_and_terms_v9.sql', 'utf8')
+          const fortyEightHourTrialMigration = readFileSync('supabase/migrations/20261125130930_20261124140242_studyspace_48_hour_trial_and_terms_v9.sql', 'utf8')
           const sevenDayTrialMigration = readFileSync('supabase/migrations/20261125161943_studyspace_seven_day_trial.sql', 'utf8')
           if (!capacityMigration.includes("interval '48 hours'") || !fortyEightHourTrialMigration.includes("interval ''48 hours''") || !fortyEightHourTrialMigration.includes("trial_expires_at - interval ''24 hours''") || !sevenDayTrialMigration.includes("interval ''168 hours''")) throw new Error('The current policy must activate a full seven-day trial and remind learners 24 hours before stored expiry.')
           if (!fortyEightHourTrialMigration.includes('2026-11-24-v9')) throw new Error('The database migration must upgrade guardian and learner terms gates to v9.')

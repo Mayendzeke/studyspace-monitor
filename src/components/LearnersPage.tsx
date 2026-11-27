@@ -6,7 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
-import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, ESWATINI_HIGHER_EDUCATION_INSTITUTIONS, TERTIARY_PROGRAMME_SUGGESTIONS, curriculaForStage, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from "../lib/educationPathways";
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, ESWATINI_HIGHER_EDUCATION_INSTITUTIONS, TERTIARY_PROGRAMME_SUGGESTIONS, curriculaForStage, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType, tertiaryProgrammesFor, tertiaryInstitutionStatus } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -203,6 +203,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
 
   const profileCurriculumOptions = curriculaForStage(profileForm.education_level);
   const profileGradeOptions = gradeOptionsFor(profileForm.education_level);
+  const profileProgrammeOptions = tertiaryProgrammesFor(profileForm.institution);
 
   const paymentVerificationRequired = Boolean(editTarget && profileForm.subscription_tier && (
     profileForm.subscription_tier !== (editTarget.subscription_tier ?? "") ||
@@ -608,7 +609,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
                 {isTertiaryStage(profileForm.education_level) && <>
                   <label>Institution type<select required value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{TERTIARY_INSTITUTION_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></label>
                   <label>Qualification level<select required value={profileForm.qualification_level} onChange={event => setProfileForm(current => ({ ...current, qualification_level: event.target.value }))}><option value="">Choose qualification</option>{TERTIARY_QUALIFICATIONS.map(qualification => <option key={qualification} value={qualification}>{qualification}</option>)}</select></label>
-                  <label>Course / programme<input list="monitor-programme-options" maxLength={160} required value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, Diploma in IT or BSc Nursing"/><datalist id="monitor-programme-options">{TERTIARY_PROGRAMME_SUGGESTIONS.map(name => <option key={name} value={name}/>)}</datalist></label>
+                  <label>Course / programme<input list="monitor-programme-options" maxLength={160} required value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, Diploma in IT or BSc Nursing"/><datalist id="monitor-programme-options">{(profileForm.institution.trim() ? profileProgrammeOptions : TERTIARY_PROGRAMME_SUGGESTIONS).map(name => <option key={name} value={name}/>)}</datalist><small>ESHEC register status: {tertiaryInstitutionStatus(profileForm.institution)}. Confirm current intake directly with the institution.</small></label>
                 </>}
                 <label>Curriculum / awarding framework<select value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))}><option value="">Choose curriculum / framework</option>{profileForm.curriculum && !profileCurriculumOptions.includes(profileForm.curriculum) && <option value={profileForm.curriculum}>{profileForm.curriculum} · saved</option>}{profileCurriculumOptions.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>

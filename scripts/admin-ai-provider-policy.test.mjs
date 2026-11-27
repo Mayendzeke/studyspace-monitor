@@ -92,3 +92,11 @@ test("Monitor toolbar removes redundant breadcrumb and duplicate quick actions",
   assert.ok(header.includes("NotificationCenter"));
   assert.ok(header.includes("aria-label=\"Sign out\""));
 });
+
+test("Gemini 2.5 Flash request omits unsupported thinkingLevel configuration", () => {
+  for (const name of adminFunctions) {
+    const provider = readFileSync(`supabase/functions/${name}/provider.ts`, "utf8");
+    assert.ok(!provider.includes("thinkingLevel"), `${name} must not send thinkingLevel to the Gemini 2.5 series.`);
+    assert.ok(!provider.includes("thinkingConfig"), `${name} must leave Gemini thinking configuration at the model default for compatibility.`);
+  }
+});

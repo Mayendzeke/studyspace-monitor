@@ -426,7 +426,7 @@ export default function ClassroomStudio() {
   }
   const load = (plan: LessonPlan) => {
     setDraft(plan);
-    setCurriculumManual(!!plan.curriculum && !standardCurricula.includes(plan.curriculum) && !learners.some(item => item.curriculum === plan.curriculum));
+    setCurriculumManual(!!plan.curriculum && !standardCurricula.some(curriculum => curriculum === plan.curriculum) && !learners.some(item => item.curriculum === plan.curriculum));
     setCourseFilter(plan.course || '');
     setSelectedLearners([]);
     setSubjectManual(!!plan.subject && !subjectOptions.includes(plan.subject));

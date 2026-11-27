@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const learnerAssistant = readFileSync("supabase/functions/mia-assistant/index.ts", "utf8");
 const registrySeed = readFileSync("supabase/migrations/20261125132701_add_eceswa_2027_2029_literature_and_siswati_sources.sql", "utf8");
 const literatureSeed = readFileSync("supabase/migrations/20261124152000_seed_eswatini_literature_registry.sql", "utf8");
+const secondLanguageSeed = readFileSync("supabase/migrations/20261126235826_add_eceswa_egcse_siswati_second_language_2027_2029.sql", "utf8");
 
 test("learner MIΛ loads SiSwati registry metadata only when relevant", () => {
   assert.ok(learnerAssistant.includes(String.raw`const requestsSiswati = /\b(?:siswati|si\s*swati)\b/i.test(siswatiSearchText);`));
@@ -33,4 +34,11 @@ test("official ECESWA First Language SiSwati source is registered for 2027–202
 test("learner personal-data separation remains explicit in MIΛ context", () => {
   assert.ok(learnerAssistant.includes("No learner name, account identifier or date of birth is sent to the AI provider."));
   assert.ok(learnerAssistant.includes("Student identifiers are not included in the model context."));
+});
+
+test("official ECESWA SiSwati as a Second Language syllabus is registered", () => {
+  assert.ok(secondLanguageSeed.includes("SiSwati as a Second Language"));
+  assert.ok(secondLanguageSeed.includes("2027–2029"));
+  assert.ok(secondLanguageSeed.includes("6871"));
+  assert.ok(secondLanguageSeed.includes("verified"));
 });

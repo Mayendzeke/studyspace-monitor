@@ -87,7 +87,7 @@ Deno.serve(async request => {
     const localToday = new Date(part("year") + "-" + part("month") + "-" + part("day") + "T00:00:00Z");
     const learners = (data ?? []).map(row => {
       const dateOfBirth = String(row.date_of_birth ?? "");
-      const dob = /^\\d{4}-\\d{2}-\\d{2}$/.test(dateOfBirth) ? new Date(dateOfBirth + "T00:00:00Z") : null;
+      const dob = /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) ? new Date(dateOfBirth + "T00:00:00Z") : null;
       let age = -1;
       if (dob && !Number.isNaN(dob.getTime()) && dob.toISOString().slice(0, 10) === dateOfBirth) {
         age = localToday.getUTCFullYear() - dob.getUTCFullYear();

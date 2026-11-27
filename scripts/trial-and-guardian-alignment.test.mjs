@@ -8,7 +8,7 @@ const guardianConsent = read("supabase/functions/guardian-consent/index.ts");
 const guardianAdmin = read("supabase/functions/manage-guardian-verification/index.ts");
 const guardianUi = read("src/components/GuardianVerificationPage.tsx");
 const subscriptions = read("src/components/SubscriptionsPage.tsx");
-const migration = read("supabase/migrations/20261124140242_studyspace_48_hour_trial_and_terms_v9.sql");
+const migration = read("supabase/migrations/20261125130930_20261124140242_studyspace_48_hour_trial_and_terms_v9.sql");
 const sevenDayMigration = read("supabase/migrations/20261125161943_studyspace_seven_day_trial.sql");
 
 test("new Monitor enrolments receive a full seven-day trial and terms v9", () => {

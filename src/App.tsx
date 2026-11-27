@@ -24,7 +24,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { runLogoHandoff } from './lib/logoTransition'
 import './brand-home-link.css'
-import { STAGE_DESCRIPTIONS, normalizeEducationStage, normalizeInstitutionType } from './lib/educationPathways'
+import { normalizeEducationStage, normalizeInstitutionType } from './lib/educationPathways'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, ArrowUpRight, Bell, BookOpen, PenTool, FlaskConical,

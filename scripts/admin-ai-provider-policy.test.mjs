@@ -61,9 +61,11 @@ test("Monitor MIΛ shows both hybrid providers without a daily request counter",
 test("learner MIΛ remains separate from the administrator hybrid system", () => {
   const source = readFileSync("supabase/functions/mia-assistant/index.ts", "utf8");
   const provider = readFileSync("supabase/functions/_shared/ai-provider.ts", "utf8");
+  const frontend = readFileSync("../planner/src/App.tsx", "utf8");
   assert.ok(!source.includes("GEMINI_API_KEY"));
   assert.ok(!source.includes("mia-monitor-assistant"));
-  assert.ok(!source.includes("CLOUDFLARE_API_TOKEN"), "Learner keys must stay server-side.");
+  assert.ok(source.includes('Deno.env.get("CLOUDFLARE_API_TOKEN")'), "Learner Cloudflare credentials are read server-side only.");
+  assert.ok(!frontend.includes("CLOUDFLARE_API_TOKEN"), "The browser bundle must never contain the server-side Cloudflare secret.");
   assert.ok(!source.includes(">= 20"), "Learner MIΛ must not add an application-level daily cap.");
   assert.ok(!source.includes("remainingDailyRequests"));
   assert.ok(source.includes("quotaManagedByProvider"));

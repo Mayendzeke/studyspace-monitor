@@ -382,7 +382,7 @@ export default function MiaStudio() {
         <div className="mia-provider-health-top"><strong><Activity size={16}/> Live AI provider test passed</strong><span>{providerHealth.provider} · {providerHealth.model}</span></div>
         <div className="mia-provider-health-grid">
           <span><strong>Gemini · Primary</strong><small>{providerHealth.providers?.gemini?.configured ? 'API key configured · Gemini 2.5 Flash' : 'Not configured · add GEMINI_API_KEY to Supabase Edge Function secrets'}</small></span>
-          <span><strong>Gemma 4 · Automatic backup</strong><small>{providerHealth.providers?.gemma?.configured ? 'Cloudflare credentials configured · Gemma 4' : 'Not configured · add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to Supabase Edge Function secrets'}</small></span>
+          <span><strong>Cloudflare Workers AI · Gemma 4</strong><small>{providerHealth.providers?.gemma?.configured ? 'Cloudflare credentials configured · Gemma 4' : 'Not configured · add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to Supabase Edge Function secrets'}</small></span>
         </div>
         {providerHealth.providerNotice && <p>{providerHealth.providerNotice}</p>}
       </div>}

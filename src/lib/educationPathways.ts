@@ -40,7 +40,7 @@ export function normalizeEducationStage(value:string,grade="",course="",institut
   if(byGrade)return byGrade;
   if(["college","university","technical / tvet","tvet"].includes(institutionType.trim().toLowerCase()))return "Tertiary";
   if(/\b(?:certificate|diploma|bachelor|master|doctorate|phd|degree)\b/i.test(course))return "Tertiary";
-  return "Secondary High";
+  return "";
 }
 export function normalizeInstitutionType(level:string,value="",legacyLevel=""):string {
   const current=value.trim();

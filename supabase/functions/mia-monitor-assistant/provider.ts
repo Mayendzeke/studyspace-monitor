@@ -112,7 +112,6 @@ async function callGemini(prompt: string, options: Required<GenerationOptions>):
         ...(options.googleSearch ? { tools: [{ googleSearch: {} }] } : {}),
         generationConfig: {
           maxOutputTokens: options.maxTokens,
-          thinkingConfig: { thinkingLevel: "low" },
           ...(options.jsonMode ? { responseMimeType: "application/json" } : {}),
         },
       }),

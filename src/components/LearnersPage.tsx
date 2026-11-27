@@ -6,7 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
-import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from "../lib/educationPathways";
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, ESWATINI_HIGHER_EDUCATION_INSTITUTIONS, TERTIARY_PROGRAMME_SUGGESTIONS, curriculaForStage, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -200,6 +200,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   }
 
   useEffect(() => { void refresh(); }, []);
+
+  const profileCurriculumOptions = curriculaForStage(profileForm.education_level);
+  const profileGradeOptions = gradeOptionsFor(profileForm.education_level);
 
   const paymentVerificationRequired = Boolean(editTarget && profileForm.subscription_tier && (
     profileForm.subscription_tier !== (editTarget.subscription_tier ?? "") ||
@@ -590,21 +593,24 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
               <div className="learner-form-grid">
                 <label>Full name<input required maxLength={120} value={profileForm.full_name} onChange={event => setProfileForm(current => ({ ...current, full_name: event.target.value }))}/></label>
                 <label>Preferred name<input maxLength={80} value={profileForm.preferred_name} onChange={event => setProfileForm(current => ({ ...current, preferred_name: event.target.value }))}/></label>
-                <label>School / institution<input maxLength={160} value={profileForm.institution} onChange={event => setProfileForm(current => ({ ...current, institution: event.target.value }))} placeholder="School or institution name"/></label>
+                <label>School / institution<input list="monitor-institutions" maxLength={160} value={profileForm.institution} onChange={event => setProfileForm(current => ({ ...current, institution: event.target.value }))} placeholder="School or institution name"/><datalist id="monitor-institutions">{ESWATINI_HIGHER_EDUCATION_INSTITUTIONS.map(name => <option key={name} value={name}/>)}</datalist></label>
                 <label>Country<input maxLength={80} value={profileForm.country} onChange={event => setProfileForm(current => ({ ...current, country: event.target.value }))}/></label>
                 <label>Education level<select required value={profileForm.education_level} onChange={event => setProfileForm(current => ({
                   ...current,
                   education_level: event.target.value,
+                  grade: "",
+                  curriculum: "",
+                  course: event.target.value === "Tertiary" ? current.course : "",
                   institution_type: event.target.value === "Tertiary" ? (current.institution_type === SCHOOL_INSTITUTION_TYPE ? "" : current.institution_type) : SCHOOL_INSTITUTION_TYPE,
                   qualification_level: event.target.value === "Tertiary" ? current.qualification_level : ""
                 }))}><option value="">Choose education stage</option>{EDUCATION_STAGES.map(stage => <option key={stage} value={stage}>{stage} · {STAGE_DESCRIPTIONS[stage]}</option>)}</select></label>
-                <label>{profileForm.education_level === "Primary" ? "Grade" : isTertiaryStage(profileForm.education_level) ? "Year / semester" : "Form / grade"}<input maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={profileForm.education_level === "Primary" ? "e.g. Grade 4" : profileForm.education_level === "Tertiary" ? "e.g. Year 1 or Semester 2" : profileForm.education_level === "Matric" ? "e.g. Form 6 or A-Level" : profileForm.education_level === "High School" ? "e.g. Form 4 or Form 5" : "e.g. Form 1, Form 2 or Form 3"}/></label>
+                <label>{profileForm.education_level === "Primary" ? "Grade" : isTertiaryStage(profileForm.education_level) ? "Year / semester" : "Form / grade"}<input list="monitor-grade-options" maxLength={80} value={profileForm.grade} onChange={event => setProfileForm(current => ({ ...current, grade: event.target.value }))} placeholder={profileForm.education_level === "Primary" ? "e.g. Grade 4" : profileForm.education_level === "Tertiary" ? "e.g. Year 1 or Semester 2" : profileForm.education_level === "Matric" ? "e.g. Form 6 or A-Level" : profileForm.education_level === "High School" ? "e.g. Form 4 or Form 5" : "e.g. Form 1, Form 2 or Form 3"}/><datalist id="monitor-grade-options">{profileGradeOptions.map(grade => <option key={grade} value={grade}/>)}</datalist></label>
                 {isTertiaryStage(profileForm.education_level) && <>
                   <label>Institution type<select required value={profileForm.institution_type} onChange={event => setProfileForm(current => ({ ...current, institution_type: event.target.value }))}><option value="">Choose institution type</option>{TERTIARY_INSTITUTION_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></label>
                   <label>Qualification level<select required value={profileForm.qualification_level} onChange={event => setProfileForm(current => ({ ...current, qualification_level: event.target.value }))}><option value="">Choose qualification</option>{TERTIARY_QUALIFICATIONS.map(qualification => <option key={qualification} value={qualification}>{qualification}</option>)}</select></label>
-                  <label>Course / programme<input maxLength={160} required value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, Diploma in IT or BSc Nursing"/></label>
+                  <label>Course / programme<input list="monitor-programme-options" maxLength={160} required value={profileForm.course} onChange={event => setProfileForm(current => ({ ...current, course: event.target.value }))} placeholder="e.g. BBA, Diploma in IT or BSc Nursing"/><datalist id="monitor-programme-options">{TERTIARY_PROGRAMME_SUGGESTIONS.map(name => <option key={name} value={name}/>)}</datalist></label>
                 </>}
-                <label>Curriculum<input maxLength={120} value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))} placeholder="e.g. IGCSE, CAPS, IB…"/></label>
+                <label>Curriculum / awarding framework<select value={profileForm.curriculum} onChange={event => setProfileForm(current => ({ ...current, curriculum: event.target.value }))}><option value="">Choose curriculum / framework</option>{profileForm.curriculum && !profileCurriculumOptions.includes(profileForm.curriculum) && <option value={profileForm.curriculum}>{profileForm.curriculum} · saved</option>}{profileCurriculumOptions.map(name => <option key={name} value={name}>{name}</option>)}</select></label>
                 <label>Academic year<input maxLength={30} value={profileForm.academic_year} onChange={event => setProfileForm(current => ({ ...current, academic_year: event.target.value }))} placeholder="e.g. 2027"/></label>
                 <label>Subscription tier<select value={profileForm.subscription_tier} onChange={event => { const tier = event.target.value; const plan = SUBSCRIPTION_PLANS.find(option => option.value === tier); setProfileForm(current => ({ ...current, subscription_tier: tier, subscription_expires_at: plan ? expiryFromNow(plan.days) : "" })); }}><option value="">No subscription / no expiry</option>{SUBSCRIPTION_PLANS.map(plan => <option key={plan.value} value={plan.value}>{plan.label}</option>)}</select></label>
                 <label>Access due date<input type="datetime-local" value={profileForm.subscription_expires_at} onChange={event => setProfileForm(current => ({ ...current, subscription_expires_at: event.target.value }))}/><small>Automatically calculated from today when you choose a tier. You can adjust the date manually if needed.</small></label>

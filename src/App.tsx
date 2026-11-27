@@ -295,7 +295,7 @@ function App() {
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
           <button type="button" className="brand-home-link" onClick={() => navigate('Overview')} aria-label="Go to Study Space home" title="Home">
-            <div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt=""/></div>
+            <div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "studyspace-monitor.svg"} alt=""/></div>
             <div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div>
           </button>
           <button type="button" className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={18} /></button>

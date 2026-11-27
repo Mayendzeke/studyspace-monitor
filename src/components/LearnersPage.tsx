@@ -262,8 +262,9 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
   }
 
   function openEdit(learner: Learner) {
-    const legacyTertiaryType = ["College", "University", "Technical / TVET"].includes(learner.education_level || "");
-    const restoredLevel = legacyTertiaryType ? "Tertiary" : learner.education_level;
+    const legacyLevel = learner.education_level || "";
+    const restoredLevel = normalizeEducationStage(legacyLevel, learner.grade, learner.course, learner.institution_type);
+    const restoredInstitutionType = normalizeInstitutionType(restoredLevel, learner.institution_type, legacyLevel);
     setEditTarget(learner);
     setPaymentConfirmed(false);
     setPaymentTransactionReference("");
@@ -276,7 +277,7 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
       institution: learner.institution || "",
       course: learner.course || "",
       education_level: EDUCATION_STAGES.includes(restoredLevel as typeof EDUCATION_STAGES[number]) ? restoredLevel : "Secondary High",
-      institution_type: learner.institution_type || (legacyTertiaryType ? learner.education_level : SCHOOL_INSTITUTION_TYPE),
+      institution_type: restoredInstitutionType || SCHOOL_INSTITUTION_TYPE,
       qualification_level: learner.qualification_level || "",
       grade: learner.grade || "",
       curriculum: learner.curriculum || "",

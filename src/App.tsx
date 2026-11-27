@@ -350,7 +350,7 @@ function App() {
               <CircleHelp size={18} />
             </button>
           )}
-          <button type="button" className="nav-item monitor-sidebar-install" onClick={() => void installMonitor()}><Download size={18}/><span>{installPrompt ? 'Install Studyspace Monitor' : 'Install / add to device'}</span></button>
+          <button type="button" className="nav-item monitor-sidebar-install" aria-label={isStandalone ? 'Installed' : 'Install app'} onClick={() => void installMonitor()}><Download size={18}/><span>{installPrompt ? 'Install Studyspace Monitor' : 'Install / add to device'}</span></button>
           <div className="sidebar-profile">
             <div className="profile-avatar">A</div>
             <div className="profile-copy"><strong>{adminName}</strong><small>Authenticated administrator</small></div>

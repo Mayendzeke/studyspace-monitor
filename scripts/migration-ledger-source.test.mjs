@@ -42,7 +42,7 @@ const required = [
   "20261124143115_curriculum_cross_reference_quality_pipeline.sql",
   "20261124150500_literature_text_registry.sql",
   "20261124152000_seed_eswatini_literature_registry.sql",
-  "20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
+  "20261125130930_20261124140242_studyspace_48_hour_trial_and_terms_v9.sql",
   "20261124140243_study_material_generation_packs.sql",
   "20261124140244_practice_assessment_requests.sql",
 ];

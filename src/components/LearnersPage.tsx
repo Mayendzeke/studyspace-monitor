@@ -6,7 +6,7 @@ import {
 import { supabase } from "../lib/supabase";
 import TimetableManager from "./TimetableManager";
 import LearnerResourcePanel from "./LearnerResourcePanel";
-import { EDUCATION_STAGES, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, isTertiaryStage } from "../lib/educationPathways";
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, SCHOOL_INSTITUTION_TYPE, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from "../lib/educationPathways";
 
 type Learner = {
   id: string;
@@ -189,7 +189,11 @@ export default function LearnersPage({ onCreatePin }: { onCreatePin: () => void 
     if (queryError) {
       setError("Learner records could not be loaded. Check administrator access and the applied migrations.");
     } else {
-      setLearners((data ?? []) as Learner[]);
+      setLearners((data ?? []).map(item => {
+        const legacyLevel = String(item.education_level || '');
+        const educationLevel = normalizeEducationStage(legacyLevel, String(item.grade || ''), String(item.course || ''), String(item.institution_type || ''));
+        return { ...item, education_level: educationLevel, institution_type: normalizeInstitutionType(educationLevel, String(item.institution_type || ''), legacyLevel) };
+      }) as Learner[]);
       setError("");
     }
     setLoading(false);

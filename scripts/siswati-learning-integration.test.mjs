@@ -42,3 +42,18 @@ test("official ECESWA SiSwati as a Second Language syllabus is registered", () =
   assert.ok(secondLanguageSeed.includes("6871"));
   assert.ok(secondLanguageSeed.includes("verified"));
 });
+
+test("SiSwati Second Language 6871 exposes its verified 2027–2029 assessment structure to MIΛ", () => {
+  const enrichment = readFileSync("supabase/migrations/20261127014500_enrich_eceswa_siswati_second_language_assessment_context.sql", "utf8");
+  assert.ok(enrichment.includes("Reading and Directed Writing"));
+  assert.ok(enrichment.includes("2 hours 15 minutes"));
+  assert.ok(enrichment.includes("50%"));
+  assert.ok(enrichment.includes("Listening"));
+  assert.ok(enrichment.includes("25%"));
+  assert.ok(enrichment.includes("Speaking"));
+  assert.ok(enrichment.includes("all_papers_compulsory"));
+});
+
+test("learner MIΛ includes the full verified syllabus note within its bounded context", () => {
+  assert.ok(learnerAssistant.includes('String(item.notes || "").slice(0, 1200)'));
+});

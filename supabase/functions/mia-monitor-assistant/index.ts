@@ -19,7 +19,7 @@ function namedKey(variable: string): string {
   const raw = Deno.env.get(variable);
   if (!raw) return "";
   try { const parsed = JSON.parse(raw); return typeof parsed?.default === "string" ? parsed.default : ""; }
-  catch { return ""; }
+  catch { return raw; }
 }
 function publishableKey() { return namedKey("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || ""; }
 function serviceKey() { return namedKey("SUPABASE_SECRET_KEYS") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""; }

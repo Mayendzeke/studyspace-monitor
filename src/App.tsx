@@ -295,7 +295,7 @@ function App() {
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
           <button type="button" className="brand-home-link" onClick={() => navigate('Overview')} aria-label="Go to Study Space home" title="Home">
-            <div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "studyspace-monitor.svg"} alt=""/></div>
+            <div className="brand-mark"><img className="brand-logo-image" src={import.meta.env.BASE_URL + "favicon.svg"} alt=""/></div>
             <div className="brand-copy"><strong>studyspace<span>.</span></strong><small>MONITOR</small></div>
           </button>
           <button type="button" className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileOpen(false)}><X size={18} /></button>
@@ -1190,7 +1190,7 @@ function SettingsPage({ supabaseConfigured, theme, onThemeChange, onOpenTimetabl
       <div className="settings-divider"/>
       <div className="settings-row"><div className="settings-symbol"><Users size={19}/></div><div><strong>Child and guardian verification</strong><p>Under-18 access remains subject to the StudySpace guardian-verification workflow. Do not bypass pending guardian consent from the account editor.</p></div><span className="connection-pill"><i/> Enforced</span></div>
       <div className="settings-divider"/>
-      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learners self-register without a pre-issued Student ID or PIN. The server generates each Student ID and starts a 48-hour free trial for eligible adult learners. After a trial or paid plan expires, an authorised administrator can issue a one-time renewal PIN tied to that learner. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Open</span></div>
+      <div className="settings-row"><div className="settings-symbol"><ShieldAlert size={19}/></div><div><strong>Controlled learner enrolment</strong><p>New learners self-register without a pre-issued Student ID or PIN. The server generates each Student ID and starts a 7-day free trial for eligible adult learners. After a trial or paid plan expires, an authorised administrator can issue a one-time renewal PIN tied to that learner. Minimum age 9, current Terms v8, guardian verification, rate limits and the 100-learner capacity control remain enforced.</p></div><span className="connection-pill"><i/> Open</span></div>
     </div>
 
     <div className="security-note"><LockKeyhole size={17}/><p><strong>Credential handling.</strong> Student IDs are generated automatically. Deliver renewal PINs and reset credentials directly to the learner. Never place a Supabase secret/service-role key, database password or function pepper in browser variables or frontend code.</p></div>

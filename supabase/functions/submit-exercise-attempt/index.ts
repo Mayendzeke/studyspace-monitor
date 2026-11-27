@@ -219,9 +219,22 @@ Deno.serve(async request => {
       }
     } else if (question.question_type === "matching") {
       const expected = Array.isArray(key.pairs) ? key.pairs as {left:string;right:string}[] : [];
-      const actual = submitted && typeof submitted === "object" && !Array.isArray(submitted) ? submitted as Record<string,unknown> : null;
+      let actual: Record<string, unknown> | null = submitted && typeof submitted === "object" && !Array.isArray(submitted)
+        ? submitted as Record<string, unknown> : null;
+      if (!actual && typeof submitted === "string") {
+        const parsed: Record<string, string> = {};
+        for (const line of submitted.split(/\r?\n/)) {
+          const separator = line.indexOf("=");
+          if (separator > 0) {
+            const left = line.slice(0, separator).trim();
+            const right = line.slice(separator + 1).trim();
+            if (left && right) parsed[left] = right;
+          }
+        }
+        actual = Object.keys(parsed).length ? parsed : null;
+      }
       correct = Boolean(actual && expected.length > 0
-        && expected.every(pair => normalize(actual[pair.left]) === normalize(pair.right))
+        && expected.every(pair => normalize(actual![pair.left]) === normalize(pair.right))
         && Object.keys(actual).length === expected.length);
       awarded = correct ? points : 0;
       score += awarded;

@@ -189,7 +189,7 @@ export default function GuardianVerificationPage() {
               <div className="guardian-queue-row" key={learner.id}>
                 <button type="button" className={selected?.id === learner.id ? "guardian-queue-item selected" : "guardian-queue-item"} onClick={() => chooseLearner(learner)}>
                   <span className="guardian-queue-avatar"><UserRound size={18}/></span>
-                  <span className="guardian-queue-copy"><strong>{learner.preferred_name || learner.full_name}</strong><small>{learner.student_id} · Age {learner.age} · DOB {new Date(learner.date_of_birth + "T00:00:00").toLocaleDateString()}</small><small>Registered {new Date(learner.created_at).toLocaleString()}</small></span>
+                  <span className="guardian-queue-copy"><strong>{learner.preferred_name || learner.full_name}</strong><small>{learner.student_id} · {learner.age >= 0 ? `Age ${learner.age}` : "Age unavailable"} · DOB {new Date(learner.date_of_birth + "T00:00:00").toLocaleDateString()}</small><small>Registered {new Date(learner.created_at).toLocaleString()}</small></span>
                   <span className="guardian-pending-tag">{learner.guardianSubmission?.approval_status === "pending" ? "Consent submitted" : "Awaiting guardian"}</span>
                 </button>
                 {!learner.guardianSubmission && <button type="button" className="subtle-button guardian-create-link" disabled={saving} onClick={() => void createGuardianLink(learner)}>Create guardian link</button>}

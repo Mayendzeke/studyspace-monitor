@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
 import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send, ShieldCheck } from 'lucide-react'
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from '../lib/educationPathways'
 
 type LessonRecap = { summary: string; keyPoints: string[]; workedExample: string; exitQuestion: string }
 type LessonPlan = {
@@ -26,7 +27,10 @@ type LessonPlan = {
 }
 const KEY = 'studyspace-monitor-classroom-plans-v1'
 const readPlans = (): LessonPlan[] => {
-  try { const value = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(value) ? value : [] } catch { return [] }
+  try {
+    const value = JSON.parse(localStorage.getItem(KEY) || '[]')
+    return Array.isArray(value) ? value.map((plan: LessonPlan) => ({ ...plan, level: plan.level ? normalizeEducationStage(plan.level, plan.grade, plan.course) : '' })) : []
+  } catch { return [] }
 }
 function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -58,7 +62,7 @@ async function describeEdgeFunctionError(reason: unknown, fallback: string): Pro
   return reason instanceof Error ? reason.message : fallback;
 }
 
-const standardEducationLevels = ['Primary school', 'Secondary school', 'High school / Sixth form', 'College', 'University', 'Other']
+const standardEducationLevels = [...EDUCATION_STAGES]
 const standardCurricula = ['Eswatini National Curriculum', 'Cambridge Primary', 'Cambridge Lower Secondary', 'Cambridge IGCSE', 'Cambridge International AS & A Level', 'South African CAPS', 'International Baccalaureate (IB)', 'Pearson Edexcel', 'Other / not specified']
 const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', course: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
@@ -74,7 +78,7 @@ export default function ClassroomStudio() {
   const [jaasConnection, setJaasConnection] = useState<'unchecked'|'checking'|'ready'|'error'>('unchecked')
   const [jaasConnectionMessage, setJaasConnectionMessage] = useState('')
   const [publishing, setPublishing] = useState(false)
-  const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string;education_level:string;grade:string;curriculum:string;course:string}[]>([])
+  const [learners, setLearners] = useState<{id:string;student_id:string|null;full_name:string;preferred_name:string;account_status:string;education_level:string;grade:string;curriculum:string;course:string;institution_type:string;qualification_level:string}[]>([])
   const [subjectOptions, setSubjectOptions] = useState<string[]>([])
   const [registeredSubjectRows, setRegisteredSubjectRows] = useState<{learner_id:string;name:string}[]>([])
   const [courseFilter, setCourseFilter] = useState('')
@@ -117,7 +121,7 @@ export default function ClassroomStudio() {
           ...emptyDraft,
           title: String(handoff.title || '').trim() || 'MIΛ lesson draft',
           subject: String(handoff.subject || '').trim(),
-          level: String(handoff.level || '').trim(),
+          level: String(handoff.level || '').trim() ? normalizeEducationStage(String(handoff.level || ''), String(handoff.grade || ''), String(handoff.course || '')) : '',
           grade: String(handoff.grade || '').trim(),
           course: String(handoff.course || '').trim(),
           curriculum: String(handoff.curriculum || '').trim(),
@@ -146,20 +150,20 @@ export default function ClassroomStudio() {
     let alive = true;
     const loadClassOptions = async () => {
       const [learnerResult, subjectResult] = await Promise.all([
-        supabase!.from('profiles').select('id,student_id,full_name,preferred_name,account_status,education_level,grade,curriculum,course')
+        supabase!.from('profiles').select('id,student_id,full_name,preferred_name,account_status,education_level,grade,curriculum,course,institution_type,qualification_level')
           .eq('role','learner').eq('account_status','active').order('preferred_name'),
         supabase!.from('student_subjects').select('learner_id,name').order('name')
       ]);
       if (!alive) return;
       if (learnerResult.error) setNotice('Learner list could not be loaded: ' + learnerResult.error.message);
-      else setLearners((learnerResult.data ?? []) as typeof learners);
+      else setLearners((learnerResult.data ?? []).map(item => { const stage = normalizeEducationStage(String(item.education_level || ''), String(item.grade || ''), String(item.course || ''), String(item.institution_type || '')); return { ...item, education_level: stage, institution_type: normalizeInstitutionType(stage, String(item.institution_type || ''), String(item.education_level || '')), qualification_level: String(item.qualification_level || '') } }) as typeof learners);
       if (subjectResult.error) {
         setNotice('Registered subjects could not be loaded. You can still enter a subject manually.');
       } else {
         const rows = (subjectResult.data ?? []).map(row => ({ learner_id: String(row.learner_id), name: String(row.name ?? '').trim() })).filter(row => row.name);
         setRegisteredSubjectRows(rows);
         setSubjectOptions(Array.from(new Set(rows.map(row => row.name))).sort((a,b)=>a.localeCompare(b)));
-        setDraft(current => current.level ? current : { ...current, level: (learnerResult.data || [])[0]?.education_level || '' });
+        setDraft(current => current.level ? current : { ...current, level: (learnerResult.data || []).length ? normalizeEducationStage(String((learnerResult.data || [])[0]?.education_level || ''), String((learnerResult.data || [])[0]?.grade || ''), String((learnerResult.data || [])[0]?.course || '')) : '' });
       }
     };
     void loadClassOptions();
@@ -217,9 +221,9 @@ export default function ClassroomStudio() {
     else {setSessionStatus(status);setNotice(status==='live'?'Class is live. The teacher and assigned learners can now join the secured video room.':'Class has been ended.')}
   };
 
-  const levelOptions = [...standardEducationLevels, ...Array.from(new Set(learners.map(item => item.education_level.trim()).filter(Boolean))).filter(level => !standardEducationLevels.includes(level)).sort((a,b)=>a.localeCompare(b))];
+  const levelOptions = [...standardEducationLevels];
   const levelLearners = learners.filter(item => !!draft.level && item.education_level === draft.level);
-  const isTertiaryLevel = draft.level === 'College' || draft.level === 'University';
+  const isTertiaryLevel = isTertiaryStage(draft.level);
   const courseOptions = Array.from(new Set(levelLearners.map(item => item.course?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   // Course/programme filters are populated from actual active learners at the selected level.
   // If older learner profiles have no course recorded, the teacher can still use their recorded year/grade.
@@ -229,11 +233,11 @@ export default function ClassroomStudio() {
   const gradeOptions = Array.from(new Set(courseLearners.map(item => item.grade?.trim()).filter((value): value is string => !!value))).sort((a,b)=>a.localeCompare(b));
   const scopedLearners = courseLearners.filter(item => !draft.grade || item.grade === draft.grade);
   const curriculumOptions = Array.from(new Set([...standardCurricula, ...learners.map(item => item.curriculum?.trim() || ''), ...scopedLearners.map(item => item.curriculum?.trim() || '')].filter(Boolean))).sort((a,b)=>a.localeCompare(b));
-  const gradeDefaults: Record<string, string[]> = { 'Primary school': ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7'], 'Secondary school': ['Form 1','Form 2','Form 3'], 'High school / Sixth form': ['Form 4','Form 5','Lower Sixth','Upper Sixth'], College: ['Year 1','Year 2','Year 3','Year 4'], University: ['Year 1','Year 2','Year 3','Year 4','Postgraduate'] };
-  const availableGradeOptions = gradeOptions.length ? gradeOptions : (gradeDefaults[draft.level] || []);
-  const gradeFieldLabel = draft.level === 'Primary school' ? 'Grade / class'
-    : draft.level === 'Secondary school' ? 'Form / grade'
-    : draft.level === 'High school / Sixth form' ? 'Form / sixth form year'
+  const availableGradeOptions = gradeOptions.length ? gradeOptions : gradeOptionsFor(draft.level);
+  const gradeFieldLabel = draft.level === 'Primary' ? 'Primary grade'
+    : draft.level === 'Secondary High' ? 'Form (1–3)'
+    : draft.level === 'High School' ? 'Form (4–5)'
+    : draft.level === 'Matric' ? 'Matric / Form 6'
     : isTertiaryLevel ? 'Year of study' : 'Grade / year';
   const scopedLearnerCountLabel = scopedLearners.length + ' matching active learner(s)';
   const scopedIds = new Set(scopedLearners.map(item => item.id));

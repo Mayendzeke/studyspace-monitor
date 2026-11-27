@@ -83,10 +83,20 @@ async function invokeMonitorMia(body: Record<string, unknown>) {
     session = refreshed.data.session;
   }
   if (!session?.access_token) throw new Error("Your administrator session has expired. Sign in again to use MIΛ.");
-  return supabase.functions.invoke("mia-monitor-assistant", {
+
+  const invoke = (accessToken: string) => supabase!.functions.invoke("mia-monitor-assistant", {
     body,
-    headers: { Authorization: "Bearer " + session.access_token },
+    headers: { Authorization: "Bearer " + accessToken },
   });
+  const firstAttempt = await invoke(session.access_token);
+  const firstStatus = (firstAttempt.error as { context?: Response } | null)?.context?.status;
+  if (firstStatus !== 401) return firstAttempt;
+
+  // Refresh and retry once if a token was revoked or rotated after getSession().
+  // Administrator AAL2 is still verified by the Edge Function on every request.
+  const refreshed = await supabase.auth.refreshSession();
+  if (refreshed.error || !refreshed.data.session?.access_token) return firstAttempt;
+  return invoke(refreshed.data.session.access_token);
 }
 
 async function edgeError(reason: unknown): Promise<string> {

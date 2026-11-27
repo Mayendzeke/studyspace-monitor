@@ -252,7 +252,7 @@ Deno.serve(async request => {
             " | cycle: " + String(item.version_label || item.academic_year || "not specified") +
             " | URL: " + String(item.source_url || "") +
             " | authority: " + String(item.authority_name || "ECESWA") +
-            " | note: " + String(item.notes || "").slice(0, 320)
+            " | note: " + String(item.notes || "").slice(0, 1200)
           );
         }
       }

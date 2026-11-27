@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import AssessmentReviewQueue from './AssessmentReviewQueue'
-import { EDUCATION_STAGES, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, gradeOptionsFor, isTertiaryStage } from '../lib/educationPathways'
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, TERTIARY_INSTITUTION_TYPES, TERTIARY_QUALIFICATIONS, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from '../lib/educationPathways'
 import { extractPastPaperQuestions, type ImportedPaperQuestion } from '../lib/pastPaper'
 import { Check, CheckCircle2, ClipboardList, Download, FileText, Filter, Plus, Save, Search, Send, Trash2, Upload, X, Eye, ShieldCheck } from 'lucide-react'
 
@@ -106,7 +106,7 @@ export default function ContentStudio() {
     const keys = new Map(answerKeys.map((item:any)=>[item.question_id,item.answer_key||{}]));
     return {
       id: String(set.id), title: String(set.title||''), subject: String(set.subject_name||''),
-      level: String(set.education_level||'Secondary High'), grade: String(set.grade||''),
+      level: normalizeEducationStage(String(set.education_level||''), String(set.grade||'')), grade: String(set.grade||''),
       curriculum: String(set.curriculum||''), instructions: String(set.instructions||''),
       duration: Number(set.duration_minutes||30), dueDate: set.due_date||'',
       status: (set.review_status||'draft') as Status, updatedAt: String(set.updated_at||set.created_at),
@@ -216,11 +216,12 @@ export default function ContentStudio() {
       }
       if(loaded.length||!readDrafts().length) setDrafts(loaded);
       const activeLearners=(learnersResult.data||[]).map((item:any)=>{
-        const legacyTertiaryType=["College","University","Technical / TVET"].includes(String(item.education_level||""));
+        const legacyLevel=String(item.education_level||"");
+        const educationLevel=normalizeEducationStage(legacyLevel,String(item.grade||""),String(item.course||""),String(item.institution_type||""));
         return {
           ...item,
-          education_level:legacyTertiaryType?"Tertiary":String(item.education_level||"Secondary High"),
-          institution_type:item.institution_type|| (legacyTertiaryType?String(item.education_level):""),
+          education_level:educationLevel,
+          institution_type:normalizeInstitutionType(educationLevel,String(item.institution_type||""),legacyLevel),
           qualification_level:item.qualification_level||"",
         };
       }) as typeof learners;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import LiveClassroomCall from './LiveClassroomCall'
 import { BookOpen, CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, Plus, Save, Sparkles, Users, MessageCircle, Send, ShieldCheck } from 'lucide-react'
-import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from '../lib/educationPathways'
+import { EDUCATION_STAGES, STAGE_DESCRIPTIONS, STANDARD_CURRICULA, gradeOptionsFor, isTertiaryStage, normalizeEducationStage, normalizeInstitutionType } from '../lib/educationPathways'
 
 type LessonRecap = { summary: string; keyPoints: string[]; workedExample: string; exitQuestion: string }
 type LessonPlan = {
@@ -63,7 +63,7 @@ async function describeEdgeFunctionError(reason: unknown, fallback: string): Pro
 }
 
 const standardEducationLevels = [...EDUCATION_STAGES]
-const standardCurricula = ['Eswatini National Curriculum', 'Cambridge Primary', 'Cambridge Lower Secondary', 'Cambridge IGCSE', 'Cambridge International AS & A Level', 'South African CAPS', 'International Baccalaureate (IB)', 'Pearson Edexcel', 'Other / not specified']
+const standardCurricula = [...STANDARD_CURRICULA]
 const blank = (): LessonPlan => ({ id: crypto.randomUUID(), title: '', subject: '', level: '', grade: '', course: '', curriculum: '', date: new Date().toISOString().slice(0,10), duration: 45, objectives: '', sourceNotes: '', checkpoints: ['', '', ''], homework: '', homeworkDue: '', updatedAt: new Date().toISOString() })
 
 export default function ClassroomStudio() {
